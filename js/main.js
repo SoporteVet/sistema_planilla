@@ -28,6 +28,16 @@ function setActive(route) {
 }
 
 async function renderRoute(route) {
+  // Clean up previous subscriptions
+  if (window._unsubscribeFunctions) {
+    Object.values(window._unsubscribeFunctions).forEach(unsubscribe => {
+      if (typeof unsubscribe === 'function') {
+        unsubscribe();
+      }
+    });
+    window._unsubscribeFunctions = {};
+  }
+
   topbarTitle.textContent = ROUTE_TITLES[route] ?? 'Inicio';
   setActive(route);
 
@@ -59,27 +69,19 @@ async function renderRoute(route) {
 
   // Default: Home
   const { storage } = await import('./storage/index.js');
-  const employees = await storage.listEmployees();
-  const attendance = await storage.listAttendance();
-  const extras = await storage.listExtras();
-  const holidays = await storage.listHolidays();
+  
+  let employees = await storage.listEmployees();
+  let attendance = await storage.listAttendance();
+  let extras = await storage.listExtras();
+  let holidays = await storage.listHolidays();
 
-  const totalEmpleados = employees.length;
-  const totalAsistencias = attendance.length;
-  const totalBonos = extras.filter(x => x.type === 'bono' || x.type === 'comision' || x.type === 'incentivo').length;
-  const totalFeriados = holidays.length;
+  function renderHomeStats() {
+    const totalEmpleados = employees.length;
+    const totalAsistencias = attendance.length;
+    const totalBonos = extras.filter(x => x.type === 'bono' || x.type === 'comision' || x.type === 'incentivo').length;
+    const totalFeriados = holidays.length;
 
-  appView.innerHTML = `
-    <div style="margin-bottom: 32px;">
-      <h2 style="font-size: 28px; font-weight: 800; margin: 0 0 8px; color: var(--color-text);">
-        Bienvenido al Sistema de Planillas CR
-      </h2>
-      <p style="color: var(--color-text-light); font-size: 16px; margin: 0;">
-        Gestiona empleados, asistencias, planillas y reportes desde un solo lugar
-      </p>
-    </div>
-
-    <div class="grid cols-4" style="margin-bottom: 32px;">
+    const statsHtml = `
       <div class="stat-card" style="background: linear-gradient(135deg, #2C2C54, #40407a);">
         <div class="stat-label">Total Empleados</div>
         <div class="stat-value">${totalEmpleados}</div>
@@ -108,6 +110,25 @@ async function renderRoute(route) {
           <path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
         </svg>
       </div>
+    `;
+    
+    const statsContainer = appView.querySelector('#home-stats-container');
+    if (statsContainer) {
+      statsContainer.innerHTML = statsHtml;
+    }
+  }
+
+  appView.innerHTML = `
+    <div style="margin-bottom: 32px;">
+      <h2 style="font-size: 28px; font-weight: 800; margin: 0 0 8px; color: var(--color-text);">
+        Bienvenido al Sistema de Planillas CR
+      </h2>
+      <p style="color: var(--color-text-light); font-size: 16px; margin: 0;">
+        Gestiona empleados, asistencias, planillas y reportes desde un solo lugar
+      </p>
+    </div>
+
+    <div id="home-stats-container" class="grid cols-4" style="margin-bottom: 32px;">
     </div>
 
     <div class="grid cols-2">
@@ -196,6 +217,36 @@ async function renderRoute(route) {
       </div>
     </div>
   `;
+
+  // Subscribe to real-time updates for home stats
+  renderHomeStats();
+  
+  const unsubscribeEmployees = await storage.subscribeToEmployees((updated) => {
+    employees = updated;
+    renderHomeStats();
+  });
+
+  const unsubscribeAttendance = await storage.subscribeToAttendance((updated) => {
+    attendance = updated;
+    renderHomeStats();
+  });
+
+  const unsubscribeExtras = await storage.subscribeToExtras((updated) => {
+    extras = updated;
+    renderHomeStats();
+  });
+
+  const unsubscribeHolidays = await storage.subscribeToHolidays((updated) => {
+    holidays = updated;
+    renderHomeStats();
+  });
+
+  // Store unsubscribe functions for cleanup
+  if (!window._unsubscribeFunctions) window._unsubscribeFunctions = {};
+  window._unsubscribeFunctions.home_employees = unsubscribeEmployees;
+  window._unsubscribeFunctions.home_attendance = unsubscribeAttendance;
+  window._unsubscribeFunctions.home_extras = unsubscribeExtras;
+  window._unsubscribeFunctions.home_holidays = unsubscribeHolidays;
 }
 
 function navigateTo(route) {

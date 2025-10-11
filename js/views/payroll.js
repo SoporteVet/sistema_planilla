@@ -60,16 +60,54 @@ export async function renderPayrollView(root, { showToast }) {
   const tbody = root.querySelector('#payroll-table tbody');
   const periodSel = root.querySelector('#period');
 
+  let employees = await storage.listEmployees();
+  let holidays = [];
+  let disabilities = [];
+  let allAttendance = [];
+  let allExtras = [];
+
+  // Subscribe to real-time updates
+  const unsubscribeEmployees = await storage.subscribeToEmployees((updated) => {
+    employees = updated;
+    recalc();
+  });
+
+  const unsubscribeHolidays = await storage.subscribeToHolidays((updated) => {
+    holidays = updated;
+    recalc();
+  });
+
+  const unsubscribeDisabilities = await storage.subscribeToDisabilities((updated) => {
+    disabilities = updated;
+    recalc();
+  });
+
+  const unsubscribeAttendance = await storage.subscribeToAttendance((updated) => {
+    allAttendance = updated;
+    recalc();
+  });
+
+  const unsubscribeExtras = await storage.subscribeToExtras((updated) => {
+    allExtras = updated;
+    recalc();
+  });
+
+  // Store unsubscribe functions for cleanup
+  if (!window._unsubscribeFunctions) window._unsubscribeFunctions = {};
+  window._unsubscribeFunctions.payroll_employees = unsubscribeEmployees;
+  window._unsubscribeFunctions.payroll_holidays = unsubscribeHolidays;
+  window._unsubscribeFunctions.payroll_disabilities = unsubscribeDisabilities;
+  window._unsubscribeFunctions.payroll_attendance = unsubscribeAttendance;
+  window._unsubscribeFunctions.payroll_extras = unsubscribeExtras;
+
   function recalc() {
-    const employees = storage.listEmployees();
-    const holidays = storage.listHolidays().map(h => h.date);
-    const disabilities = storage.listDisabilities();
+    const holidayDates = holidays.map(h => h.date);
     const period = periodSel.value;
     const days = buildDays(period);
 
     const rows = employees.map(emp => {
       // Merge attendance into days (if any)
-      const attendance = storage.listAttendance(emp.id);
+      const attendance = allAttendance.filter(a => a.employeeId === emp.id);
       const dayMap = Object.fromEntries(days.map(d => [d.date, { ...d }]));
       attendance.forEach(a => {
         if (dayMap[a.date]) dayMap[a.date].hours = Number(a.hours || 0);
@@ -77,8 +115,8 @@ export async function renderPayrollView(root, { showToast }) {
       const dayList = Object.values(dayMap);
 
       const disForEmp = disabilities.filter(d => d.employeeId === emp.id);
-      const hol = holidays;
-      const extrasForEmp = storage.listExtras(emp.id);
+      const hol = holidayDates;
+      const extrasForEmp = allExtras.filter(x => x.employeeId === emp.id);
       const extrasSum = extrasForEmp
         .filter(x => x.type === 'bono' || x.type === 'comision' || x.type === 'incentivo')
         .reduce((s,x) => s + Number(x.amount||0), 0);
@@ -114,7 +152,7 @@ export async function renderPayrollView(root, { showToast }) {
     showToast('Planilla recalculada'); 
   });
 
-  root.querySelector('#save-payroll').addEventListener('click', () => {
+  root.querySelector('#save-payroll').addEventListener('click', async () => {
     if (!lastCalculatedRows || lastCalculatedRows.length === 0) {
       showToast('Primero debes calcular la planilla');
       return;
@@ -126,7 +164,7 @@ export async function renderPayrollView(root, { showToast }) {
     const periodEndDate = days.length > 0 ? days[days.length - 1].date : new Date().toISOString().slice(0,10);
 
     // Guardar cada registro de planilla para cada empleado
-    lastCalculatedRows.forEach(row => {
+    for (const row of lastCalculatedRows) {
       const payrollRecord = {
         employeeId: row.emp.id,
         employeeName: row.emp.nombre,
@@ -142,8 +180,8 @@ export async function renderPayrollView(root, { showToast }) {
         overtimeHoursTotal: row.overtimeHoursTotal,
         savedAt: new Date().toISOString(),
       };
-      storage.createPayrollRecord(payrollRecord);
-    });
+      await storage.createPayrollRecord(payrollRecord);
+    }
 
     showToast(`Planilla guardada exitosamente (${lastCalculatedRows.length} empleados)`);
   });

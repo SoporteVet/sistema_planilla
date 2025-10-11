@@ -38,12 +38,31 @@ export async function renderExtrasView(root, { showToast }) {
   const noteIn = root.querySelector('#note');
   const tbody = root.querySelector('#table tbody');
 
-  const employees = storage.listEmployees();
+  let employees = await storage.listEmployees();
+  let allExtras = [];
   empSel.innerHTML += employees.map(e => `<option value="${e.id}">${e.nombre}</option>`).join('');
+
+  // Subscribe to real-time updates for employees
+  const unsubscribeEmployees = await storage.subscribeToEmployees((updatedEmployees) => {
+    employees = updatedEmployees;
+    empSel.innerHTML = '<option value="">Seleccione empleado</option>' + 
+      employees.map(e => `<option value="${e.id}">${e.nombre}</option>`).join('');
+  });
+
+  // Subscribe to real-time updates for extras
+  const unsubscribeExtras = await storage.subscribeToExtras((updatedExtras) => {
+    allExtras = updatedExtras;
+    renderRows();
+  });
+
+  // Store unsubscribe functions for cleanup
+  if (!window._unsubscribeFunctions) window._unsubscribeFunctions = {};
+  window._unsubscribeFunctions.extras_employees = unsubscribeEmployees;
+  window._unsubscribeFunctions.extras = unsubscribeExtras;
 
   function renderRows() {
     const empId = empSel.value;
-    const rows = empId ? storage.listExtras(empId) : [];
+    const rows = empId ? allExtras.filter(x => x.employeeId === empId) : [];
     tbody.innerHTML = rows.map(r => `
       <tr data-id="${r.id}">
         <td>${r.type}</td>
@@ -54,10 +73,11 @@ export async function renderExtrasView(root, { showToast }) {
     `).join('');
   }
 
-  root.querySelector('#add').addEventListener('click', () => {
+  root.querySelector('#add').addEventListener('click', async () => {
     const empId = empSel.value; if (!empId) { showToast('Seleccione empleado'); return; }
     const extra = { employeeId: empId, type: typeSel.value, amount: Number(amountIn.value || 0), note: noteIn.value };
-    storage.upsertExtra(extra); showToast('Registro agregado'); renderRows();
+    await storage.upsertExtra(extra); 
+    showToast('Registro agregado');
   });
 
   tbody.addEventListener('click', (e) => {
@@ -72,11 +92,10 @@ export async function renderExtrasView(root, { showToast }) {
       '¿Estás seguro de que deseas eliminar este registro? Esta acción no se puede deshacer.',
       'Eliminar',
       'Cancelar'
-    ).then((confirmed) => {
+    ).then(async (confirmed) => {
       if (confirmed) {
-        storage.deleteExtra(id); 
-        showToast('Registro eliminado'); 
-        renderRows();
+        await storage.deleteExtra(id); 
+        showToast('Registro eliminado');
       }
     });
   });

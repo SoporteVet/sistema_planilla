@@ -25,6 +25,8 @@ export function initFirebase(firebaseConfig) {
       api.set = dbMod.set;
       api.update = dbMod.update;
       api.remove = dbMod.remove;
+      api.onValue = dbMod.onValue;
+      api.off = dbMod.off;
       return { db: _db, api };
     });
   }

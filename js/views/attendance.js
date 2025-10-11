@@ -67,15 +67,36 @@ export async function renderAttendanceView(root, { showToast }) {
   const typeSel = root.querySelector('#type');
   const tableBody = root.querySelector('#table tbody');
 
-  const employees = storage.listEmployees();
+  let employees = await storage.listEmployees();
+  let allAttendance = [];
   empSel.innerHTML += employees.map(e => `<option value="${e.id}">${e.nombre}</option>`).join('');
   // For disabilities section
   const disEmpSel = root.querySelector('#disEmp');
   disEmpSel.innerHTML += employees.map(e => `<option value="${e.id}">${e.nombre}</option>`).join('');
 
+  // Subscribe to real-time updates for employees
+  const unsubscribeEmployees = await storage.subscribeToEmployees((updatedEmployees) => {
+    employees = updatedEmployees;
+    empSel.innerHTML = '<option value="">Seleccione empleado</option>' + 
+      employees.map(e => `<option value="${e.id}">${e.nombre}</option>`).join('');
+    disEmpSel.innerHTML = '<option value="">Empleado</option>' + 
+      employees.map(e => `<option value="${e.id}">${e.nombre}</option>`).join('');
+  });
+
+  // Subscribe to real-time updates for attendance
+  const unsubscribeAttendance = await storage.subscribeToAttendance((updatedAttendance) => {
+    allAttendance = updatedAttendance;
+    renderRows();
+  });
+
+  // Store unsubscribe functions for cleanup
+  if (!window._unsubscribeFunctions) window._unsubscribeFunctions = {};
+  window._unsubscribeFunctions.attendance_employees = unsubscribeEmployees;
+  window._unsubscribeFunctions.attendance = unsubscribeAttendance;
+
   function renderRows() {
     const empId = empSel.value;
-    const rows = empId ? storage.listAttendance(empId) : [];
+    const rows = empId ? allAttendance.filter(x => x.employeeId === empId) : [];
     tableBody.innerHTML = rows.map(r => `
       <tr data-id="${r.id}">
         <td>${r.date}</td>
@@ -89,13 +110,12 @@ export async function renderAttendanceView(root, { showToast }) {
   }
 
   empSel.addEventListener('change', renderRows);
-  root.querySelector('#save').addEventListener('click', () => {
+  root.querySelector('#save').addEventListener('click', async () => {
     const empId = empSel.value;
     if (!empId) { showToast('Seleccione un empleado'); return; }
     const rec = { employeeId: empId, date: dateIn.value, hours: Number(hoursIn.value || 0), type: typeSel.value };
-    storage.upsertAttendance(rec);
+    await storage.upsertAttendance(rec);
     showToast('Asistencia guardada');
-    renderRows();
   });
 
   // Manejar eliminación de asistencias
@@ -107,7 +127,7 @@ export async function renderAttendanceView(root, { showToast }) {
     const attendanceId = row?.dataset?.id;
     if (!attendanceId) return;
 
-    const attendance = storage.listAttendance(empSel.value).find(a => a.id === attendanceId);
+    const attendance = allAttendance.find(a => a.id === attendanceId);
     const attendanceDate = attendance?.date || 'esta asistencia';
 
     ConfirmModal.show(
@@ -115,34 +135,38 @@ export async function renderAttendanceView(root, { showToast }) {
       `¿Estás seguro de que deseas eliminar la asistencia del ${attendanceDate}?`,
       'Eliminar',
       'Cancelar'
-    ).then((confirmed) => {
+    ).then(async (confirmed) => {
       if (confirmed) {
-        deleteAttendance(attendanceId);
+        await storage.deleteAttendance(attendanceId);
         showToast('Asistencia eliminada');
-        renderRows();
       }
     });
   });
-
-  // Función para eliminar asistencia usando el storage
-  function deleteAttendance(id) {
-    storage.deleteAttendance(id);
-  }
 
   renderRows();
 
   // Holidays management
   const holidayTbody = root.querySelector('#holidayTable tbody');
+  let allHolidays = [];
+  
+  // Subscribe to real-time updates for holidays
+  const unsubscribeHolidays = await storage.subscribeToHolidays((updatedHolidays) => {
+    allHolidays = updatedHolidays;
+    renderHolidays();
+  });
+  
+  window._unsubscribeFunctions.holidays = unsubscribeHolidays;
+  
   function renderHolidays() {
-    const list = storage.listHolidays();
-    holidayTbody.innerHTML = list.map(h => `
+    holidayTbody.innerHTML = allHolidays.map(h => `
       <tr data-id="${h.id}"><td>${h.date}</td><td style="text-align:right;"><button class="btn danger" data-action="del">Eliminar</button></td></tr>
     `).join('');
   }
-  root.querySelector('#addHoliday').addEventListener('click', () => {
+  root.querySelector('#addHoliday').addEventListener('click', async () => {
     const date = root.querySelector('#holidayDate').value;
     if (!date) { showToast('Seleccione fecha de feriado'); return; }
-    storage.upsertHoliday({ date }); showToast('Feriado agregado'); renderHolidays();
+    await storage.upsertHoliday({ date }); 
+    showToast('Feriado agregado');
   });
   root.querySelector('#holidayTable').addEventListener('click', (e) => {
     const btn = e.target.closest('button[data-action="del"]'); 
@@ -155,11 +179,10 @@ export async function renderAttendanceView(root, { showToast }) {
       '¿Estás seguro de que deseas eliminar este feriado?',
       'Eliminar',
       'Cancelar'
-    ).then((confirmed) => {
+    ).then(async (confirmed) => {
       if (confirmed) {
-        storage.deleteHoliday(id); 
-        showToast('Feriado eliminado'); 
-        renderHolidays();
+        await storage.deleteHoliday(id); 
+        showToast('Feriado eliminado');
       }
     });
   });
@@ -167,18 +190,28 @@ export async function renderAttendanceView(root, { showToast }) {
 
   // Disabilities management
   const disTbody = root.querySelector('#disTable tbody');
+  let allDisabilities = [];
+  
+  // Subscribe to real-time updates for disabilities
+  const unsubscribeDisabilities = await storage.subscribeToDisabilities((updatedDisabilities) => {
+    allDisabilities = updatedDisabilities;
+    renderDisabilities();
+  });
+  
+  window._unsubscribeFunctions.disabilities = unsubscribeDisabilities;
+  
   function renderDisabilities() {
-    const list = storage.listDisabilities();
-    disTbody.innerHTML = list.map(d => {
+    disTbody.innerHTML = allDisabilities.map(d => {
       const emp = employees.find(e => e.id === d.employeeId);
       return `<tr data-id="${d.id}"><td>${emp?.nombre || '-'}</td><td>${d.date}</td><td>${d.type}</td><td style="text-align:right;"><button class=\"btn danger\" data-action=\"del\">Eliminar</button></td></tr>`;
     }).join('');
   }
-  root.querySelector('#addDis').addEventListener('click', () => {
+  root.querySelector('#addDis').addEventListener('click', async () => {
     const employeeId = disEmpSel.value; if (!employeeId) { showToast('Seleccione empleado'); return; }
     const date = root.querySelector('#disDate').value; if (!date) { showToast('Seleccione fecha'); return; }
     const type = root.querySelector('#disType').value;
-    storage.upsertDisability({ employeeId, date, type }); showToast('Incapacidad agregada'); renderDisabilities();
+    await storage.upsertDisability({ employeeId, date, type }); 
+    showToast('Incapacidad agregada');
   });
   root.querySelector('#disTable').addEventListener('click', (e) => {
     const btn = e.target.closest('button[data-action="del"]'); 
@@ -191,11 +224,10 @@ export async function renderAttendanceView(root, { showToast }) {
       '¿Estás seguro de que deseas eliminar este registro de incapacidad?',
       'Eliminar',
       'Cancelar'
-    ).then((confirmed) => {
+    ).then(async (confirmed) => {
       if (confirmed) {
-        storage.deleteDisability(id); 
-        showToast('Incapacidad eliminada'); 
-        renderDisabilities();
+        await storage.deleteDisability(id); 
+        showToast('Incapacidad eliminada');
       }
     });
   });

@@ -16,6 +16,15 @@ export async function createFirebaseAdapter(firebaseConfig) {
     return value ? Object.values(value) : [];
   }
 
+  function subscribeToList(path, callback) {
+    const reference = api.ref(db, path);
+    api.onValue(reference, (snapshot) => {
+      const value = snapshot.val();
+      callback(value ? Object.values(value) : []);
+    });
+    return () => api.off(reference);
+  }
+
   async function writeObject(path, id, obj) {
     await api.set(api.ref(db, `${path}/${id}`), obj);
     return obj;
@@ -34,6 +43,7 @@ export async function createFirebaseAdapter(firebaseConfig) {
   return {
     // Employees
     async listEmployees() { return await readList('employees'); },
+    subscribeToEmployees(callback) { return subscribeToList('employees', callback); },
     async getEmployee(id) {
       const snap = await api.get(api.ref(db, `employees/${id}`));
       return snap.val();
@@ -58,6 +68,7 @@ export async function createFirebaseAdapter(firebaseConfig) {
       const list = await readList('attendance');
       return employeeId ? list.filter(x => x.employeeId === employeeId) : list;
     },
+    subscribeToAttendance(callback) { return subscribeToList('attendance', callback); },
     async upsertAttendance(record) {
       const id = record.id || newId('att');
       await writeObject('attendance', id, { id, ...record });
@@ -70,6 +81,7 @@ export async function createFirebaseAdapter(firebaseConfig) {
       const list = await readList('extras');
       return employeeId ? list.filter(x => x.employeeId === employeeId) : list;
     },
+    subscribeToExtras(callback) { return subscribeToList('extras', callback); },
     async upsertExtra(extra) {
       const id = extra.id || newId('ext');
       await writeObject('extras', id, { id, ...extra });
@@ -79,6 +91,7 @@ export async function createFirebaseAdapter(firebaseConfig) {
 
     // Holidays
     async listHolidays() { return await readList('holidays'); },
+    subscribeToHolidays(callback) { return subscribeToList('holidays', callback); },
     async upsertHoliday(holiday) {
       const id = holiday.id || newId('hol');
       await writeObject('holidays', id, { id, ...holiday });
@@ -91,6 +104,7 @@ export async function createFirebaseAdapter(firebaseConfig) {
       const list = await readList('disabilities');
       return employeeId ? list.filter(x => x.employeeId === employeeId) : list;
     },
+    subscribeToDisabilities(callback) { return subscribeToList('disabilities', callback); },
     async upsertDisability(disability) {
       const id = disability.id || newId('dis');
       await writeObject('disabilities', id, { id, ...disability });
@@ -103,6 +117,7 @@ export async function createFirebaseAdapter(firebaseConfig) {
       const list = await readList('payrollHistory');
       return employeeId ? list.filter(x => x.employeeId === employeeId) : list;
     },
+    subscribeToPayrollHistory(callback) { return subscribeToList('payrollHistory', callback); },
     async createPayrollRecord(record) {
       const row = { ...record, id: newId('pay') };
       await writeObject('payrollHistory', row.id, row);

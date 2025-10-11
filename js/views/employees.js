@@ -166,26 +166,35 @@ export async function renderEmployeesView(root, { showToast }) {
   const searchInput = root.querySelector('#search');
   const form = root.querySelector('#employee-form');
 
-  let employees = storage.listEmployees();
+  let employees = await storage.listEmployees();
   renderTable(tableContainer, employees, '');
+
+  // Subscribe to real-time updates
+  const unsubscribeEmployees = await storage.subscribeToEmployees((updatedEmployees) => {
+    employees = updatedEmployees;
+    renderTable(tableContainer, employees, searchInput.value);
+  });
+
+  // Store unsubscribe function for cleanup
+  root.dataset.unsubscribe = 'employees';
+  if (!window._unsubscribeFunctions) window._unsubscribeFunctions = {};
+  window._unsubscribeFunctions.employees = unsubscribeEmployees;
 
   searchInput.addEventListener('input', () => {
     renderTable(tableContainer, employees, searchInput.value);
   });
 
-  form.addEventListener('submit', (e) => {
+  form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const emp = readForm(form);
     const errors = validateEmployee(emp);
     if (errors.length) { showToast(errors[0]); return; }
-    const created = storage.createEmployee(emp);
-    employees = storage.listEmployees();
-    renderTable(tableContainer, employees, searchInput.value);
+    await storage.createEmployee(emp);
     form.reset();
     showToast('Empleado agregado');
   });
 
-  tableContainer.addEventListener('click', (e) => {
+  tableContainer.addEventListener('click', async (e) => {
     const btn = e.target.closest('button[data-action]');
     if (!btn) return;
     const row = btn.closest('tr[data-id]');
@@ -194,7 +203,7 @@ export async function renderEmployeesView(root, { showToast }) {
     if (!id) return;
 
     if (action === 'delete') {
-      const employee = storage.getEmployee(id);
+      const employee = await storage.getEmployee(id);
       const employeeName = employee?.nombre || 'este empleado';
       
       ConfirmModal.show(
@@ -202,11 +211,9 @@ export async function renderEmployeesView(root, { showToast }) {
         `¿Estás seguro de que deseas eliminar a ${employeeName}? Esta acción no se puede deshacer.`,
         'Eliminar',
         'Cancelar'
-      ).then((confirmed) => {
+      ).then(async (confirmed) => {
         if (confirmed) {
-          storage.deleteEmployee(id);
-          employees = storage.listEmployees();
-          renderTable(tableContainer, employees, searchInput.value);
+          await storage.deleteEmployee(id);
           showToast('Empleado eliminado');
         }
       });
@@ -214,7 +221,7 @@ export async function renderEmployeesView(root, { showToast }) {
     }
 
     if (action === 'edit') {
-      const current = storage.getEmployee(id);
+      const current = await storage.getEmployee(id);
       if (!current) return;
 
       const modal = new Modal();
@@ -266,7 +273,7 @@ export async function renderEmployeesView(root, { showToast }) {
       });
 
       // Handle save
-      modal.onSave((data) => {
+      modal.onSave(async (data) => {
         const updates = {
           nombre: data.nombre?.trim(),
           cedula: data.cedula?.trim(),
@@ -282,9 +289,7 @@ export async function renderEmployeesView(root, { showToast }) {
           return;
         }
 
-        storage.updateEmployee(id, updates);
-        employees = storage.listEmployees();
-        renderTable(tableContainer, employees, searchInput.value);
+        await storage.updateEmployee(id, updates);
         modal.close();
         showToast('Empleado actualizado');
       });
@@ -292,12 +297,11 @@ export async function renderEmployeesView(root, { showToast }) {
   });
 
   // Render History Tab
-  function renderHistoryTab() {
+  async function renderHistoryTab() {
     const historyContainer = root.querySelector('#history-container');
     const employeeSelect = root.querySelector('#history-employee-select');
     
     // Populate employee select
-    const employees = storage.listEmployees();
     const currentOptions = [...employeeSelect.querySelectorAll('option:not([value=""])')];
     if (currentOptions.length === 0) {
       employees.forEach(emp => {
@@ -308,10 +312,10 @@ export async function renderEmployeesView(root, { showToast }) {
       });
     }
 
-    function renderHistory(employeeId) {
+    async function renderHistory(employeeId) {
       const history = employeeId 
-        ? storage.listPayrollHistory(employeeId)
-        : storage.listPayrollHistory();
+        ? await storage.listPayrollHistory(employeeId)
+        : await storage.listPayrollHistory();
       
       if (history.length === 0) {
         historyContainer.innerHTML = '<div class="card"><p style="text-align:center; color: var(--color-text-secondary);">No hay registros de planillas guardadas. Guarda una planilla desde la sección de Planillas.</p></div>';
@@ -398,11 +402,11 @@ export async function renderEmployeesView(root, { showToast }) {
 
       // Handle delete
       historyContainer.querySelectorAll('button[data-action="delete"]').forEach(btn => {
-        btn.addEventListener('click', () => {
+        btn.addEventListener('click', async () => {
           const id = btn.dataset.id;
           if (confirm('¿Estás seguro de eliminar este registro?')) {
-            storage.deletePayrollRecord(id);
-            renderHistory(employeeSelect.value);
+            await storage.deletePayrollRecord(id);
+            await renderHistory(employeeSelect.value);
             showToast('Registro eliminado');
           }
         });
@@ -413,7 +417,7 @@ export async function renderEmployeesView(root, { showToast }) {
       renderHistory(employeeSelect.value);
     });
 
-    renderHistory('');
+    await renderHistory('');
   }
 }
 

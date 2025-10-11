@@ -21,6 +21,10 @@ export const storage = {
     const a = await ensureAdapter();
     return a.listEmployees();
   },
+  async subscribeToEmployees(callback) {
+    const a = await ensureAdapter();
+    return a.subscribeToEmployees(callback);
+  },
   async getEmployee(id) {
     const a = await ensureAdapter();
     return a.getEmployee(id);
@@ -43,6 +47,10 @@ export const storage = {
     const a = await ensureAdapter();
     return a.listAttendance(employeeId);
   },
+  async subscribeToAttendance(callback) {
+    const a = await ensureAdapter();
+    return a.subscribeToAttendance(callback);
+  },
   async upsertAttendance(record) {
     const a = await ensureAdapter();
     return a.upsertAttendance(record);
@@ -56,6 +64,10 @@ export const storage = {
   async listExtras(employeeId) {
     const a = await ensureAdapter();
     return a.listExtras(employeeId);
+  },
+  async subscribeToExtras(callback) {
+    const a = await ensureAdapter();
+    return a.subscribeToExtras(callback);
   },
   async upsertExtra(extra) {
     const a = await ensureAdapter();
@@ -71,6 +83,10 @@ export const storage = {
     const a = await ensureAdapter();
     return a.listHolidays();
   },
+  async subscribeToHolidays(callback) {
+    const a = await ensureAdapter();
+    return a.subscribeToHolidays(callback);
+  },
   async upsertHoliday(holiday) {
     const a = await ensureAdapter();
     return a.upsertHoliday(holiday);
@@ -83,6 +99,10 @@ export const storage = {
   async listDisabilities(employeeId) {
     const a = await ensureAdapter();
     return a.listDisabilities(employeeId);
+  },
+  async subscribeToDisabilities(callback) {
+    const a = await ensureAdapter();
+    return a.subscribeToDisabilities(callback);
   },
   async upsertDisability(disability) {
     const a = await ensureAdapter();
@@ -97,6 +117,10 @@ export const storage = {
   async listPayrollHistory(employeeId) {
     const a = await ensureAdapter();
     return a.listPayrollHistory(employeeId);
+  },
+  async subscribeToPayrollHistory(callback) {
+    const a = await ensureAdapter();
+    return a.subscribeToPayrollHistory(callback);
   },
   async createPayrollRecord(record) {
     const a = await ensureAdapter();
