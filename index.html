@@ -7,9 +7,79 @@
     <link rel="stylesheet" href="./css/styles.css">
     <link rel="stylesheet" href="./css/modal-fixes.css">
     <link rel="stylesheet" href="./css/responsive-touch.css">
+    <link rel="stylesheet" href="./css/login.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
+    <!-- Spinner de Carga Inicial -->
+    <div class="app-loader" id="appLoader">
+        <div class="loader-content">
+            <div class="loader-logo">
+                <i class="fas fa-money-check-alt"></i>
+            </div>
+            <div class="loader-spinner">
+                <div class="spinner-circle"></div>
+            </div>
+            <div class="loader-text">Cargando Sistema de Planillas...</div>
+        </div>
+    </div>
+
+    <!-- Login Screen -->
+    <div class="login-wrapper" id="loginWrapper" style="display: none;">
+        <div class="login-container">
+            <div class="login-header">
+                <div class="login-logo">
+                    <i class="fas fa-money-check-alt"></i>
+                </div>
+                <h1 class="login-title">Bienvenido</h1>
+                <p class="login-subtitle">Sistema de Planillas - SMP</p>
+            </div>
+
+            <div id="loginAlert" style="display: none;"></div>
+
+            <form class="login-form" id="loginForm">
+                <div class="form-group">
+                    <label for="loginEmail">Correo Electrónico</label>
+                    <input 
+                        type="email" 
+                        id="loginEmail" 
+                        class="form-input" 
+                        placeholder="correo@ejemplo.com"
+                        required
+                        autocomplete="email"
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label for="loginPassword">Contraseña</label>
+                    <div class="password-toggle">
+                        <input 
+                            type="password" 
+                            id="loginPassword" 
+                            class="form-input" 
+                            placeholder="••••••••"
+                            required
+                            autocomplete="current-password"
+                        >
+                        <i class="fas fa-eye toggle-icon" id="togglePassword"></i>
+                    </div>
+                </div>
+
+                <div class="form-options">
+                    <div class="remember-me">
+                        <input type="checkbox" id="rememberMe">
+                        <label for="rememberMe">Recordarme</label>
+                    </div>
+                    <a href="#" class="forgot-password">¿Olvidaste tu contraseña?</a>
+                </div>
+
+                <button type="submit" class="login-button" id="loginButton">
+                    Iniciar Sesión
+                </button>
+            </form>
+        </div>
+    </div>
+
     <!-- Menú Lateral -->
     <div class="sidebar" id="sidebar">
         <div class="logo">
@@ -56,6 +126,17 @@
             </button>
             <div class="header-info">
                 <span class="current-date" id="currentDate"></span>
+                <div class="user-info" id="userInfo" style="display: none;">
+                    <div class="user-avatar" id="userAvatar">U</div>
+                    <div class="user-details">
+                        <div class="user-name">Usuario</div>
+                        <div class="user-email" id="userEmailDisplay"></div>
+                    </div>
+                </div>
+                <button class="logout-button" id="logoutButton" style="display: none; margin-left: 16px;">
+                    <i class="fas fa-sign-out-alt"></i>
+                    Cerrar Sesión
+                </button>
             </div>
         </header>
 
@@ -91,9 +172,6 @@
                         <option value="Grupo Empresarial San Martin de Porres">Grupo Empresarial San Martin de Porres</option>
                         <option value="Instituto Veterinario San Martin de Porres">Instituto Veterinario San Martin de Porres</option>
                     </select>
-                    <button class="btn btn-secondary" id="btnLimpiarFiltros" style="padding: 8px 16px;">
-                        <i class="fas fa-times"></i> Limpiar Filtros
-                    </button>
                 </div>
 
                 <div class="table-container">
@@ -146,7 +224,6 @@
                 </select>
                 <input type="date" id="filtroFechaInicio" class="form-control">
                 <input type="date" id="filtroFechaFin" class="form-control">
-                <button class="btn btn-secondary" id="btnFiltrarAsistencias">Filtrar</button>
             </div>
 
             <div class="table-container">
@@ -184,7 +261,6 @@
                     <option value="bono">Bonos</option>
                     <option value="rebajo">Rebajos</option>
                 </select>
-                <button class="btn btn-secondary" id="btnFiltrarBonos">Filtrar</button>
             </div>
 
             <div class="table-container">
@@ -645,6 +721,10 @@
     
     <!-- Archivo de prueba (remover en producción) -->
     <script src="js/test-notifications.js"></script>
+    
+    <!-- Sistema de Autenticación -->
+    <script type="module" src="js/auth.js"></script>
+    <script type="module" src="js/login-handler.js"></script>
     
     <!-- Sistema de Planillas con Firebase Realtime Database -->
     <script type="module" src="js/app.js"></script>

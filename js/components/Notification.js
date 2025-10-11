@@ -317,6 +317,17 @@ window.showConfirm = function(message, title = '¿Está seguro?') {
 };
 
 // Exportar para uso en módulos
+// Hacer las funciones disponibles globalmente
+window.showNotification = (message, type = 'info', duration = 4000) => {
+    notificationSystem.show(message, type, duration);
+};
+
+window.confirmDialog = (message, title = 'Confirmar') => {
+    return confirmDialog.confirm(message, title);
+};
+
+window.loadingOverlay = loadingOverlay;
+
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
         NotificationSystem,

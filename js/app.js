@@ -120,6 +120,11 @@ class SistemaPlanillas {
         this.guardarDatos();
         this.renderEmpleados();
         this.actualizarSelectsEmpleados();
+        
+        // Mostrar notificación de éxito
+        if (window.showNotification) {
+            window.showNotification('Empleado creado exitosamente', 'success');
+        }
     }
 
     editarEmpleado(id, datosActualizados) {
@@ -181,8 +186,8 @@ class SistemaPlanillas {
             );
         }
         
-        // Filtro por empresa
-        if (empresaFiltro) {
+        // Filtro por empresa (solo si se selecciona una empresa específica)
+        if (empresaFiltro && empresaFiltro !== '') {
             empleadosFiltrados = empleadosFiltrados.filter(emp => 
                 emp.empresa === empresaFiltro
             );
@@ -191,10 +196,30 @@ class SistemaPlanillas {
         this.renderEmpleados(empleadosFiltrados);
     }
 
+    aplicarFiltrosAsistencias() {
+        const empleadoId = document.getElementById('filtroEmpleadoAsistencia').value;
+        const fechaInicio = document.getElementById('filtroFechaInicio').value;
+        const fechaFin = document.getElementById('filtroFechaFin').value;
+        const resultados = this.filtrarAsistencias(empleadoId, fechaInicio, fechaFin);
+        this.renderAsistencias(resultados);
+    }
+
+    aplicarFiltrosBonos() {
+        const empleadoId = document.getElementById('filtroEmpleadoBono').value;
+        const tipo = document.getElementById('filtroTipoBono').value;
+        const resultados = this.filtrarBonos(empleadoId, tipo);
+        this.renderBonos(resultados);
+    }
+
     renderEmpleados(empleados = this.empleados) {
         const tbody = document.getElementById('tablaEmpleados');
         
-        if (empleados.length === 0) {
+        if (!tbody) {
+            console.warn('No se encontró el elemento tablaEmpleados');
+            return;
+        }
+        
+        if (!empleados || empleados.length === 0) {
             tbody.innerHTML = `
                 <tr>
                     <td colspan="8" class="empty-state">
@@ -2098,12 +2123,17 @@ class SistemaPlanillas {
             this.cerrarModal('modalAsistencia');
         });
 
-        document.getElementById('btnFiltrarAsistencias')?.addEventListener('click', () => {
-            const empleadoId = document.getElementById('filtroEmpleadoAsistencia').value;
-            const fechaInicio = document.getElementById('filtroFechaInicio').value;
-            const fechaFin = document.getElementById('filtroFechaFin').value;
-            const resultados = this.filtrarAsistencias(empleadoId, fechaInicio, fechaFin);
-            this.renderAsistencias(resultados);
+        // Filtros automáticos para asistencias
+        document.getElementById('filtroEmpleadoAsistencia')?.addEventListener('change', () => {
+            this.aplicarFiltrosAsistencias();
+        });
+
+        document.getElementById('filtroFechaInicio')?.addEventListener('change', () => {
+            this.aplicarFiltrosAsistencias();
+        });
+
+        document.getElementById('filtroFechaFin')?.addEventListener('change', () => {
+            this.aplicarFiltrosAsistencias();
         });
 
         // Bonos
@@ -2135,11 +2165,13 @@ class SistemaPlanillas {
             this.cerrarModal('modalBono');
         });
 
-        document.getElementById('btnFiltrarBonos')?.addEventListener('click', () => {
-            const empleadoId = document.getElementById('filtroEmpleadoBono').value;
-            const tipo = document.getElementById('filtroTipoBono').value;
-            const resultados = this.filtrarBonos(empleadoId, tipo);
-            this.renderBonos(resultados);
+        // Filtros automáticos para bonos
+        document.getElementById('filtroEmpleadoBono')?.addEventListener('change', () => {
+            this.aplicarFiltrosBonos();
+        });
+
+        document.getElementById('filtroTipoBono')?.addEventListener('change', () => {
+            this.aplicarFiltrosBonos();
         });
 
         // Planillas
@@ -2901,8 +2933,60 @@ class SistemaPlanillas {
 
 // Inicializar el sistema
 let sistema;
-document.addEventListener('DOMContentLoaded', () => {
-    sistema = new SistemaPlanillas();
-    sistema.renderEmpleados();
-    sistema.actualizarSelectsEmpleados();
+
+// Función para inicializar el sistema después de autenticación
+async function initializeSistema() {
+    try {
+        sistema = new SistemaPlanillas();
+        await sistema.init(); // Asegurar que se ejecute la inicialización completa
+        
+        // Pequeño delay para asegurar que el DOM esté listo
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        await sistema.renderEmpleados();
+        await sistema.actualizarSelectsEmpleados();
+        
+        // Aplicar filtros iniciales para mostrar todos los empleados
+        setTimeout(() => {
+            if (sistema.aplicarFiltrosEmpleados) {
+                sistema.aplicarFiltrosEmpleados();
+            }
+        }, 200);
+        
+        console.log('✅ Sistema de Planillas inicializado correctamente');
+    } catch (error) {
+        console.error('❌ Error al inicializar el sistema:', error);
+    }
+}
+
+// Inicialización con autenticación
+document.addEventListener('DOMContentLoaded', async () => {
+    try {
+        // Importar el manejador de login
+        const { initializeAuth } = await import('./login-handler.js');
+        
+        // Inicializar autenticación (muestra spinner, verifica auth, muestra login o app)
+        await initializeAuth();
+        
+        // Si el usuario está autenticado, inicializar el sistema
+        const { checkAuthState } = await import('./auth.js');
+        const user = await checkAuthState();
+        
+        if (user) {
+            await initializeSistema();
+        } else {
+            // Esperar a que el usuario inicie sesión
+            // El sistema se inicializará cuando el usuario haga login exitoso
+            window.addEventListener('userLoggedIn', async () => {
+                await initializeSistema();
+            });
+        }
+    } catch (error) {
+        console.error('Error en la inicialización:', error);
+        // En caso de error, inicializar el sistema de todas formas (modo fallback)
+        await initializeSistema();
+    }
 });
+
+// Exportar para uso global
+window.initializeSistema = initializeSistema;
