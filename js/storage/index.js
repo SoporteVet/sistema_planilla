@@ -1,44 +1,111 @@
-// Storage facade - defaults to localStorage adapter
+// Storage facade - using Firebase adapter for multi-device sync
 
-import { createLocalStorageAdapter } from './localStorageAdapter.js';
+import { createFirebaseAdapter } from './firebaseAdapter.js';
+import { firebaseConfig } from '../firebase/config.js';
 
-// In the future, we can switch to Firebase by swapping the adapter
-// e.g., import { createFirebaseAdapter } from './firebaseAdapter.js'
-// const adapter = createFirebaseAdapter(firebaseConfig)
+// Initialize Firebase adapter asynchronously
+let adapterPromise = createFirebaseAdapter(firebaseConfig);
+let adapter = null;
 
-const adapter = createLocalStorageAdapter();
+// Helper to ensure adapter is ready
+async function ensureAdapter() {
+  if (!adapter) {
+    adapter = await adapterPromise;
+  }
+  return adapter;
+}
 
 export const storage = {
   // Employees
-  listEmployees: adapter.listEmployees,
-  getEmployee: adapter.getEmployee,
-  createEmployee: adapter.createEmployee,
-  updateEmployee: adapter.updateEmployee,
-  deleteEmployee: adapter.deleteEmployee,
+  async listEmployees() {
+    const a = await ensureAdapter();
+    return a.listEmployees();
+  },
+  async getEmployee(id) {
+    const a = await ensureAdapter();
+    return a.getEmployee(id);
+  },
+  async createEmployee(employee) {
+    const a = await ensureAdapter();
+    return a.createEmployee(employee);
+  },
+  async updateEmployee(id, updates) {
+    const a = await ensureAdapter();
+    return a.updateEmployee(id, updates);
+  },
+  async deleteEmployee(id) {
+    const a = await ensureAdapter();
+    return a.deleteEmployee(id);
+  },
 
   // Attendance
-  listAttendance: adapter.listAttendance,
-  upsertAttendance: adapter.upsertAttendance,
-  deleteAttendance: adapter.deleteAttendance,
+  async listAttendance(employeeId) {
+    const a = await ensureAdapter();
+    return a.listAttendance(employeeId);
+  },
+  async upsertAttendance(record) {
+    const a = await ensureAdapter();
+    return a.upsertAttendance(record);
+  },
+  async deleteAttendance(id) {
+    const a = await ensureAdapter();
+    return a.deleteAttendance(id);
+  },
 
-  // Bonuses & deductions (stubs)
-  listExtras: adapter.listExtras,
-  upsertExtra: adapter.upsertExtra,
-  deleteExtra: adapter.deleteExtra,
+  // Bonuses & deductions
+  async listExtras(employeeId) {
+    const a = await ensureAdapter();
+    return a.listExtras(employeeId);
+  },
+  async upsertExtra(extra) {
+    const a = await ensureAdapter();
+    return a.upsertExtra(extra);
+  },
+  async deleteExtra(id) {
+    const a = await ensureAdapter();
+    return a.deleteExtra(id);
+  },
 
-  // Holidays and disabilities (stubs)
-  listHolidays: adapter.listHolidays,
-  upsertHoliday: adapter.upsertHoliday,
-  deleteHoliday: adapter.deleteHoliday,
+  // Holidays and disabilities
+  async listHolidays() {
+    const a = await ensureAdapter();
+    return a.listHolidays();
+  },
+  async upsertHoliday(holiday) {
+    const a = await ensureAdapter();
+    return a.upsertHoliday(holiday);
+  },
+  async deleteHoliday(id) {
+    const a = await ensureAdapter();
+    return a.deleteHoliday(id);
+  },
 
-  listDisabilities: adapter.listDisabilities,
-  upsertDisability: adapter.upsertDisability,
-  deleteDisability: adapter.deleteDisability,
+  async listDisabilities(employeeId) {
+    const a = await ensureAdapter();
+    return a.listDisabilities(employeeId);
+  },
+  async upsertDisability(disability) {
+    const a = await ensureAdapter();
+    return a.upsertDisability(disability);
+  },
+  async deleteDisability(id) {
+    const a = await ensureAdapter();
+    return a.deleteDisability(id);
+  },
 
   // Payroll History
-  listPayrollHistory: adapter.listPayrollHistory,
-  createPayrollRecord: adapter.createPayrollRecord,
-  deletePayrollRecord: adapter.deletePayrollRecord,
+  async listPayrollHistory(employeeId) {
+    const a = await ensureAdapter();
+    return a.listPayrollHistory(employeeId);
+  },
+  async createPayrollRecord(record) {
+    const a = await ensureAdapter();
+    return a.createPayrollRecord(record);
+  },
+  async deletePayrollRecord(id) {
+    const a = await ensureAdapter();
+    return a.deletePayrollRecord(id);
+  },
 };
 
 

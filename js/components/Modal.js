@@ -1,128 +1,223 @@
-// Modal component for editing forms
+/**
+ * Sistema de Modales Centrados
+ * Asegura que todos los modales aparezcan perfectamente centrados
+ */
 
-export class Modal {
-  constructor() {
-    this.overlay = null;
-    this.modal = null;
-    this.isOpen = false;
-  }
+class ModalManager {
+    constructor() {
+        this.activeModal = null;
+        this.init();
+    }
 
-  createModal(title, subtitle = '') {
-    const overlay = document.createElement('div');
-    overlay.className = 'modal-overlay';
-    overlay.innerHTML = `
-      <div class="modal">
-        <button class="close-btn" type="button">&times;</button>
-        <div class="modal-header">
-          <h2 class="modal-title">${title}</h2>
-          ${subtitle ? `<p class="modal-subtitle">${subtitle}</p>` : ''}
-        </div>
-        <div class="modal-body">
-          <form class="modal-form" id="modal-form">
-            <!-- Form content will be inserted here -->
-          </form>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="modal-btn secondary" data-action="cancel">Cancelar</button>
-          <button type="submit" form="modal-form" class="modal-btn primary" data-action="save">Guardar</button>
-        </div>
-      </div>
-    `;
+    init() {
+        // Agregar event listeners para todos los modales
+        document.addEventListener('click', (e) => {
+            // Cerrar modal al hacer clic en el fondo
+            if (e.target.classList.contains('modal')) {
+                this.closeModal(e.target);
+            }
 
-    document.body.appendChild(overlay);
-    this.overlay = overlay;
-    this.modal = overlay.querySelector('.modal');
-    this.isOpen = true;
+            // Cerrar modal con botón X
+            if (e.target.classList.contains('close') || e.target.closest('.close')) {
+                const modal = e.target.closest('.modal');
+                if (modal) {
+                    this.closeModal(modal);
+                }
+            }
 
-    // Show with animation
-    setTimeout(() => overlay.classList.add('show'), 10);
+            // Cerrar modal con botón cancelar
+            if (e.target.hasAttribute('data-close')) {
+                const modalId = e.target.getAttribute('data-close');
+                const modal = document.getElementById(modalId);
+                if (modal) {
+                    this.closeModal(modal);
+                }
+            }
+        });
 
-    // Event listeners
-    this.setupEventListeners();
+        // Cerrar modal con ESC
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && this.activeModal) {
+                this.closeModal(this.activeModal);
+            }
+        });
 
-    return overlay;
-  }
+        // Asegurar que los modales estén centrados al cargar
+        this.centerAllModals();
+        
+        // Inicializar sidebar responsive
+        this.initResponsiveSidebar();
+    }
 
-  setupEventListeners() {
-    const closeBtn = this.overlay.querySelector('.close-btn');
-    const cancelBtn = this.overlay.querySelector('[data-action="cancel"]');
-    const form = this.overlay.querySelector('#modal-form');
+    /**
+     * Mostrar modal centrado
+     */
+    showModal(modalId) {
+        const modal = document.getElementById(modalId);
+        if (!modal) return;
 
-    const closeModal = () => this.close();
+        this.activeModal = modal;
+        
+        // Remover clases anteriores
+        modal.classList.remove('show');
+        
+        // Forzar reflow
+        modal.offsetHeight;
+        
+        // Agregar clase show
+        modal.classList.add('show');
+        
+        // Asegurar centrado
+        this.centerModal(modal);
+        
+        // Prevenir scroll del body
+        document.body.style.overflow = 'hidden';
+        
+        // Focus en el primer input
+        const firstInput = modal.querySelector('input, select, textarea');
+        if (firstInput) {
+            setTimeout(() => firstInput.focus(), 100);
+        }
+    }
 
-    closeBtn.addEventListener('click', closeModal);
-    cancelBtn.addEventListener('click', closeModal);
-    
-    // Close on overlay click
-    this.overlay.addEventListener('click', (e) => {
-      if (e.target === this.overlay) closeModal();
-    });
+    /**
+     * Cerrar modal
+     */
+    closeModal(modal) {
+        if (typeof modal === 'string') {
+            modal = document.getElementById(modal);
+        }
+        
+        if (!modal) return;
 
-    // Close on Escape key
-    const handleEscape = (e) => {
-      if (e.key === 'Escape') closeModal();
-    };
-    document.addEventListener('keydown', handleEscape);
+        this.activeModal = null;
+        
+        // Remover clase show
+        modal.classList.remove('show');
+        
+        // Restaurar scroll del body
+        document.body.style.overflow = '';
+        
+        // Limpiar formularios
+        const form = modal.querySelector('form');
+        if (form) {
+            form.reset();
+        }
+    }
 
-    // Store cleanup function
-    this.cleanup = () => {
-      document.removeEventListener('keydown', handleEscape);
-    };
-  }
+    /**
+     * Centrar un modal específico
+     */
+    centerModal(modal) {
+        if (!modal) return;
+        
+        const modalContent = modal.querySelector('.modal-content');
+        if (!modalContent) return;
 
-  close() {
-    if (!this.overlay || !this.isOpen) return;
+        // Forzar centrado con JavaScript si es necesario
+        modal.style.display = 'flex';
+        modal.style.alignItems = 'center';
+        modal.style.justifyContent = 'center';
+        
+        // Asegurar que el contenido esté centrado
+        modalContent.style.margin = '0';
+        modalContent.style.transform = 'none';
+    }
 
-    this.overlay.classList.remove('show');
-    
-    setTimeout(() => {
-      if (this.cleanup) this.cleanup();
-      if (this.overlay && this.overlay.parentNode) {
-        this.overlay.parentNode.removeChild(this.overlay);
-      }
-      this.overlay = null;
-      this.modal = null;
-      this.isOpen = false;
-    }, 300);
-  }
+    /**
+     * Centrar todos los modales
+     */
+    centerAllModals() {
+        const modals = document.querySelectorAll('.modal');
+        modals.forEach(modal => {
+            this.centerModal(modal);
+        });
+    }
 
-  setFormContent(html) {
-    if (!this.overlay) return;
-    const form = this.overlay.querySelector('#modal-form');
-    if (form) form.innerHTML = html;
-  }
+    /**
+     * Obtener modal activo
+     */
+    getActiveModal() {
+        return this.activeModal;
+    }
 
-  getFormData() {
-    if (!this.overlay) return null;
-    const form = this.overlay.querySelector('#modal-form');
-    if (!form) return null;
-    
-    const formData = new FormData(form);
-    return Object.fromEntries(formData.entries());
-  }
+    /**
+     * Verificar si hay un modal abierto
+     */
+    isModalOpen() {
+        return this.activeModal !== null;
+    }
 
-  setFormData(data) {
-    if (!this.overlay) return;
-    const form = this.overlay.querySelector('#modal-form');
-    if (!form) return;
+    /**
+     * Inicializar sidebar responsive para móviles
+     */
+    initResponsiveSidebar() {
+        const toggleBtn = document.getElementById('toggleSidebar');
+        const sidebar = document.querySelector('.sidebar');
+        const sidebarOverlay = document.createElement('div');
+        
+        // Crear overlay para móviles
+        sidebarOverlay.className = 'sidebar-overlay';
+        document.body.appendChild(sidebarOverlay);
 
-    Object.entries(data).forEach(([key, value]) => {
-      const input = form.querySelector(`[name="${key}"]`);
-      if (input) input.value = value || '';
-    });
-  }
+        // Toggle sidebar en móviles
+        if (toggleBtn) {
+            toggleBtn.addEventListener('click', () => {
+                if (window.innerWidth <= 768) {
+                    // En móviles, mostrar/ocultar sidebar con overlay
+                    sidebar.classList.toggle('open');
+                    sidebarOverlay.classList.toggle('show');
+                } else {
+                    // En desktop, solo colapsar
+                    sidebar.classList.toggle('collapsed');
+                }
+            });
+        }
 
-  onSave(callback) {
-    if (!this.overlay) return;
-    const form = this.overlay.querySelector('#modal-form');
-    if (!form) return;
+        // Cerrar sidebar al hacer clic en overlay
+        sidebarOverlay.addEventListener('click', () => {
+            sidebar.classList.remove('open');
+            sidebarOverlay.classList.remove('show');
+        });
 
-    form.addEventListener('submit', (e) => {
-      e.preventDefault();
-      const data = this.getFormData();
-      callback(data);
-    });
-  }
+        // Cerrar sidebar al hacer clic en item del menú en móviles
+        document.querySelectorAll('.sidebar .menu-item').forEach(item => {
+            item.addEventListener('click', () => {
+                if (window.innerWidth <= 768) {
+                    sidebar.classList.remove('open');
+                    sidebarOverlay.classList.remove('show');
+                }
+            });
+        });
+
+        // Manejar resize
+        window.addEventListener('resize', () => {
+            if (window.innerWidth > 768) {
+                sidebar.classList.remove('open');
+                sidebarOverlay.classList.remove('show');
+            }
+        });
+    }
 }
 
+// Crear instancia global
+window.modalManager = new ModalManager();
 
+// Función de ayuda para mostrar modales
+window.showModal = function(modalId) {
+    window.modalManager.showModal(modalId);
+};
+
+// Función de ayuda para cerrar modales
+window.closeModal = function(modalId) {
+    window.modalManager.closeModal(modalId);
+};
+
+// Asegurar centrado en resize
+window.addEventListener('resize', () => {
+    if (window.modalManager.isModalOpen()) {
+        window.modalManager.centerModal(window.modalManager.getActiveModal());
+    }
+});
+
+console.log('🎯 Sistema de modales centrados cargado');

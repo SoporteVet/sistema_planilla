@@ -19,52 +19,95 @@ class SistemaPlanillas {
         this.init();
     }
 
-    init() {
-        this.cargarDatos();
+    async init() {
+        await this.initializeFirebase();
+        await this.cargarDatos();
         this.initEventListeners();
         this.actualizarFecha();
         this.cargarFeriadosDefecto();
     }
 
     // ============================================
-    // GESTIÓN DE DATOS (localStorage)
+    // GESTIÓN DE DATOS (Firebase + localStorage fallback)
     // ============================================
 
-    cargarDatos() {
-        const empleadosGuardados = localStorage.getItem('empleados');
-        const asistenciasGuardadas = localStorage.getItem('asistencias');
-        const bonosGuardados = localStorage.getItem('bonos');
-        const feriadosGuardados = localStorage.getItem('feriados');
-        const configGuardada = localStorage.getItem('config');
-        const historialGuardado = localStorage.getItem('historialPlanillas');
-
-        if (empleadosGuardados) {
-            this.empleados = JSON.parse(empleadosGuardados);
-        }
-        if (asistenciasGuardadas) {
-            this.asistencias = JSON.parse(asistenciasGuardadas);
-        }
-        if (bonosGuardados) {
-            this.bonos = JSON.parse(bonosGuardados);
-        }
-        if (feriadosGuardados) {
-            this.feriados = JSON.parse(feriadosGuardados);
-        }
-        if (configGuardada) {
-            this.config = JSON.parse(configGuardada);
-        }
-        if (historialGuardado) {
-            this.historialPlanillas = JSON.parse(historialGuardado);
+    async initializeFirebase() {
+        try {
+            // Importar dinámicamente el módulo de Firebase helpers
+            const firebaseHelpers = await import('./firebase-helpers.js');
+            this.firebaseHelpers = firebaseHelpers;
+            await firebaseHelpers.initializeFirebaseStorage();
+            console.log('🔥 Sistema conectado a Firebase');
+        } catch (error) {
+            console.warn('⚠️ Firebase no disponible, usando localStorage', error);
+            this.firebaseHelpers = null;
         }
     }
 
-    guardarDatos() {
-        localStorage.setItem('empleados', JSON.stringify(this.empleados));
-        localStorage.setItem('asistencias', JSON.stringify(this.asistencias));
-        localStorage.setItem('bonos', JSON.stringify(this.bonos));
-        localStorage.setItem('feriados', JSON.stringify(this.feriados));
-        localStorage.setItem('config', JSON.stringify(this.config));
-        localStorage.setItem('historialPlanillas', JSON.stringify(this.historialPlanillas));
+    async cargarDatos() {
+        if (this.firebaseHelpers) {
+            // Cargar desde Firebase
+            this.empleados = await this.firebaseHelpers.getData('empleados') || [];
+            this.asistencias = await this.firebaseHelpers.getData('asistencias') || [];
+            this.bonos = await this.firebaseHelpers.getData('bonos') || [];
+            this.feriados = await this.firebaseHelpers.getData('feriados') || [];
+            const configData = await this.firebaseHelpers.getData('config');
+            if (configData && typeof configData === 'object' && !Array.isArray(configData)) {
+                this.config = { ...this.config, ...configData };
+            }
+            this.historialPlanillas = await this.firebaseHelpers.getData('historialPlanillas') || [];
+            console.log('📥 Datos cargados desde Firebase');
+        } else {
+            // Fallback a localStorage
+            const empleadosGuardados = localStorage.getItem('empleados');
+            const asistenciasGuardadas = localStorage.getItem('asistencias');
+            const bonosGuardados = localStorage.getItem('bonos');
+            const feriadosGuardados = localStorage.getItem('feriados');
+            const configGuardada = localStorage.getItem('config');
+            const historialGuardado = localStorage.getItem('historialPlanillas');
+
+            if (empleadosGuardados) {
+                this.empleados = JSON.parse(empleadosGuardados);
+            }
+            if (asistenciasGuardadas) {
+                this.asistencias = JSON.parse(asistenciasGuardadas);
+            }
+            if (bonosGuardados) {
+                this.bonos = JSON.parse(bonosGuardados);
+            }
+            if (feriadosGuardados) {
+                this.feriados = JSON.parse(feriadosGuardados);
+            }
+            if (configGuardada) {
+                this.config = JSON.parse(configGuardada);
+            }
+            if (historialGuardado) {
+                this.historialPlanillas = JSON.parse(historialGuardado);
+            }
+            console.log('📥 Datos cargados desde localStorage');
+        }
+    }
+
+    async guardarDatos() {
+        if (this.firebaseHelpers) {
+            // Guardar en Firebase y localStorage
+            await Promise.all([
+                this.firebaseHelpers.saveData('empleados', this.empleados),
+                this.firebaseHelpers.saveData('asistencias', this.asistencias),
+                this.firebaseHelpers.saveData('bonos', this.bonos),
+                this.firebaseHelpers.saveData('feriados', this.feriados),
+                this.firebaseHelpers.saveData('config', this.config),
+                this.firebaseHelpers.saveData('historialPlanillas', this.historialPlanillas)
+            ]);
+        } else {
+            // Fallback a localStorage
+            localStorage.setItem('empleados', JSON.stringify(this.empleados));
+            localStorage.setItem('asistencias', JSON.stringify(this.asistencias));
+            localStorage.setItem('bonos', JSON.stringify(this.bonos));
+            localStorage.setItem('feriados', JSON.stringify(this.feriados));
+            localStorage.setItem('config', JSON.stringify(this.config));
+            localStorage.setItem('historialPlanillas', JSON.stringify(this.historialPlanillas));
+        }
     }
 
     // ============================================
@@ -88,14 +131,32 @@ class SistemaPlanillas {
         }
     }
 
-    eliminarEmpleado(id) {
-        if (confirm('¿Está seguro de eliminar este empleado? Se eliminarán también sus registros de asistencia y bonos.')) {
+    async eliminarEmpleado(id) {
+        const empleado = this.empleados.find(e => e.id === id);
+        const nombreEmpleado = empleado ? empleado.nombre : 'este empleado';
+        
+        const confirmado = await confirmDialog.confirmDelete(`el empleado ${nombreEmpleado}`);
+        
+        if (confirmado) {
+            try {
+                loadingOverlay.show();
+                
+                // Simular delay para mejor UX
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
             this.empleados = this.empleados.filter(e => e.id !== id);
             this.asistencias = this.asistencias.filter(a => a.empleadoId !== id);
             this.bonos = this.bonos.filter(b => b.empleadoId !== id);
             this.guardarDatos();
             this.renderEmpleados();
             this.actualizarSelectsEmpleados();
+                
+                loadingOverlay.hide();
+                notify.success(`Empleado ${nombreEmpleado} eliminado correctamente`);
+            } catch (error) {
+                loadingOverlay.hide();
+                notify.error('Error al eliminar el empleado');
+            }
         }
     }
 
@@ -186,7 +247,7 @@ class SistemaPlanillas {
         }
     }
 
-    eliminarAsistencia(id) {
+    async eliminarAsistencia(id) {
         const asistencia = this.asistencias.find(a => a.id === id);
         if (!asistencia) {
             console.error('Asistencia no encontrada para eliminar:', id);
@@ -196,10 +257,27 @@ class SistemaPlanillas {
         const empleado = this.empleados.find(e => e.id === asistencia.empleadoId);
         const empleadoNombre = empleado ? empleado.nombre : 'Empleado desconocido';
         
-        if (confirm(`¿Está seguro de que desea eliminar la asistencia de ${empleadoNombre} del ${asistencia.fecha}?`)) {
+        // Usar confirmación personalizada
+        const confirmado = await confirmDialog.confirmAction(
+            `¿Está seguro de que desea eliminar la asistencia de ${empleadoNombre} del ${asistencia.fecha}?`,
+            'Eliminar Asistencia'
+        );
+        
+        if (confirmado) {
+            try {
+                loadingOverlay.show();
+                await new Promise(resolve => setTimeout(resolve, 300));
+                
             this.asistencias = this.asistencias.filter(a => a.id !== id);
             this.guardarDatos();
             this.renderAsistencias();
+                
+                loadingOverlay.hide();
+                notify.success('Asistencia eliminada correctamente');
+            } catch (error) {
+                loadingOverlay.hide();
+                notify.error('Error al eliminar la asistencia');
+            }
         }
     }
 
@@ -270,11 +348,27 @@ class SistemaPlanillas {
         }
     }
 
-    eliminarBono(id) {
-        if (confirm('¿Está seguro de eliminar este bono/rebajo?')) {
+    async eliminarBono(id) {
+        const confirmado = await confirmDialog.confirmAction(
+            '¿Está seguro de eliminar este bono/rebajo?',
+            'Eliminar Bono/Rebajo'
+        );
+        
+        if (confirmado) {
+            try {
+                loadingOverlay.show();
+                await new Promise(resolve => setTimeout(resolve, 300));
+                
             this.bonos = this.bonos.filter(b => b.id !== id);
             this.guardarDatos();
             this.renderBonos();
+                
+                loadingOverlay.hide();
+                notify.success('Bono/Rebajo eliminado correctamente');
+            } catch (error) {
+                loadingOverlay.hide();
+                notify.error('Error al eliminar el bono/rebajo');
+            }
         }
     }
 
@@ -587,7 +681,7 @@ class SistemaPlanillas {
 
     guardarPlanillaEnHistorial() {
         if (!this.ultimaPlanilla || this.ultimaPlanilla.length === 0) {
-            alert('No hay una planilla calculada para guardar');
+            notify.warning('No hay una planilla calculada para guardar');
             return;
         }
 
@@ -620,7 +714,7 @@ class SistemaPlanillas {
         });
 
         this.guardarDatos();
-        alert(`Planilla guardada exitosamente (${this.ultimaPlanilla.length} empleados)`);
+        notify.success(`Planilla guardada exitosamente (${this.ultimaPlanilla.length} empleados)`);
     }
 
     renderHistorialPlanillas(empleadoId = '') {
@@ -714,14 +808,30 @@ class SistemaPlanillas {
         };
     }
 
-    eliminarRegistroHistorial(id) {
-        if (!confirm('¿Estás seguro de eliminar este registro?')) return;
+    async eliminarRegistroHistorial(id) {
+        const confirmado = await confirmDialog.confirmAction(
+            '¿Estás seguro de eliminar este registro?',
+            'Eliminar Registro'
+        );
+        
+        if (!confirmado) return;
+        
+        try {
+            loadingOverlay.show();
+            await new Promise(resolve => setTimeout(resolve, 300));
         
         this.historialPlanillas = this.historialPlanillas.filter(h => h.id !== id);
         this.guardarDatos();
         
         const filtroEmpleado = document.getElementById('filtroEmpleadoHistorial');
         this.renderHistorialPlanillas(filtroEmpleado ? filtroEmpleado.value : '');
+            
+            loadingOverlay.hide();
+            notify.success('Registro eliminado correctamente');
+        } catch (error) {
+            loadingOverlay.hide();
+            notify.error('Error al eliminar el registro');
+        }
     }
 
     // ============================================
@@ -761,11 +871,30 @@ class SistemaPlanillas {
         }
     }
 
-    eliminarFeriado(id) {
-        if (confirm('¿Está seguro de eliminar este feriado?')) {
+    async eliminarFeriado(id) {
+        const feriado = this.feriados.find(f => f.id === id);
+        const nombreFeriado = feriado ? feriado.descripcion : 'este feriado';
+        
+        const confirmado = await confirmDialog.confirmAction(
+            `¿Está seguro de eliminar ${nombreFeriado}?`,
+            'Eliminar Feriado'
+        );
+        
+        if (confirmado) {
+            try {
+                loadingOverlay.show();
+                await new Promise(resolve => setTimeout(resolve, 300));
+                
             this.feriados = this.feriados.filter(f => f.id !== id);
             this.guardarDatos();
             this.renderFeriados();
+                
+                loadingOverlay.hide();
+                notify.success(`Feriado ${nombreFeriado} eliminado correctamente`);
+            } catch (error) {
+                loadingOverlay.hide();
+                notify.error('Error al eliminar el feriado');
+            }
         }
     }
 
@@ -1034,7 +1163,7 @@ class SistemaPlanillas {
     generarComprobantePago(empleadoId, periodo, fechaInicio, fechaFin) {
         const empleado = this.empleados.find(e => e.id === empleadoId);
         if (!empleado) {
-            alert('Empleado no encontrado');
+            notify.error('Empleado no encontrado');
             return;
         }
 
@@ -1219,7 +1348,7 @@ class SistemaPlanillas {
             
             <div class="header">
                 <div class="logo">
-                    <img src="${empleado.empresa === 'Instituto Veterinario San Martin de Porres' ? 'images/empresa.png' : 'images/empresa.jpg'}" alt="Logo" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%22 height=%22100%22%3E%3Crect fill=%22%232C2C54%22 width=%22100%22 height=%22100%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 fill=%22white%22 font-size=%2212%22%3ELogo%3C/text%3E%3C/svg%3E'">
+                    <img src="${empleado.empresa === 'Instituto Veterinario San Martin de Porres' ? './images/empresa.png' : './images/logo.jpg'}" alt="Logo" onerror="this.onerror=null; this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%22 height=%22100%22%3E%3Crect fill=%22%23007bff%22 width=%22100%22 height=%22100%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 fill=%22white%22 font-size=%2212%22%3EVeterinaria%3C/text%3E%3C/svg%3E'">
                 </div>
                 <div style="flex: 1; text-align: right;">
                     <h2 style="margin: 0; color: #007bff;">${empleado.empresa || 'Veterinaria San Martín de Porres'}</h2>
@@ -1524,7 +1653,7 @@ class SistemaPlanillas {
             }
         });
 
-        alert(`Se crearon ${registrosCreados} registros de asistencia automática`);
+        notify.success(`Se crearon ${registrosCreados} registros de asistencia automática`);
         this.renderAsistencias();
     }
 
@@ -1671,7 +1800,7 @@ class SistemaPlanillas {
             const fechaFin = document.getElementById('autoFechaFin').value;
 
             if (!empleadoId || !fechaInicio || !fechaFin) {
-                alert('Por favor complete todos los campos');
+                notify.warning('Por favor complete todos los campos');
                 return;
             }
 
@@ -1773,13 +1902,33 @@ class SistemaPlanillas {
     // ============================================
 
     abrirModal(modalId) {
+        // Usar el nuevo sistema de modales centrados
+        if (window.modalManager) {
+            window.modalManager.showModal(modalId);
+        } else {
+            // Fallback para compatibilidad
         const modal = document.getElementById(modalId);
-        modal.style.display = 'block';
+            if (modal) {
+                modal.style.display = 'flex';
+                modal.style.alignItems = 'center';
+                modal.style.justifyContent = 'center';
+                modal.classList.add('show');
+            }
+        }
     }
 
     cerrarModal(modalId) {
+        // Usar el nuevo sistema de modales centrados
+        if (window.modalManager) {
+            window.modalManager.closeModal(modalId);
+        } else {
+            // Fallback para compatibilidad
         const modal = document.getElementById(modalId);
+            if (modal) {
         modal.style.display = 'none';
+                modal.classList.remove('show');
+            }
+        }
     }
 
     abrirEditarEmpleado(id) {
@@ -1859,25 +2008,11 @@ class SistemaPlanillas {
             });
         });
 
-        // Toggle sidebar
-        document.getElementById('toggleSidebar')?.addEventListener('click', () => {
-            document.querySelector('.sidebar').classList.toggle('collapsed');
-        });
+        // Toggle sidebar (ahora manejado por ModalManager en móviles)
+        // En desktop sigue funcionando con CSS
 
-        // Modales - cerrar
-        document.querySelectorAll('.close').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const modalId = e.target.dataset.modal;
-                this.cerrarModal(modalId);
-            });
-        });
-
-        document.querySelectorAll('[data-close]').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const modalId = e.target.dataset.close;
-                this.cerrarModal(modalId);
-            });
-        });
+        // Modales - cerrar (ahora manejado por ModalManager)
+        // Los event listeners se manejan automáticamente en Modal.js
 
         // Empleados
         document.getElementById('btnNuevoEmpleado')?.addEventListener('click', () => {
@@ -2015,7 +2150,7 @@ class SistemaPlanillas {
             const empresaFiltro = document.getElementById('filtroEmpresaPlanilla').value;
 
             if (!fechaInicio || !fechaFin) {
-                alert('Por favor seleccione las fechas de inicio y fin');
+                notify.warning('Por favor seleccione las fechas de inicio y fin');
                 return;
             }
 
@@ -2146,13 +2281,38 @@ class SistemaPlanillas {
             this.config.incapacidadCCSS = parseInt(document.getElementById('configIncapCCSS').value);
             this.config.incapacidadINS = parseInt(document.getElementById('configIncapINS').value);
             this.guardarDatos();
-            alert('Configuración guardada exitosamente');
+            notify.success('Configuración guardada exitosamente');
         });
 
-        document.getElementById('btnLimpiarDatos')?.addEventListener('click', () => {
-            if (confirm('¿Está seguro de eliminar todos los datos? Esta acción no se puede deshacer.')) {
+        document.getElementById('btnLimpiarDatos')?.addEventListener('click', async () => {
+            const confirmado = await confirmDialog.show(
+                '¿Está seguro de eliminar TODOS los datos? Esta acción no se puede deshacer y se perderá toda la información del sistema.',
+                '⚠️ PELIGRO: Eliminar Todos los Datos',
+                'danger',
+                {
+                    confirmText: 'ELIMINAR TODO',
+                    cancelText: 'Cancelar',
+                    confirmClass: 'btn-danger'
+                }
+            );
+            
+            if (confirmado) {
+                try {
+                    loadingOverlay.show();
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    
                 localStorage.clear();
+                    loadingOverlay.hide();
+                    
+                    notify.warning('Todos los datos han sido eliminados');
+                    
+                    setTimeout(() => {
                 location.reload();
+                    }, 2000);
+                } catch (error) {
+                    loadingOverlay.hide();
+                    notify.error('Error al eliminar los datos');
+                }
             }
         });
 
@@ -2189,10 +2349,10 @@ class SistemaPlanillas {
                         this.feriados = datos.feriados || [];
                         this.config = datos.config || this.config;
                         this.guardarDatos();
-                        alert('Datos importados exitosamente');
-                        location.reload();
+                        notify.success('Datos importados exitosamente');
+                        setTimeout(() => location.reload(), 1500);
                     } catch (error) {
-                        alert('Error al importar datos: ' + error.message);
+                        notify.error('Error al importar datos: ' + error.message);
                     }
                 };
                 reader.readAsText(file);
@@ -2389,7 +2549,7 @@ class SistemaPlanillas {
         // Verificar que hay empleados
         if (!employees || employees.length === 0) {
             tbody.innerHTML = '<tr><td colspan="5" class="no-data">No hay empleados registrados</td></tr>';
-            alert('No hay empleados registrados. Agrega empleados primero.');
+            notify.warning('No hay empleados registrados. Agrega empleados primero.');
             return;
         }
 
@@ -2409,13 +2569,13 @@ class SistemaPlanillas {
         sectionReportes.querySelector('#constancia').addEventListener('click', () => {
             const id = empSel.value;
             if (!id) { 
-                alert('Seleccione un empleado de la lista'); 
+                notify.warning('Seleccione un empleado de la lista'); 
                 return; 
             }
             
             const empleado = employees.find(x => x.id === id);
             if (!empleado) {
-                alert('Empleado no encontrado');
+                notify.error('Empleado no encontrado');
                 return;
             }
             
@@ -2578,14 +2738,14 @@ class SistemaPlanillas {
             
             <div class="header">
                 <div class="logo">
-                    <img src="${empleado.empresa === 'Instituto Veterinario San Martin de Porres' ? 'images/empresa.png' : 'images/empresa.png'}" alt="Logo" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22120%22 height=%22120%22%3E%3Crect fill=%22%23007bff%22 width=%22120%22 height=%22120%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 fill=%22white%22 font-size=%2212%22%3ELogo%3C/text%3E%3C/svg%3E'">
+                    <img src="${empleado.empresa === 'Instituto Veterinario San Martin de Porres' ? './images/empresa.png' : './images/logo.jpg'}" alt="Logo" onerror="this.onerror=null; this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22120%22 height=%22120%22%3E%3Crect fill=%22%23007bff%22 width=%22120%22 height=%22120%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 fill=%22white%22 font-size=%2212%22%3EVeterinaria%3C/text%3E%3C/svg%3E'">
                 </div>
                 
             </div>
             
             <div class="title">CONSTANCIA SALARIAL</div>
             <div class="subtitle">A QUIEN INTERESE</div>
-            
+
             <div class="content">
                 Por medio de este documento hacemos constar que el (la) Sr. (Sra.) <strong>${empleado.nombre}</strong> con documento de identidad número <strong>${empleado.cedula}</strong>, labora en nuestra empresa en el puesto de <strong>${empleado.puesto || 'Empleado'}</strong> desde el <strong>${empleado.fechaIngreso || 'fecha de ingreso'}</strong> y hasta la actualidad. Percibiendo en el último mes un salario mensual bruto de <strong>${this.formatearMoneda(salarioMensualBruto)}</strong> (${this.salarioATexto(salarioMensualBruto)}) y salario mensual neto de <strong>${this.formatearMoneda(salarioMensualNeto)}</strong> (${this.salarioATexto(salarioMensualNeto)}).
             </div>

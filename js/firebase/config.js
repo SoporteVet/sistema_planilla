@@ -4,7 +4,6 @@
 export const firebaseConfig = {
   apiKey: "AIzaSyBtnnoH8WdNdPso5VSvBdi_T3QUj6bKjdc",
   authDomain: "sistemaplanilla.firebaseapp.com",
-  databaseURL: "https://sistemaplanilla-default-rtdb.firebaseio.com",
   projectId: "sistemaplanilla",
   storageBucket: "sistemaplanilla.firebasestorage.app",
   messagingSenderId: "491116295999",

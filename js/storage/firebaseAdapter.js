@@ -6,8 +6,9 @@
 
 import { initFirebase } from '../firebase/init.js';
 
-export function createFirebaseAdapter(firebaseConfig) {
-  const { db, api } = initFirebase(firebaseConfig);
+export async function createFirebaseAdapter(firebaseConfig) {
+  const firebaseInstance = initFirebase(firebaseConfig);
+  const { db, api } = await firebaseInstance.ensureLoaded();
 
   async function readList(path) {
     const snapshot = await api.get(api.ref(db, path));
@@ -62,6 +63,7 @@ export function createFirebaseAdapter(firebaseConfig) {
       await writeObject('attendance', id, { id, ...record });
       return true;
     },
+    async deleteAttendance(id) { return await deleteById('attendance', id); },
 
     // Extras
     async listExtras(employeeId) {

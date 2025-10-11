@@ -59,10 +59,10 @@ async function renderRoute(route) {
 
   // Default: Home
   const { storage } = await import('./storage/index.js');
-  const employees = storage.listEmployees();
-  const attendance = storage.listAttendance();
-  const extras = storage.listExtras();
-  const holidays = storage.listHolidays();
+  const employees = await storage.listEmployees();
+  const attendance = await storage.listAttendance();
+  const extras = await storage.listExtras();
+  const holidays = await storage.listHolidays();
 
   const totalEmpleados = employees.length;
   const totalAsistencias = attendance.length;
