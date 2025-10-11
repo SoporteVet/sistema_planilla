@@ -16,6 +16,52 @@ class SistemaPlanillas {
             incapacidadCCSS: 50,
             incapacidadINS: 0
         };
+        // Configuración de jornadas laborales según normativa de Costa Rica
+        this.jornadas = {
+            diurna: {
+                horasPorDia: 8,
+                horasTrabajadas: 8, // Horas físicas trabajadas
+                horasPagadas: 8,    // Horas que se pagan
+                horasMensuales: 240,
+                horasQuincenales: 120,
+                diasPorSemana: 6
+            },
+            mixta: {
+                horasPorDia: 7,
+                horasTrabajadas: 7,
+                horasPagadas: 7,
+                horasMensuales: 210,
+                horasQuincenales: 105,
+                diasPorSemana: 6
+            },
+            nocturna: {
+                horasPorDia: 6,
+                horasTrabajadas: 6,
+                horasPagadas: 6,
+                horasMensuales: 180,
+                horasQuincenales: 90,
+                diasPorSemana: 6
+            },
+            diurna_acumulativa: {
+                horasPorDia: 10,        // Horas físicas trabajadas
+                horasTrabajadas: 10,     // Trabaja 10 horas
+                horasPagadas: 8,         // Pero se le pagan solo 8 horas
+                horasMensuales: 240,     // 8h × 30 días = 240
+                horasQuincenales: 120,   // 8h × 15 días = 120
+                diasPorSemana: 5,        // Trabaja 5 días a la semana
+                diasLibres: 2            // 2 días libres (beneficio por acumular horas)
+            },
+            mixta_acumulativa: {
+                horasPorDia: 9,          // Horas físicas trabajadas
+                horasTrabajadas: 9,      // Trabaja 9 horas
+                horasPagadas: 7,         // Pero se le pagan solo 7 horas
+                horasMensuales: 210,     // 7h × 30 días = 210
+                horasQuincenales: 105,   // 7h × 15 días = 105
+                diasPorSemana: 5,        // Trabaja 5 días a la semana
+                diasLibres: 2            // 2 días libres
+            }
+        };
+        this.eventListenersInitialized = false; // Flag para evitar duplicados
         this.init();
     }
 
@@ -497,31 +543,47 @@ class SistemaPlanillas {
                 const extra = parseFloat(asist.horasExtra || 0);
 
                 // Calcular según jornada
+                const horasPorDia = this.getHorasJornada(empleado.jornada);
+                
                 if (empleado.jornada === 'diurna') {
-                    // Jornada diurna: 8 horas máximo
-                    const horasRegulares = Math.min(horas, 8);
+                    // Jornada diurna: 8 horas por día
+                    const horasRegulares = Math.min(horas, horasPorDia);
                     horasNormales += horasRegulares;
+                    if (horas > horasPorDia) {
+                        horasExtra += horas - horasPorDia;
+                    }
+                } else if (empleado.jornada === 'nocturna') {
+                    // Jornada nocturna: 6 horas por día
+                    const horasRegulares = Math.min(horas, horasPorDia);
+                    horasNormales += horasRegulares;
+                    if (horas > horasPorDia) {
+                        horasExtra += horas - horasPorDia;
+                    }
+                } else if (empleado.jornada === 'mixta') {
+                    // Jornada mixta: 7 horas por día
+                    const horasRegulares = Math.min(horas, horasPorDia);
+                    horasNormales += horasRegulares;
+                    if (horas > horasPorDia) {
+                        horasExtra += horas - horasPorDia;
+                    }
+                } else if (empleado.jornada === 'diurna_acumulativa') {
+                    // Jornada diurna acumulativa: siempre se pagan 8 horas por día trabajado
+                    // Independientemente de las horas registradas, se pagan 8 horas
+                    horasNormales += horasPorDia; // Siempre 8 horas pagadas
+                    // NO se suman horas extra automáticamente por jornada acumulativa
+                } else if (empleado.jornada === 'mixta_acumulativa') {
+                    // Jornada mixta acumulativa: siempre se pagan 7 horas por día trabajado
+                    horasNormales += horasPorDia; // Siempre 7 horas pagadas
+                    // NO se suman horas extra automáticamente por jornada acumulativa
+                } else if (empleado.jornada === 'acumulativa') {
+                    // Compatibilidad con jornadas antiguas
+                    horasNormales += Math.min(horas, 8);
                     if (horas > 8) {
                         horasExtra += horas - 8;
                     }
-                } else if (empleado.jornada === 'nocturna') {
-                    // Jornada nocturna: 6 horas trabajadas = 8 horas pagadas
-                    const horasTrabajadas = Math.min(horas, 6);
-                    const horasAPagar = horasTrabajadas * (8/6);
-                    horasNormales += horasAPagar;
-                    if (horas > 6) {
-                        horasExtra += (horas - 6) * (8/6);
-                    }
-                } else if (empleado.jornada === 'mixta') {
-                    // Jornada mixta: 7 horas máximo
-                    const horasRegulares = Math.min(horas, 7);
-                    horasNormales += horasRegulares;
-                    if (horas > 7) {
-                        horasExtra += horas - 7;
-                    }
-                } else if (empleado.jornada === 'acumulativa') {
-                    // Jornada acumulativa: Se pagan 8 horas por día trabajado
-                    horasNormales += 8;
+                } else {
+                    // Jornada no reconocida, usar horas directamente
+                    horasNormales += horas;
                 }
 
                 // Sumar horas extra registradas explícitamente
@@ -589,13 +651,38 @@ class SistemaPlanillas {
     }
 
     getHorasJornada(jornada) {
-        switch(jornada) {
-            case 'diurna': return 8;
-            case 'nocturna': return 8; // Se pagan 8 aunque se trabajan 6
-            case 'mixta': return 7;
-            case 'acumulativa': return 8; // Se pagan 8 horas por día trabajado
-            default: return 8;
+        // Retorna las horas PAGADAS por día según la jornada
+        // Para acumulativas: se trabaja más horas pero se pagan menos por día
+        const config = this.jornadas[jornada];
+        if (config) {
+            return config.horasPagadas || config.horasPorDia;
         }
+        // Default para jornadas antiguas o no reconocidas
+        return 8;
+    }
+    
+    getHorasTrabajadas(jornada) {
+        // Retorna las horas FÍSICAS trabajadas por día
+        const config = this.jornadas[jornada];
+        if (config) {
+            return config.horasTrabajadas || config.horasPorDia;
+        }
+        return 8;
+    }
+    
+    getHorasMensuales(jornada) {
+        const config = this.jornadas[jornada];
+        return config ? config.horasMensuales : 240;
+    }
+    
+    getHorasQuincenales(jornada) {
+        const config = this.jornadas[jornada];
+        return config ? config.horasQuincenales : 120;
+    }
+    
+    getDiasPorSemana(jornada) {
+        const config = this.jornadas[jornada];
+        return config ? config.diasPorSemana : 6;
     }
 
     renderPlanilla(planilla) {
@@ -1749,17 +1836,37 @@ class SistemaPlanillas {
     }
 
     calcularHorasSegunJornada(jornada, diaSemana, horario) {
-        if (jornada === 'acumulativa') {
-            if (diaSemana === 'sábado' && horario.toLowerCase().includes('sábado')) {
-                const match = horario.match(/sábado[^:]*:?\s*(\d+)/i);
+        // Para jornadas acumulativas: trabajan más horas pero se registran menos
+        if (jornada === 'diurna_acumulativa' || jornada === 'acumulativa') {
+            // Trabajan 10 horas pero se pagan 8 horas
+            // Si el horario especifica algo diferente, respetar eso
+            if (horario && horario.toLowerCase().includes(diaSemana.toLowerCase())) {
+                const match = horario.match(new RegExp(diaSemana + '[^:]*:?\\s*(\\d+)', 'i'));
                 if (match) {
-                    return parseInt(match[1]);
+                    const horasTrabajadas = parseInt(match[1]);
+                    // Si son acumulativas, ajustar a horas pagadas (80% de las trabajadas)
+                    return Math.round(horasTrabajadas * 0.8);
                 }
-                return 8;
             }
-            return 10;
+            // Default: devolver horas PAGADAS (8), no trabajadas (10)
+            return 8;
         }
         
+        if (jornada === 'mixta_acumulativa') {
+            // Trabajan 9 horas pero se pagan 7 horas
+            if (horario && horario.toLowerCase().includes(diaSemana.toLowerCase())) {
+                const match = horario.match(new RegExp(diaSemana + '[^:]*:?\\s*(\\d+)', 'i'));
+                if (match) {
+                    const horasTrabajadas = parseInt(match[1]);
+                    // Ajustar a horas pagadas
+                    return Math.round(horasTrabajadas * 0.78);
+                }
+            }
+            // Default: devolver horas PAGADAS (7), no trabajadas (9)
+            return 7;
+        }
+        
+        // Para el resto de jornadas, usar las horas estándar (que son las pagadas)
         return this.getHorasJornada(jornada);
     }
 
@@ -1851,9 +1958,11 @@ class SistemaPlanillas {
     formatJornada(jornada) {
         const jornadas = {
             'diurna': 'Diurna (8h)',
-            'nocturna': 'Nocturna (6h, pago 8h)',
             'mixta': 'Mixta (7h)',
-            'acumulativa': 'Acumulativa'
+            'nocturna': 'Nocturna (6h)',
+            'diurna_acumulativa': 'Diurna Acum. (10h→8h)',
+            'mixta_acumulativa': 'Mixta Acum. (9h→7h)',
+            'acumulativa': 'Acumulativa' // Compatibilidad con datos antiguos
         };
         return jornadas[jornada] || jornada;
     }
@@ -2024,6 +2133,12 @@ class SistemaPlanillas {
     // ============================================
 
     initEventListeners() {
+        // Evitar inicializar múltiples veces
+        if (this.eventListenersInitialized) {
+            console.log('⚠️ Event listeners ya inicializados, evitando duplicados');
+            return;
+        }
+        
         // Navegación
         document.querySelectorAll('.menu-item').forEach(item => {
             item.addEventListener('click', (e) => {
@@ -2401,6 +2516,10 @@ class SistemaPlanillas {
         const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
         document.getElementById('fechaInicioPlanilla').value = inicioMes.toISOString().split('T')[0];
         document.getElementById('fechaFinPlanilla').value = hoy.toISOString().split('T')[0];
+        
+        // Marcar como inicializados
+        this.eventListenersInitialized = true;
+        console.log('✅ Event listeners inicializados correctamente');
     }
 
     cambiarSeccion(seccion) {
@@ -2833,15 +2952,6 @@ class SistemaPlanillas {
             });
         }, 100);
     }
-
-    getHorasJornada(jornada) {
-        switch(jornada) {
-            case 'Tiempo completo': return 8;
-            case 'Medio tiempo': return 4;
-            case 'Tiempo parcial': return 6;
-            default: return 8;
-        }
-    }
     
     calcularImpuestoRenta(salarioBruto) {
         // Nuevos tramos de impuesto de renta
@@ -2938,6 +3048,7 @@ let sistema;
 async function initializeSistema() {
     try {
         sistema = new SistemaPlanillas();
+        window.sistema = sistema; // Hacer accesible globalmente para onclick handlers
         await sistema.init(); // Asegurar que se ejecute la inicialización completa
         
         // Pequeño delay para asegurar que el DOM esté listo
