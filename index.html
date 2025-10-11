@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Planillas - Costa Rica</title>
+    <link rel="stylesheet" href="./css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <!-- Menú Lateral -->
+    <div class="sidebar" id="sidebar">
+        <div class="logo">
+            <i class="fas fa-money-check-alt"></i>
+            <h2>Sistema Planilla Veterinaria SMP</h2>
+        </div>
+        <nav class="menu">
+            <a href="#" class="menu-item active" data-section="empleados">
+                <i class="fas fa-users"></i>
+                <span>Empleados</span>
+            </a>
+            <a href="#" class="menu-item" data-section="asistencias">
+                <i class="fas fa-calendar-check"></i>
+                <span>Asistencias</span>
+            </a>
+            <a href="#" class="menu-item" data-section="bonos">
+                <i class="fas fa-gift"></i>
+                <span>Bonos y Rebajos</span>
+            </a>
+            <a href="#" class="menu-item" data-section="planillas">
+                <i class="fas fa-file-invoice-dollar"></i>
+                <span>Planillas</span>
+            </a>
+            <a href="#" class="menu-item" data-section="reportes">
+                <i class="fas fa-chart-bar"></i>
+                <span>Reportes</span>
+            </a>
+            <a href="#" class="menu-item" data-section="feriados">
+                <i class="fas fa-calendar-alt"></i>
+                <span>Feriados</span>
+            </a>
+            <a href="#" class="menu-item" data-section="configuracion">
+                <i class="fas fa-cog"></i>
+                <span>Configuración</span>
+            </a>
+        </nav>
+    </div>
+
+    <!-- Contenido Principal -->
+    <div class="main-content">
+        <header class="header">
+            <button class="toggle-sidebar" id="toggleSidebar">
+                <i class="fas fa-bars"></i>
+            </button>
+            <div class="header-info">
+                <span class="current-date" id="currentDate"></span>
+            </div>
+        </header>
+
+        <!-- Sección Empleados -->
+        <section id="section-empleados" class="content-section active">
+            <div class="section-header">
+                <h1>Gestión de Empleados</h1>
+                <button class="btn btn-primary" id="btnNuevoEmpleado">
+                    <i class="fas fa-plus"></i> Nuevo Empleado
+                </button>
+            </div>
+
+            <div class="tabs" style="margin-bottom: 20px; display: flex; gap: 10px; border-bottom: 2px solid var(--gray-300);">
+                <button class="tab-btn active" data-tab="lista" style="padding: 12px 24px; background: transparent; border: none; border-bottom: 3px solid var(--primary-color); color: var(--primary-color); font-size: 15px; font-weight: 500; cursor: pointer;">
+                    Lista de Empleados
+                </button>
+                <button class="tab-btn" data-tab="historial" style="padding: 12px 24px; background: transparent; border: none; border-bottom: 3px solid transparent; color: var(--gray-600); font-size: 15px; font-weight: 500; cursor: pointer;">
+                    Historial de Salarios
+                </button>
+            </div>
+
+            <div id="tab-lista" class="tab-panel" style="display: block;">
+                <div class="search-box">
+                    <input type="text" id="searchEmpleado" placeholder="Buscar por nombre o cédula...">
+                    <i class="fas fa-search"></i>
+                </div>
+
+                <div class="filters" style="margin-bottom: 20px; display: flex; gap: 15px; align-items: center;">
+                    <label for="filtroEmpresa" style="font-weight: 500; color: #333;">Filtrar por empresa:</label>
+                    <select id="filtroEmpresa" class="form-control" style="max-width: 300px;">
+                        <option value="">Todas las empresas</option>
+                        <option value="Veterinaria San Martin de Porres">Veterinaria San Martin de Porres</option>
+                        <option value="Grupo Empresarial San Martin de Porres">Grupo Empresarial San Martin de Porres</option>
+                        <option value="Instituto Veterinario San Martin de Porres">Instituto Veterinario San Martin de Porres</option>
+                    </select>
+                    <button class="btn btn-secondary" id="btnLimpiarFiltros" style="padding: 8px 16px;">
+                        <i class="fas fa-times"></i> Limpiar Filtros
+                    </button>
+                </div>
+
+                <div class="table-container">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Cédula</th>
+                            <th>Nombre</th>
+                            <th>Empresa</th>
+                            <th>Puesto</th>
+                            <th>Jornada</th>
+                            <th>Salario/Hora</th>
+                            <th>Fecha Ingreso</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tablaEmpleados">                    </tbody>
+                </table>
+            </div>
+            </div>
+
+            <div id="tab-historial" class="tab-panel" style="display: none;">
+                <div class="filters" style="margin-bottom: 20px;">
+                    <label>Empleado:</label>
+                    <select id="filtroEmpleadoHistorial" class="form-control" style="max-width: 300px;">
+                        <option value="">Todos los empleados</option>
+                    </select>
+                </div>
+                <div id="historialContainer"></div>
+            </div>
+        </section>
+
+        <!-- Sección Asistencias -->
+        <section id="section-asistencias" class="content-section">
+            <div class="section-header">
+                <h1>Control de Asistencias</h1>
+                <div>
+                    <button class="btn btn-success" id="btnAsistenciaAutomatica">
+                        <i class="fas fa-magic"></i> Registro Automático
+                    </button>
+                    <button class="btn btn-primary" id="btnNuevaAsistencia">
+                        <i class="fas fa-plus"></i> Registrar Asistencia
+                    </button>
+                </div>
+            </div>
+
+            <div class="filters">
+                <select id="filtroEmpleadoAsistencia" class="form-control">
+                    <option value="">Todos los empleados</option>
+                </select>
+                <input type="date" id="filtroFechaInicio" class="form-control">
+                <input type="date" id="filtroFechaFin" class="form-control">
+                <button class="btn btn-secondary" id="btnFiltrarAsistencias">Filtrar</button>
+            </div>
+
+            <div class="table-container">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Empleado</th>
+                            <th>Tipo</th>
+                            <th>Horas</th>
+                            <th>Detalle</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tablaAsistencias"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Sección Bonos y Rebajos -->
+        <section id="section-bonos" class="content-section">
+            <div class="section-header">
+                <h1>Bonos y Rebajos</h1>
+                <button class="btn btn-primary" id="btnNuevoBono">
+                    <i class="fas fa-plus"></i> Agregar Bono/Rebajo
+                </button>
+            </div>
+
+            <div class="filters">
+                <select id="filtroEmpleadoBono" class="form-control">
+                    <option value="">Todos los empleados</option>
+                </select>
+                <select id="filtroTipoBono" class="form-control">
+                    <option value="">Todos los tipos</option>
+                    <option value="bono">Bonos</option>
+                    <option value="rebajo">Rebajos</option>
+                </select>
+                <button class="btn btn-secondary" id="btnFiltrarBonos">Filtrar</button>
+            </div>
+
+            <div class="table-container">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Empleado</th>
+                            <th>Tipo</th>
+                            <th>Concepto</th>
+                            <th>Monto</th>
+                            <th>Fecha</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tablaBonos"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Sección Planillas -->
+        <section id="section-planillas" class="content-section">
+            <div class="section-header">
+                <h1>Generación de Planillas</h1>
+                <div style="display: flex; gap: 10px;">
+                    <button class="btn btn-primary" id="btnGenerarPlanilla">
+                        <i class="fas fa-calculator"></i> Generar Planilla
+                    </button>
+                    <button class="btn btn-success" id="btnGuardarPlanilla" style="display: none;">
+                        <i class="fas fa-save"></i> Guardar Planilla
+                    </button>
+                </div>
+            </div>
+
+            <div class="filters">
+                <select id="periodoPlanilla" class="form-control">
+                    <option value="semanal">Semanal</option>
+                    <option value="quincenal">Quincenal</option>
+                    <option value="mensual">Mensual</option>
+                </select>
+                <select id="filtroEmpresaPlanilla" class="form-control">
+                    <option value="">Todas las empresas</option>
+                    <option value="Veterinaria San Martin de Porres">Veterinaria San Martin de Porres</option>
+                    <option value="Grupo Empresarial San Martin de Porres">Grupo Empresarial San Martin de Porres</option>
+                    <option value="Instituto Veterinario San Martin de Porres">Instituto Veterinario San Martin de Porres</option>
+                </select>
+                <input type="date" id="fechaInicioPlanilla" class="form-control">
+                <input type="date" id="fechaFinPlanilla" class="form-control">
+            </div>
+
+            <div class="planilla-summary" id="planillaSummary" style="display: none;">
+                <h3>Resumen de Planilla</h3>
+                <div class="summary-grid">
+                    <div class="summary-card">
+                        <span class="label">Total Salarios Brutos:</span>
+                        <span class="value" id="totalBruto">₡0.00</span>
+                    </div>
+                    <div class="summary-card">
+                        <span class="label">Total Deducciones:</span>
+                        <span class="value" id="totalDeducciones">₡0.00</span>
+                    </div>
+                    <div class="summary-card">
+                        <span class="label">Total Neto a Pagar:</span>
+                        <span class="value" id="totalNeto">₡0.00</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="table-container">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Empleado</th>
+                            <th>Salario Base</th>
+                            <th>Horas Extra</th>
+                            <th>Bonos</th>
+                            <th>Salario Bruto</th>
+                            <th>CCSS (10.67%)</th>
+                            <th>Rebajos</th>
+                            <th>Salario Neto</th>
+                            <th>Documentos</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tablaPlanilla"></tbody>
+                </table>
+            </div>
+
+            <div class="planilla-actions" style="margin-top: 20px; display: none;" id="planillaActions">
+                <button class="btn btn-success" id="btnExportarExcel">
+                    <i class="fas fa-file-excel"></i> Exportar a Excel
+                </button>
+                <button class="btn btn-danger" id="btnExportarPDF">
+                    <i class="fas fa-file-pdf"></i> Exportar a PDF
+                </button>
+            </div>
+        </section>
+
+        <!-- Sección Reportes -->
+        <section id="section-reportes" class="content-section">
+            <div class="section-header">
+                <h1>Reportes</h1>
+            </div>
+
+            <div class="reports-grid">
+                <div class="report-card" id="reporteVacaciones">
+                    <i class="fas fa-umbrella-beach"></i>
+                    <h3>Vacaciones</h3>
+                    <p>Ver días de vacaciones acumulados por empleado</p>
+                    <button class="btn btn-primary">Ver Reporte</button>
+                </div>
+                <div class="report-card" id="reporteAguinaldo">
+                    <i class="fas fa-gift"></i>
+                    <h3>Aguinaldo</h3>
+                    <p>Calcular aguinaldo del año</p>
+                    <button class="btn btn-primary">Ver Reporte</button>
+                </div>
+                <div class="report-card" id="reporteConstancias">
+                    <i class="fas fa-file-alt"></i>
+                    <h3>Constancias Salariales</h3>
+                    <p>Generar constancias en PDF</p>
+                    <button class="btn btn-primary">Generar</button>
+                </div>
+                <div class="report-card" id="reporteIncapacidades">
+                    <i class="fas fa-notes-medical"></i>
+                    <h3>Incapacidades</h3>
+                    <p>Historial de incapacidades</p>
+                    <button class="btn btn-primary">Ver Reporte</button>
+                </div>
+            </div>
+
+            <div id="reporteDetalle" class="reporte-detalle" style="display: none;">
+                <div class="section-header">
+                    <h2 id="reporteTitulo"></h2>
+                    <button class="btn btn-secondary" id="btnCerrarReporte">Cerrar</button>
+                </div>
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead id="reporteTableHead"></thead>
+                        <tbody id="reporteTableBody"></tbody>
+                    </table>
+                </div>
+                <div style="margin-top: 20px;">
+                    <button class="btn btn-success" id="btnExportarReportePDF">
+                        <i class="fas fa-file-pdf"></i> Exportar PDF
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Sección Feriados -->
+        <section id="section-feriados" class="content-section">
+            <div class="section-header">
+                <h1>Gestión de Feriados</h1>
+                <button class="btn btn-primary" id="btnNuevoFeriado">
+                    <i class="fas fa-plus"></i> Nuevo Feriado
+                </button>
+            </div>
+
+            <div class="table-container">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Descripción</th>
+                            <th>Recargo Extra</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tablaFeriados"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Sección Configuración -->
+        <section id="section-configuracion" class="content-section">
+            <div class="section-header">
+                <h1>Configuración del Sistema</h1>
+            </div>
+
+            <div class="config-container">
+                <div class="config-section">
+                    <h3>Cargas Sociales</h3>
+                    <div class="form-group">
+                        <label>CCSS (%):</label>
+                        <input type="number" id="configCCSS" class="form-control" value="10.67" step="0.01">
+                    </div>
+                </div>
+
+                <div class="config-section">
+                    <h3>Incapacidades</h3>
+                    <div class="form-group">
+                        <label>CCSS - Porcentaje a pagar (%):</label>
+                        <input type="number" id="configIncapCCSS" class="form-control" value="50" step="1">
+                    </div>
+                    <div class="form-group">
+                        <label>INS - Porcentaje a pagar (%):</label>
+                        <input type="number" id="configIncapINS" class="form-control" value="0" step="1">
+                    </div>
+                </div>
+
+                <div class="config-section">
+                    <h3>Almacenamiento</h3>
+                    <button class="btn btn-danger" id="btnLimpiarDatos">
+                        <i class="fas fa-trash"></i> Limpiar Todos los Datos
+                    </button>
+                    <button class="btn btn-warning" id="btnExportarDatos">
+                        <i class="fas fa-download"></i> Exportar Datos (Backup)
+                    </button>
+                    <button class="btn btn-info" id="btnImportarDatos">
+                        <i class="fas fa-upload"></i> Importar Datos
+                    </button>
+                    <input type="file" id="inputImportarDatos" accept=".json" style="display: none;">
+                </div>
+
+                <div class="config-section">
+                    <h3>Integración Firebase</h3>
+                    <p>El sistema está preparado para conectarse a Firebase Firestore.</p>
+                    <button class="btn btn-secondary" id="btnConfigurarFirebase">
+                        <i class="fas fa-cloud"></i> Configurar Firebase
+                    </button>
+                </div>
+
+                <button class="btn btn-success" id="btnGuardarConfig">Guardar Configuración</button>
+            </div>
+        </section>
+    </div>
+
+    <!-- Modal Empleado -->
+    <div id="modalEmpleado" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalEmpleadoTitulo">Nuevo Empleado</h2>
+                <span class="close" data-modal="modalEmpleado">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="formEmpleado">
+                    <input type="hidden" id="empleadoId">
+                    <div class="form-group">
+                        <label>Cédula *</label>
+                        <input type="text" id="empleadoCedula" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Nombre Completo *</label>
+                        <input type="text" id="empleadoNombre" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Puesto *</label>
+                        <input type="text" id="empleadoPuesto" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Jornada Laboral *</label>
+                        <select id="empleadoJornada" class="form-control" required>
+                            <option value="">Seleccione...</option>
+                            <option value="diurna">Diurna (8 horas)</option>
+                            <option value="nocturna">Nocturna (6 horas, pago 8)</option>
+                            <option value="mixta">Mixta (7 horas)</option>
+                            <option value="acumulativa">Acumulativa</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Salario por Hora *</label>
+                        <input type="number" id="empleadoSalarioHora" class="form-control" step="0.01" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Fecha de Ingreso *</label>
+                        <input type="date" id="empleadoFechaIngreso" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Horario de Trabajo</label>
+                        <textarea id="empleadoHorario" class="form-control" rows="3" placeholder="Ejemplo: Martes a Viernes: 7:00 AM - 5:00 PM&#10;Sábado: 8:00 AM - 4:00 PM&#10;Domingo y Lunes: Libre"></textarea>
+                        <small>Describa los días y horarios de trabajo para cálculo automático de asistencias</small>
+                    </div>
+                    <div class="form-group">
+                        <label>Teléfono</label>
+                        <input type="tel" id="empleadoTelefono" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input type="email" id="empleadoEmail" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label>Empresa *</label>
+                        <select id="empleadoEmpresa" class="form-control" required>
+                            <option value="">Seleccione...</option>
+                            <option value="Veterinaria San Martin de Porres">Veterinaria San Martin de Porres</option>
+                            <option value="Grupo Empresarial San Martin de Porres">Grupo Empresarial San Martin de Porres</option>
+                            <option value="Instituto Veterinario San Martin de Porres">Instituto Veterinario San Martin de Porres</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Depositado en</label>
+                        <input type="text" id="empleadoDepositadoEn" class="form-control" placeholder="Ej: BAC San José, Banco Nacional, etc.">
+                    </div>
+                    <div class="form-group">
+                        <label>Departamento</label>
+                        <input type="text" id="empleadoDepartamento" class="form-control" placeholder="Ej: Operativo, Administrativo, Veterinaria">
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-close="modalEmpleado">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">Guardar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Asistencia -->
+    <div id="modalAsistencia" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Registrar Asistencia</h2>
+                <span class="close" data-modal="modalAsistencia">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="formAsistencia">
+                    <input type="hidden" id="asistenciaId">
+                    <div class="form-group">
+                        <label>Empleado *</label>
+                        <select id="asistenciaEmpleado" class="form-control" required></select>
+                    </div>
+                    <div class="form-group">
+                        <label>Fecha *</label>
+                        <input type="date" id="asistenciaFecha" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Tipo *</label>
+                        <select id="asistenciaTipo" class="form-control" required>
+                            <option value="">Seleccione...</option>
+                            <option value="presente">Presente</option>
+                            <option value="ausencia">Ausencia</option>
+                            <option value="tardanza">Tardanza</option>
+                            <option value="permiso">Permiso</option>
+                            <option value="incapacidad_ccss">Incapacidad CCSS</option>
+                            <option value="incapacidad_ins">Incapacidad INS</option>
+                            <option value="vacaciones">Vacaciones</option>
+                            <option value="libre">Libre</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Horas Trabajadas</label>
+                        <input type="number" id="asistenciaHoras" class="form-control" step="0.5" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label>Horas Extra</label>
+                        <input type="number" id="asistenciaHorasExtra" class="form-control" step="0.5" min="0" value="0">
+                    </div>
+                    <div class="form-group">
+                        <label>Detalle</label>
+                        <textarea id="asistenciaDetalle" class="form-control" rows="3"></textarea>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-close="modalAsistencia">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">Guardar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Bono/Rebajo -->
+    <div id="modalBono" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Agregar Bono/Rebajo</h2>
+                <span class="close" data-modal="modalBono">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="formBono">
+                    <input type="hidden" id="bonoId">
+                    <div class="form-group">
+                        <label>Empleado *</label>
+                        <select id="bonoEmpleado" class="form-control" required></select>
+                    </div>
+                    <div class="form-group">
+                        <label>Tipo *</label>
+                        <select id="bonoTipo" class="form-control" required>
+                            <option value="">Seleccione...</option>
+                            <option value="bono">Bono</option>
+                            <option value="rebajo">Rebajo</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Concepto *</label>
+                        <input type="text" id="bonoConcepto" class="form-control" required placeholder="Ej: Bono de productividad, Rebajo por préstamo">
+                    </div>
+                    <div class="form-group">
+                        <label>Monto *</label>
+                        <input type="number" id="bonoMonto" class="form-control" step="0.01" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Fecha *</label>
+                        <input type="date" id="bonoFecha" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Aplicar a planilla</label>
+                        <select id="bonoPeriodo" class="form-control">
+                            <option value="actual">Período actual</option>
+                            <option value="siguiente">Período siguiente</option>
+                        </select>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-close="modalBono">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">Guardar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Feriado -->
+    <div id="modalFeriado" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Agregar Feriado</h2>
+                <span class="close" data-modal="modalFeriado">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="formFeriado">
+                    <input type="hidden" id="feriadoId">
+                    <div class="form-group">
+                        <label>Fecha *</label>
+                        <input type="date" id="feriadoFecha" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Descripción *</label>
+                        <input type="text" id="feriadoDescripcion" class="form-control" required placeholder="Ej: Día de la Independencia">
+                    </div>
+                    <div class="form-group">
+                        <label>Recargo Extra (%)</label>
+                        <input type="number" id="feriadoRecargo" class="form-control" step="1" value="50" min="0">
+                        <small>Porcentaje adicional sobre el salario normal para quienes trabajen este día</small>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-close="modalFeriado">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">Guardar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { getFirestore } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+        import { getAuth } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+
+        // Tu configuración de Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyBtnnoH8WdNdPso5VSvBdi_T3QUj6bKjdc",
+            authDomain: "sistemaplanilla.firebaseapp.com",
+            projectId: "sistemaplanilla",
+            storageBucket: "sistemaplanilla.firebasestorage.app",
+            messagingSenderId: "491116295999",
+            appId: "1:491116295999:web:704f7c8620fcb43b00858a",
+            measurementId: "G-QBB39HNE7R"
+        };
+
+        // Inicializar Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+
+        // Hacer disponible globalmente
+        window.db = db;
+        window.auth = auth;
+        
+        console.log('Firebase inicializado correctamente');
+    </script>
+    
+    <script src="js/app.js"></script>
