@@ -219,5 +219,3 @@ window.addEventListener('resize', () => {
         window.modalManager.centerModal(window.modalManager.getActiveModal());
     }
 });
-
-console.log('🎯 Sistema de modales centrados cargado');

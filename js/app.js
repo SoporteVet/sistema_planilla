@@ -83,7 +83,6 @@ class SistemaPlanillas {
             const firebaseHelpers = await import('./firebase-helpers.js');
             this.firebaseHelpers = firebaseHelpers;
             await firebaseHelpers.initializeFirebaseStorage();
-            console.log('🔥 Sistema conectado a Firebase');
         } catch (error) {
             console.warn('⚠️ Firebase no disponible, usando localStorage', error);
             this.firebaseHelpers = null;
@@ -102,7 +101,6 @@ class SistemaPlanillas {
                 this.config = { ...this.config, ...configData };
             }
             this.historialPlanillas = await this.firebaseHelpers.getData('historialPlanillas') || [];
-            console.log('📥 Datos cargados desde Firebase');
         } else {
             // Fallback a localStorage
             const empleadosGuardados = localStorage.getItem('empleados');
@@ -130,7 +128,6 @@ class SistemaPlanillas {
             if (historialGuardado) {
                 this.historialPlanillas = JSON.parse(historialGuardado);
             }
-            console.log('📥 Datos cargados desde localStorage');
         }
     }
 
@@ -532,6 +529,22 @@ class SistemaPlanillas {
         let horasExtra = 0;
         let montoHorasExtra = 0;
 
+        // Si no hay asistencias registradas, NO pagar nada
+        if (asistencias.length === 0) {
+            return {
+                horasNormales: '0.00',
+                horasExtra: '0.00',
+                salarioBase: '0.00',
+                montoHorasExtra: '0.00',
+                bonos: '0.00',
+                rebajos: '0.00',
+                salarioBruto: '0.00',
+                ccss: '0.00',
+                impuestoRenta: '0.00',
+                salarioNeto: '0.00'
+            };
+        }
+
         asistencias.forEach(asist => {
             if (asist.tipo === 'presente') {
                 // Si no hay horas registradas o son 0, asumir jornada completa
@@ -567,14 +580,68 @@ class SistemaPlanillas {
                         horasExtra += horas - horasPorDia;
                     }
                 } else if (empleado.jornada === 'diurna_acumulativa') {
-                    // Jornada diurna acumulativa: siempre se pagan 8 horas por día trabajado
-                    // Independientemente de las horas registradas, se pagan 8 horas
-                    horasNormales += horasPorDia; // Siempre 8 horas pagadas
-                    // NO se suman horas extra automáticamente por jornada acumulativa
+                    // Jornada diurna acumulativa:
+                    // Regla: Por cada hora visual menos, se resta 1 hora pagada
+                    // - 10h visuales = 8h pagadas (día completo martes-viernes)
+                    // - 9h visuales = 7h pagadas (1h menos)
+                    // - 8h visuales = 6h pagadas (2h menos) O 8h pagadas si es sábado completo
+                    // - 8h visuales sábado = 8h pagadas (día completo sábado)
+                    // - 7h visuales sábado = 7h pagadas (1h menos)
+                    
+                    // Obtener las horas visuales normales del día según el horario
+                    const fecha = asist.fecha;
+                    const diaSemana = this.getDiaSemana(fecha);
+                    const horasVisualesNormales = this.getHorasVisualesJornada(empleado.jornada, diaSemana, empleado.horario);
+                    
+                    let horasPagadas;
+                    if (horasVisualesNormales === 10) {
+                        // Días de 10 horas visuales (martes-viernes)
+                        // 10h visuales = 8h pagadas, 9h = 7h, 8h = 6h, etc.
+                        const horasFaltantes = horasVisualesNormales - horas;
+                        horasPagadas = horasPorDia - horasFaltantes; // 8 - (10-horas)
+                    } else if (horasVisualesNormales === 8) {
+                        // Días de 8 horas visuales (sábado)
+                        // 8h visuales = 8h pagadas, 7h = 7h, 6h = 6h, etc.
+                        horasPagadas = horas; // 1:1
+                    } else if (horasVisualesNormales === 0) {
+                        // Día libre, no debería entrar aquí (se maneja en tipo 'libre')
+                        horasPagadas = 0;
+                    } else {
+                        // Otros casos: usar proporción
+                        const horasFaltantes = horasVisualesNormales - horas;
+                        horasPagadas = Math.max(0, horasPorDia - horasFaltantes);
+                    }
+                    
+                    horasNormales += horasPagadas;
+                    // NO calcular horas extra automáticamente
                 } else if (empleado.jornada === 'mixta_acumulativa') {
-                    // Jornada mixta acumulativa: siempre se pagan 7 horas por día trabajado
-                    horasNormales += horasPorDia; // Siempre 7 horas pagadas
-                    // NO se suman horas extra automáticamente por jornada acumulativa
+                    // Jornada mixta acumulativa:
+                    // - SIEMPRE se pagan 7 horas por día trabajado (sin importar las horas visuales)
+                    // - Las horas registradas son solo para control visual
+                    // - Si trabajó menos horas, se paga proporcionalmente SOLO si es menos de las horas esperadas
+                    // - Las horas extra SOLO se toman del campo "Horas Extra" (no se calculan automáticamente)
+                    
+                    // Obtener las horas visuales normales del día según el horario
+                    const fecha = asist.fecha;
+                    const diaSemana = this.getDiaSemana(fecha);
+                    const horasVisualesNormales = this.getHorasVisualesJornada(empleado.jornada, diaSemana, empleado.horario);
+                    
+                    // Si trabajó las horas completas o más, pagar 7 horas
+                    // Si trabajó menos, pagar proporcionalmente
+                    let horasPagadas;
+                    if (horas >= horasVisualesNormales) {
+                        // Día completo: siempre 7 horas pagadas
+                        horasPagadas = horasPorDia; // 7 horas
+                    } else if (horasVisualesNormales > 0) {
+                        // Trabajó menos: calcular proporción
+                        const proporcion = horasPorDia / horasVisualesNormales; // 7/9 ≈ 0.778
+                        horasPagadas = horas * proporcion;
+                    } else {
+                        horasPagadas = 0;
+                    }
+                    
+                    horasNormales += horasPagadas;
+                    // NO calcular horas extra automáticamente
                 } else if (empleado.jornada === 'acumulativa') {
                     // Compatibilidad con jornadas antiguas
                     horasNormales += Math.min(horas, 8);
@@ -592,14 +659,26 @@ class SistemaPlanillas {
                 // CCSS paga el 50% del día
                 const horasDia = this.getHorasJornada(empleado.jornada);
                 horasNormales += horasDia * (this.config.incapacidadCCSS / 100);
+            } else if (asist.tipo === 'libre') {
+                // Días libres en jornadas acumulativas SÍ se pagan
+                // porque las horas trabajadas en otros días cubren toda la semana
+                if (empleado.jornada === 'diurna_acumulativa' || empleado.jornada === 'mixta_acumulativa' || empleado.jornada === 'acumulativa') {
+                    const horasDia = this.getHorasJornada(empleado.jornada);
+                    horasNormales += horasDia;
+                }
+                // Para otras jornadas, los días libres no se pagan (0%)
             }
             // INS no paga (0%)
         });
 
-        salarioBase = horasNormales * empleado.salarioHora;
+        // NOTA: Ya NO sobrescribimos las horas con las horas quincenales completas
+        // Ahora usamos las horas realmente trabajadas registradas en las asistencias
+        // Esto permite que el sistema calcule correctamente cuando alguien trabaja menos horas
+
+        salarioBase = Math.round((horasNormales * empleado.salarioHora) * 100000000) / 100000000;
         
         // Horas extra con recargo del 50% según ley costarricense
-        montoHorasExtra = horasExtra * empleado.salarioHora * 1.5;
+        montoHorasExtra = Math.round((horasExtra * empleado.salarioHora * 1.5) * 100000000) / 100000000;
 
         // Obtener bonos y rebajos del período
         const bonosEmpleado = this.bonos.filter(b => 
@@ -617,10 +696,10 @@ class SistemaPlanillas {
             .reduce((sum, b) => sum + parseFloat(b.monto), 0);
 
         // Calcular salario bruto
-        const salarioBruto = salarioBase + montoHorasExtra + totalBonos;
+        const salarioBruto = Math.round((salarioBase + montoHorasExtra + totalBonos) * 100000000) / 100000000;
 
         // Calcular deducciones CCSS
-        const ccss = salarioBruto * (this.config.ccss / 100);
+        const ccss = Math.round((salarioBruto * (this.config.ccss / 100)) * 100000000) / 100000000;
         
         // Calcular impuesto de renta (solo en la segunda quincena)
         let impuestoRenta = 0;
@@ -634,7 +713,7 @@ class SistemaPlanillas {
         }
 
         // Calcular salario neto
-        const salarioNeto = salarioBruto - ccss - impuestoRenta - totalRebajos;
+        const salarioNeto = Math.round((salarioBruto - ccss - impuestoRenta - totalRebajos) * 100000000) / 100000000;
 
         return {
             horasNormales: horasNormales.toFixed(2),
@@ -1740,13 +1819,14 @@ class SistemaPlanillas {
 
             if (!asistenciaExistente) {
                 if (diasTrabajo.includes(diaSemana)) {
-                    const horas = this.calcularHorasSegunJornada(empleado.jornada, diaSemana, empleado.horario);
+                    // Usar las horas VISUALES (reales trabajadas) para el registro
+                    const horasVisuales = this.getHorasVisualesJornada(empleado.jornada, diaSemana, empleado.horario);
                     
                     this.agregarAsistencia({
                         empleadoId: empleadoId,
                         fecha: fecha,
                         tipo: 'presente',
-                        horas: horas,
+                        horas: horasVisuales,
                         horasExtra: 0,
                         detalle: `Registro automático - ${diaSemana}`
                     });
@@ -1813,7 +1893,8 @@ class SistemaPlanillas {
             });
         }
 
-        return [...new Set(dias)];
+        const diasUnicos = [...new Set(dias)];
+        return diasUnicos;
     }
 
     generarFechasEntre(fechaInicio, fechaFin) {
@@ -1867,6 +1948,132 @@ class SistemaPlanillas {
         }
         
         // Para el resto de jornadas, usar las horas estándar (que son las pagadas)
+        return this.getHorasJornada(jornada);
+    }
+
+    // Nueva función para obtener las horas VISUALES (horas reales trabajadas)
+    getHorasVisualesJornada(jornada, diaSemana, horario) {
+        // Función mejorada para extraer horas del horario del empleado
+        const extraerHorasDelHorario = (horario, diaSemana) => {
+            if (!horario) {
+                return null;
+            }
+            
+            const horarioLower = horario.toLowerCase();
+            const diaLower = diaSemana.toLowerCase();
+            
+            // Buscar patrones como:
+            // "martes a viernes: 7:00 a 5:00" -> 10 horas
+            // "sábado: 8:00 a 4:00" -> 8 horas
+            // "lunes: 8:00 a 5:00" -> 9 horas
+            
+            // Patrón 2: "día a día: hora1 a hora2" (para rangos como "martes a viernes") - PRIORITARIO
+            const diasSemana = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
+            const diaIndex = diasSemana.indexOf(diaLower);
+            
+            if (diaIndex >= 0) {
+                const patron2 = new RegExp(`(\\w+)\\s*a\\s*(\\w+)\\s*:?\\s*(\\d{1,2})\\s*:?\\s*\\d{0,2}\\s*a\\s*(\\d{1,2})\\s*:?\\s*\\d{0,2}`, 'i');
+                const match2 = horarioLower.match(patron2);
+                if (match2) {
+                    const diaInicio = diasSemana.indexOf(match2[1].toLowerCase());
+                    const diaFin = diasSemana.indexOf(match2[2].toLowerCase());
+                    const horaInicio = parseInt(match2[3]);
+                    const horaFin = parseInt(match2[4]);
+                    
+                    // Verificar si el día actual está en el rango
+                    if (diaIndex >= diaInicio && diaIndex <= diaFin) {
+                        const horas = Math.abs(horaFin - horaInicio);
+                        return horas;
+                    }
+                }
+            }
+            
+            // Patrón 1: "día: hora1 a hora2" (días individuales) - formato original
+            const patron1 = new RegExp(`${diaLower}\\s*:?\\s*(\\d{1,2})\\s*:?\\s*\\d{0,2}\\s*a\\s*(\\d{1,2})\\s*:?\\s*\\d{0,2}`, 'i');
+            const match1 = horarioLower.match(patron1);
+            if (match1) {
+                const horaInicio = parseInt(match1[1]);
+                const horaFin = parseInt(match1[2]);
+                const horas = Math.abs(horaFin - horaInicio);
+                return horas;
+            }
+            
+            // Patrón 1b: "día: hora1 AM - hora2 PM" (formato con AM/PM y guión)
+            const patron1b = new RegExp(`${diaLower}\\s*:?\\s*(\\d{1,2})\\s*:?\\s*\\d{0,2}\\s*(a\\.?m\\.?)?\\s*-\\s*(\\d{1,2})\\s*:?\\s*\\d{0,2}\\s*(p\\.?m\\.?)?`, 'i');
+            const match1b = horarioLower.match(patron1b);
+            if (match1b) {
+                let horaInicio = parseInt(match1b[1]);
+                let horaFin = parseInt(match1b[3]);
+                
+                const tieneAM = match1b[2]; // Captura si hay "a.m" en hora inicio
+                const tienePM = match1b[4]; // Captura si hay "p.m" en hora fin
+                
+                // Convertir PM a formato 24h
+                if (tienePM && horaFin < 12) {
+                    horaFin += 12;
+                }
+                
+                // Si la hora de inicio es PM también
+                if (tieneAM === undefined && horaInicio >= 12) {
+                    // Ya está en formato 24h
+                } else if (!tieneAM && !tienePM && horaInicio < horaFin) {
+                    // Caso sin AM/PM explícito, asumir que está bien
+                }
+                
+                const horas = Math.abs(horaFin - horaInicio);
+                return horas;
+            }
+            
+            // Patrón 3: "día: X horas" (horas explícitas)
+            const patron3 = new RegExp(`${diaLower}\\s*:?\\s*(\\d+)\\s*horas?`, 'i');
+            const match3 = horarioLower.match(patron3);
+            if (match3) {
+                const horas = parseInt(match3[1]);
+                return horas;
+            }
+            
+            // Patrón 4: "día: Libre" (día libre)
+            const patron4 = new RegExp(`${diaLower}\\s*:?\\s*libre`, 'i');
+            const match4 = horarioLower.match(patron4);
+            if (match4) {
+                return 0;
+            }
+            
+            return null;
+        };
+        
+            // Para jornadas acumulativas: usar el horario del empleado
+            if (jornada === 'diurna_acumulativa' || jornada === 'acumulativa' || jornada === 'mixta_acumulativa') {
+                // Intentar extraer horas del horario del empleado
+                const horasDelHorario = extraerHorasDelHorario(horario, diaSemana);
+                if (horasDelHorario !== null) {
+                    return horasDelHorario;
+                }
+            
+            // Si no se encuentra en el horario, usar patrones por defecto
+            const diasSemana = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
+            const diaIndex = diasSemana.indexOf(diaSemana.toLowerCase());
+            
+            if (jornada === 'diurna_acumulativa' || jornada === 'acumulativa') {
+                if (diaIndex >= 1 && diaIndex <= 4) { // Lunes a Jueves
+                    return 10;
+                } else if (diaIndex === 5) { // Viernes
+                    return 8;
+                } else { // Sábado y Domingo
+                    return 0;
+                }
+            } else if (jornada === 'mixta_acumulativa') {
+                if (diaIndex >= 1 && diaIndex <= 4) { // Lunes a Jueves
+                    return 9;
+                } else if (diaIndex === 5) { // Viernes
+                    return 7;
+                } else { // Sábado y Domingo
+                    return 0;
+                }
+            }
+        }
+        
+        // Para el resto de jornadas, las horas visuales son iguales a las pagadas
         return this.getHorasJornada(jornada);
     }
 
@@ -1960,7 +2167,7 @@ class SistemaPlanillas {
             'diurna': 'Diurna (8h)',
             'mixta': 'Mixta (7h)',
             'nocturna': 'Nocturna (6h)',
-            'diurna_acumulativa': 'Diurna Acum. (10h→8h)',
+            'diurna_acumulativa': 'Diurna Acumulativa',
             'mixta_acumulativa': 'Mixta Acum. (9h→7h)',
             'acumulativa': 'Acumulativa' // Compatibilidad con datos antiguos
         };
@@ -2135,7 +2342,6 @@ class SistemaPlanillas {
     initEventListeners() {
         // Evitar inicializar múltiples veces
         if (this.eventListenersInitialized) {
-            console.log('⚠️ Event listeners ya inicializados, evitando duplicados');
             return;
         }
         
@@ -2215,6 +2421,48 @@ class SistemaPlanillas {
 
         document.getElementById('btnAsistenciaAutomatica')?.addEventListener('click', () => {
             this.abrirModalRegistroAutomatico();
+        });
+
+        // Auto-llenar horas según jornada cuando se selecciona empleado en modal de asistencia
+        document.getElementById('asistenciaEmpleado')?.addEventListener('change', () => {
+            const empId = document.getElementById('asistenciaEmpleado').value;
+            if (empId) {
+                const empleado = this.empleados.find(e => e.id === empId);
+                if (empleado) {
+                    // Obtener la fecha seleccionada para calcular el día de la semana
+                    const fechaInput = document.getElementById('asistenciaFecha');
+                    const fecha = fechaInput ? fechaInput.value : new Date().toISOString().split('T')[0];
+                    const diaSemana = this.getDiaSemana(fecha);
+                    
+                    // Usar la función corregida para obtener las horas visuales según el día
+                    const horasSugeridas = this.getHorasVisualesJornada(empleado.jornada, diaSemana, empleado.horario);
+                    
+                    const horasInput = document.getElementById('asistenciaHoras');
+                    if (horasInput && !horasInput.value) {
+                        horasInput.value = horasSugeridas;
+                    }
+                }
+            }
+        });
+
+        // Auto-llenar horas cuando se cambia la fecha en el modal de asistencia
+        document.getElementById('asistenciaFecha')?.addEventListener('change', () => {
+            const empId = document.getElementById('asistenciaEmpleado').value;
+            if (empId) {
+                const empleado = this.empleados.find(e => e.id === empId);
+                if (empleado) {
+                    const fechaInput = document.getElementById('asistenciaFecha');
+                    const fecha = fechaInput ? fechaInput.value : new Date().toISOString().split('T')[0];
+                    const diaSemana = this.getDiaSemana(fecha);
+                    
+                    const horasSugeridas = this.getHorasVisualesJornada(empleado.jornada, diaSemana, empleado.horario);
+                    
+                    const horasInput = document.getElementById('asistenciaHoras');
+                    if (horasInput) {
+                        horasInput.value = horasSugeridas;
+                    }
+                }
+            }
         });
 
         document.getElementById('formAsistencia')?.addEventListener('submit', (e) => {
@@ -2519,7 +2767,6 @@ class SistemaPlanillas {
         
         // Marcar como inicializados
         this.eventListenersInitialized = true;
-        console.log('✅ Event listeners inicializados correctamente');
     }
 
     cambiarSeccion(seccion) {
@@ -3064,7 +3311,6 @@ async function initializeSistema() {
             }
         }, 200);
         
-        console.log('✅ Sistema de Planillas inicializado correctamente');
     } catch (error) {
         console.error('❌ Error al inicializar el sistema:', error);
     }

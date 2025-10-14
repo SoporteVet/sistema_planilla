@@ -109,7 +109,126 @@ export async function renderAttendanceView(root, { showToast }) {
     `).join('');
   }
 
-  empSel.addEventListener('change', renderRows);
+  empSel.addEventListener('change', () => {
+    renderRows();
+    // Auto-llenar horas según la jornada del empleado y día de la semana
+    const empId = empSel.value;
+    if (empId) {
+      const employee = employees.find(e => e.id === empId);
+      if (employee) {
+        // Obtener la fecha seleccionada para calcular el día de la semana
+        const fechaInput = root.querySelector('#date');
+        const fecha = fechaInput ? fechaInput.value : new Date().toISOString().split('T')[0];
+        
+        // Función para obtener día de la semana (simplificada)
+        const getDiaSemana = (fecha) => {
+          const dias = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
+          const fechaObj = new Date(fecha + 'T00:00:00');
+          return dias[fechaObj.getDay()];
+        };
+        
+        const diaSemana = getDiaSemana(fecha);
+        
+        // Función para obtener horas visuales según jornada y día
+        const getHorasVisualesJornada = (jornada, diaSemana, horario) => {
+          if (jornada === 'diurna_acumulativa' || jornada === 'acumulativa') {
+            const diasSemana = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
+            const diaIndex = diasSemana.indexOf(diaSemana.toLowerCase());
+            
+            if (diaIndex >= 1 && diaIndex <= 4) { // Lunes a Jueves
+              return 10;
+            } else if (diaIndex === 5) { // Viernes
+              return 8;
+            } else { // Sábado y Domingo
+              return 0;
+            }
+          } else if (jornada === 'mixta_acumulativa') {
+            const diasSemana = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
+            const diaIndex = diasSemana.indexOf(diaSemana.toLowerCase());
+            
+            if (diaIndex >= 1 && diaIndex <= 4) { // Lunes a Jueves
+              return 9;
+            } else if (diaIndex === 5) { // Viernes
+              return 7;
+            } else { // Sábado y Domingo
+              return 0;
+            }
+          } else if (jornada === 'nocturna') {
+            return 6;
+          } else if (jornada === 'mixta') {
+            return 7;
+          } else {
+            return 8; // default
+          }
+        };
+        
+        const horasSugeridas = getHorasVisualesJornada(employee.jornada, diaSemana, employee.horario);
+        
+        const hoursInput = root.querySelector('#hours');
+        if (hoursInput && !hoursInput.value) {
+          hoursInput.value = horasSugeridas;
+        }
+      }
+    }
+  });
+  
+  // Auto-llenar horas cuando se cambia la fecha
+  dateIn.addEventListener('change', () => {
+    const empId = empSel.value;
+    if (empId) {
+      const employee = employees.find(e => e.id === empId);
+      if (employee) {
+        const fecha = dateIn.value || new Date().toISOString().split('T')[0];
+        
+        // Función para obtener día de la semana (simplificada)
+        const getDiaSemana = (fecha) => {
+          const dias = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
+          const fechaObj = new Date(fecha + 'T00:00:00');
+          return dias[fechaObj.getDay()];
+        };
+        
+        const diaSemana = getDiaSemana(fecha);
+        
+        // Función para obtener horas visuales según jornada y día
+        const getHorasVisualesJornada = (jornada, diaSemana, horario) => {
+          if (jornada === 'diurna_acumulativa' || jornada === 'acumulativa') {
+            const diasSemana = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
+            const diaIndex = diasSemana.indexOf(diaSemana.toLowerCase());
+            
+            if (diaIndex >= 1 && diaIndex <= 4) { // Lunes a Jueves
+              return 10;
+            } else if (diaIndex === 5) { // Viernes
+              return 8;
+            } else { // Sábado y Domingo
+              return 0;
+            }
+          } else if (jornada === 'mixta_acumulativa') {
+            const diasSemana = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
+            const diaIndex = diasSemana.indexOf(diaSemana.toLowerCase());
+            
+            if (diaIndex >= 1 && diaIndex <= 4) { // Lunes a Jueves
+              return 9;
+            } else if (diaIndex === 5) { // Viernes
+              return 7;
+            } else { // Sábado y Domingo
+              return 0;
+            }
+          } else if (jornada === 'nocturna') {
+            return 6;
+          } else if (jornada === 'mixta') {
+            return 7;
+          } else {
+            return 8; // default
+          }
+        };
+        
+        const horasSugeridas = getHorasVisualesJornada(employee.jornada, diaSemana, employee.horario);
+        
+        hoursIn.value = horasSugeridas;
+      }
+    }
+  });
+  
   root.querySelector('#save').addEventListener('click', async () => {
     const empId = empSel.value;
     if (!empId) { showToast('Seleccione un empleado'); return; }

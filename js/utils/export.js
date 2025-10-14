@@ -38,3 +38,5 @@ export function exportPayrollToPDF(rows, meta = {}, filename = 'planilla.pdf') {
 
 
 
+
+

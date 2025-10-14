@@ -58,30 +58,10 @@ function testLoadingOverlay() {
 
 // Ejecutar pruebas cuando se carga la página
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('🚀 Sistema de notificaciones cargado correctamente');
-    console.log('📝 Para probar las notificaciones, ejecuta: testNotifications()');
-    console.log('⏳ Para probar el loading overlay, ejecuta: testLoadingOverlay()');
-    
-    // Verificar que los objetos están disponibles
-    if (typeof notify !== 'undefined') {
-        console.log('✅ notify disponible');
-    } else {
-        console.error('❌ notify no está disponible');
-    }
-    
-    if (typeof confirmDialog !== 'undefined') {
-        console.log('✅ confirmDialog disponible');
-    } else {
-        console.error('❌ confirmDialog no está disponible');
-    }
-    
-    if (typeof loadingOverlay !== 'undefined') {
-        console.log('✅ loadingOverlay disponible');
-    } else {
-        console.error('❌ loadingOverlay no está disponible');
-    }
 });
 
 // Hacer las funciones disponibles globalmente para pruebas
 window.testNotifications = testNotifications;
 window.testLoadingOverlay = testLoadingOverlay;
+
+

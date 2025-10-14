@@ -20,7 +20,6 @@ export async function initializeFirebaseStorage() {
     firebaseAPI = api;
     isInitialized = true;
     
-    console.log('✅ Firebase inicializado correctamente');
     return true;
   } catch (error) {
     console.error('❌ Error al inicializar Firebase:', error);
@@ -115,4 +114,6 @@ export async function deleteData(key) {
 export function isFirebaseReady() {
   return isInitialized;
 }
+
+
 

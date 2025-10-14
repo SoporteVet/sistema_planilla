@@ -251,11 +251,9 @@ export async function initializeAuth() {
     
     if (user) {
       // Usuario autenticado
-      console.log('Usuario autenticado:', user.email);
       showMainApp();
     } else {
       // Usuario no autenticado
-      console.log('Usuario no autenticado');
       showLoginScreen();
     }
   } catch (error) {

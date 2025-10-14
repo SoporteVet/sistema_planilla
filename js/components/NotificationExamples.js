@@ -281,8 +281,6 @@ window.notificationHelpers = {
     ejecutarConConfirmacion
 };
 
-console.log('✨ Sistema de notificaciones cargado correctamente');
-console.log('📝 Usa notify.success(), notify.error(), notify.warning(), notify.info()');
-console.log('❓ Usa confirmDialog.confirmDelete() o confirmDialog.confirmAction()');
-console.log('⏳ Usa loadingOverlay.show() y loadingOverlay.hide()');
+
+
 

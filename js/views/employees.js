@@ -113,7 +113,7 @@ export async function renderEmployeesView(root, { showToast }) {
             </div>
             <div>
               <label>₡/Hora</label>
-              <input name="salarioHora" type="number" step="0.01" min="0" placeholder="0" required />
+              <input name="salarioHora" type="number" step="0.00000001" min="0" placeholder="0" required />
             </div>
             <div>
               <label>Fecha ingreso</label>
@@ -254,7 +254,7 @@ export async function renderEmployeesView(root, { showToast }) {
         </div>
         <div class="form-group">
           <label for="salarioHora">₡/Hora *</label>
-          <input type="number" name="salarioHora" id="salarioHora" step="0.01" min="0" placeholder="0" required />
+          <input type="number" name="salarioHora" id="salarioHora" step="0.00000001" min="0" placeholder="0" required />
         </div>
         <div class="form-group">
           <label for="fechaIngreso">Fecha ingreso</label>
