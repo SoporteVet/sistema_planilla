@@ -9,6 +9,7 @@ class SistemaPlanillas {
         this.asistencias = [];
         this.bonos = [];
         this.feriados = [];
+        this.vacaciones = [];
         this.historialPlanillas = [];
         this.ultimaPlanilla = null;
         this.config = {
@@ -96,6 +97,7 @@ class SistemaPlanillas {
             this.asistencias = await this.firebaseHelpers.getData('asistencias') || [];
             this.bonos = await this.firebaseHelpers.getData('bonos') || [];
             this.feriados = await this.firebaseHelpers.getData('feriados') || [];
+            this.vacaciones = await this.firebaseHelpers.getData('vacaciones') || [];
             const configData = await this.firebaseHelpers.getData('config');
             if (configData && typeof configData === 'object' && !Array.isArray(configData)) {
                 this.config = { ...this.config, ...configData };
@@ -107,6 +109,7 @@ class SistemaPlanillas {
             const asistenciasGuardadas = localStorage.getItem('asistencias');
             const bonosGuardados = localStorage.getItem('bonos');
             const feriadosGuardados = localStorage.getItem('feriados');
+            const vacacionesGuardadas = localStorage.getItem('vacaciones');
             const configGuardada = localStorage.getItem('config');
             const historialGuardado = localStorage.getItem('historialPlanillas');
 
@@ -121,6 +124,9 @@ class SistemaPlanillas {
             }
             if (feriadosGuardados) {
                 this.feriados = JSON.parse(feriadosGuardados);
+            }
+            if (vacacionesGuardadas) {
+                this.vacaciones = JSON.parse(vacacionesGuardadas);
             }
             if (configGuardada) {
                 this.config = JSON.parse(configGuardada);
@@ -139,6 +145,7 @@ class SistemaPlanillas {
                 this.firebaseHelpers.saveData('asistencias', this.asistencias),
                 this.firebaseHelpers.saveData('bonos', this.bonos),
                 this.firebaseHelpers.saveData('feriados', this.feriados),
+                this.firebaseHelpers.saveData('vacaciones', this.vacaciones),
                 this.firebaseHelpers.saveData('config', this.config),
                 this.firebaseHelpers.saveData('historialPlanillas', this.historialPlanillas)
             ]);
@@ -148,6 +155,7 @@ class SistemaPlanillas {
             localStorage.setItem('asistencias', JSON.stringify(this.asistencias));
             localStorage.setItem('bonos', JSON.stringify(this.bonos));
             localStorage.setItem('feriados', JSON.stringify(this.feriados));
+            localStorage.setItem('vacaciones', JSON.stringify(this.vacaciones));
             localStorage.setItem('config', JSON.stringify(this.config));
             localStorage.setItem('historialPlanillas', JSON.stringify(this.historialPlanillas));
         }
@@ -581,66 +589,78 @@ class SistemaPlanillas {
                     }
                 } else if (empleado.jornada === 'diurna_acumulativa') {
                     // Jornada diurna acumulativa:
-                    // Regla: Por cada hora visual menos, se resta 1 hora pagada
-                    // - 10h visuales = 8h pagadas (día completo martes-viernes)
-                    // - 9h visuales = 7h pagadas (1h menos)
-                    // - 8h visuales = 6h pagadas (2h menos) O 8h pagadas si es sábado completo
-                    // - 8h visuales sábado = 8h pagadas (día completo sábado)
-                    // - 7h visuales sábado = 7h pagadas (1h menos)
+                    // Se trabajan 10 horas físicas pero se PAGAN 8 horas
+                    // Por cada hora menos trabajada, se resta 1 hora de pago
+                    // Ej: 10h trabajadas = 8h pagadas, 9h trabajadas = 7h pagadas, 8h = 6h pagadas
+                    // Los días libres también se pagan 8 horas
                     
-                    // Obtener las horas visuales normales del día según el horario
-                    const fecha = asist.fecha;
-                    const diaSemana = this.getDiaSemana(fecha);
-                    const horasVisualesNormales = this.getHorasVisualesJornada(empleado.jornada, diaSemana, empleado.horario);
+                    const horasOriginales = parseFloat(asist.horas || 0);
                     
-                    let horasPagadas;
-                    if (horasVisualesNormales === 10) {
-                        // Días de 10 horas visuales (martes-viernes)
-                        // 10h visuales = 8h pagadas, 9h = 7h, 8h = 6h, etc.
-                        const horasFaltantes = horasVisualesNormales - horas;
-                        horasPagadas = horasPorDia - horasFaltantes; // 8 - (10-horas)
-                    } else if (horasVisualesNormales === 8) {
-                        // Días de 8 horas visuales (sábado)
-                        // 8h visuales = 8h pagadas, 7h = 7h, 6h = 6h, etc.
-                        horasPagadas = horas; // 1:1
-                    } else if (horasVisualesNormales === 0) {
-                        // Día libre, no debería entrar aquí (se maneja en tipo 'libre')
-                        horasPagadas = 0;
+                    // Si el día fue registrado con 0 horas (día libre), pagar jornada completa
+                    if (horasOriginales === 0) {
+                        // Día libre en jornada acumulativa: se paga la jornada completa
+                        horasNormales += horasPorDia; // 8 horas
                     } else {
-                        // Otros casos: usar proporción
-                        const horasFaltantes = horasVisualesNormales - horas;
-                        horasPagadas = Math.max(0, horasPorDia - horasFaltantes);
+                        // Día trabajado: calcular según las horas trabajadas
+                        const fecha = asist.fecha;
+                        const diaSemana = this.getDiaSemana(fecha);
+                        const horasVisualesNormales = this.getHorasVisualesJornada(empleado.jornada, diaSemana, empleado.horario);
+                        
+                        let horasPagadas;
+                        
+                        if (horasVisualesNormales === 0) {
+                            // Según horario es día libre, pero está trabajando: pagar 1:1
+                            horasPagadas = horas;
+                        } else if (horasVisualesNormales === 8) {
+                            // Días de 8 horas visuales: relación 1:1
+                            // 8h trabajadas = 8h pagadas, 7h = 7h, etc.
+                            horasPagadas = horas;
+                        } else {
+                            // Días con más de 8 horas visuales (típicamente 10h)
+                            // Por cada hora menos trabajada, se resta 1 hora de pago
+                            // 10h visuales → 8h pagadas (si trabaja las 10 completas)
+                            // 9h visuales → 7h pagadas (1h menos)
+                            const horasFaltantes = horasVisualesNormales - horas;
+                            horasPagadas = Math.max(0, horasPorDia - horasFaltantes);
+                        }
+                        
+                        horasNormales += horasPagadas;
                     }
-                    
-                    horasNormales += horasPagadas;
                     // NO calcular horas extra automáticamente
                 } else if (empleado.jornada === 'mixta_acumulativa') {
                     // Jornada mixta acumulativa:
-                    // - SIEMPRE se pagan 7 horas por día trabajado (sin importar las horas visuales)
-                    // - Las horas registradas son solo para control visual
-                    // - Si trabajó menos horas, se paga proporcionalmente SOLO si es menos de las horas esperadas
-                    // - Las horas extra SOLO se toman del campo "Horas Extra" (no se calculan automáticamente)
+                    // Se trabajan 9 horas físicas pero se PAGAN 7 horas
+                    // Los días libres también se pagan 7 horas
                     
-                    // Obtener las horas visuales normales del día según el horario
-                    const fecha = asist.fecha;
-                    const diaSemana = this.getDiaSemana(fecha);
-                    const horasVisualesNormales = this.getHorasVisualesJornada(empleado.jornada, diaSemana, empleado.horario);
+                    const horasOriginales = parseFloat(asist.horas || 0);
                     
-                    // Si trabajó las horas completas o más, pagar 7 horas
-                    // Si trabajó menos, pagar proporcionalmente
-                    let horasPagadas;
-                    if (horas >= horasVisualesNormales) {
-                        // Día completo: siempre 7 horas pagadas
-                        horasPagadas = horasPorDia; // 7 horas
-                    } else if (horasVisualesNormales > 0) {
-                        // Trabajó menos: calcular proporción
-                        const proporcion = horasPorDia / horasVisualesNormales; // 7/9 ≈ 0.778
-                        horasPagadas = horas * proporcion;
+                    // Si el día fue registrado con 0 horas (día libre), pagar jornada completa
+                    if (horasOriginales === 0) {
+                        // Día libre en jornada acumulativa: se paga la jornada completa
+                        horasNormales += horasPorDia; // 7 horas
                     } else {
-                        horasPagadas = 0;
+                        // Día trabajado: calcular según las horas trabajadas
+                        const fecha = asist.fecha;
+                        const diaSemana = this.getDiaSemana(fecha);
+                        const horasVisualesNormales = this.getHorasVisualesJornada(empleado.jornada, diaSemana, empleado.horario);
+                        
+                        // Si trabajó las horas completas o más, pagar 7 horas
+                        // Si trabajó menos, pagar proporcionalmente
+                        let horasPagadas;
+                        if (horas >= horasVisualesNormales) {
+                            // Día completo: siempre 7 horas pagadas
+                            horasPagadas = horasPorDia; // 7 horas
+                        } else if (horasVisualesNormales > 0) {
+                            // Trabajó menos: calcular proporción
+                            const proporcion = horasPorDia / horasVisualesNormales; // 7/9 ≈ 0.778
+                            horasPagadas = horas * proporcion;
+                        } else {
+                            // Según horario es día libre, pero está trabajando: pagar proporcionalmente
+                            horasPagadas = horas;
+                        }
+                        
+                        horasNormales += horasPagadas;
                     }
-                    
-                    horasNormales += horasPagadas;
                     // NO calcular horas extra automáticamente
                 } else if (empleado.jornada === 'acumulativa') {
                     // Compatibilidad con jornadas antiguas
@@ -671,9 +691,26 @@ class SistemaPlanillas {
             // INS no paga (0%)
         });
 
-        // NOTA: Ya NO sobrescribimos las horas con las horas quincenales completas
-        // Ahora usamos las horas realmente trabajadas registradas en las asistencias
-        // Esto permite que el sistema calcule correctamente cuando alguien trabaja menos horas
+        // Para jornadas acumulativas: completar días faltantes del período
+        // En jornadas acumulativas TODOS los días se pagan (trabajados o libres)
+        if (empleado.jornada === 'diurna_acumulativa' || empleado.jornada === 'mixta_acumulativa' || empleado.jornada === 'acumulativa') {
+            // Calcular días del período
+            const fechaInicioObj = new Date(fechaInicio + 'T00:00:00');
+            const fechaFinObj = new Date(fechaFin + 'T00:00:00');
+            const diasDelPeriodo = Math.round((fechaFinObj - fechaInicioObj) / (1000 * 60 * 60 * 24)) + 1;
+            
+            // Contar días ya procesados en asistencias
+            const diasRegistrados = asistencias.length;
+            
+            // Calcular días faltantes (días libres no registrados)
+            const diasFaltantes = diasDelPeriodo - diasRegistrados;
+            
+            if (diasFaltantes > 0) {
+                // Agregar las horas de los días libres no registrados
+                const horasPorDia = this.getHorasJornada(empleado.jornada);
+                horasNormales += diasFaltantes * horasPorDia;
+            }
+        }
 
         salarioBase = Math.round((horasNormales * empleado.salarioHora) * 100000000) / 100000000;
         
@@ -837,6 +874,145 @@ class SistemaPlanillas {
         
         // 1 día de vacaciones por mes trabajado
         return meses;
+    }
+
+    // ============================================
+    // GESTIÓN DE VACACIONES TOMADAS
+    // ============================================
+
+    agregarVacacion(vacacion) {
+        vacacion.id = Date.now().toString();
+        this.vacaciones.push(vacacion);
+        this.guardarDatos();
+        this.renderVacaciones();
+        notify.success('Vacaciones registradas correctamente');
+    }
+
+    editarVacacion(id, datos) {
+        const index = this.vacaciones.findIndex(v => v.id === id);
+        if (index !== -1) {
+            this.vacaciones[index] = { ...this.vacaciones[index], ...datos };
+            this.guardarDatos();
+            this.renderVacaciones();
+            notify.success('Vacaciones actualizadas correctamente');
+        }
+    }
+
+    eliminarVacacion(id) {
+        this.vacaciones = this.vacaciones.filter(v => v.id !== id);
+        this.guardarDatos();
+        this.renderVacaciones();
+        notify.success('Vacaciones eliminadas correctamente');
+    }
+
+    calcularDiasVacacionesTomadas(empleadoId) {
+        return this.vacaciones
+            .filter(v => v.empleadoId === empleadoId && v.tomada === true)
+            .reduce((total, v) => total + parseInt(v.dias || 0), 0);
+    }
+
+    renderVacaciones() {
+        const tabla = document.getElementById('tablaVacaciones');
+        if (!tabla) return;
+
+        const filas = this.empleados.map(emp => {
+            const diasAcumulados = this.calcularVacaciones(emp.id);
+            const diasTomados = this.calcularDiasVacacionesTomadas(emp.id);
+            const diasDisponibles = diasAcumulados - diasTomados;
+
+            return `
+                <tr>
+                    <td>${emp.nombre}</td>
+                    <td>${this.formatearFecha(emp.fechaIngreso)}</td>
+                    <td><span class="badge badge-info">${diasAcumulados} días</span></td>
+                    <td><span class="badge badge-warning">${diasTomados} días</span></td>
+                    <td><span class="badge ${diasDisponibles > 0 ? 'badge-success' : 'badge-danger'}">${diasDisponibles} días</span></td>
+                    <td>
+                        <button class="btn btn-sm btn-primary" onclick="sistema.verDetalleVacaciones('${emp.id}')">
+                            <i class="fas fa-eye"></i> Ver Detalle
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+
+        tabla.innerHTML = filas;
+    }
+
+    verDetalleVacaciones(empleadoId) {
+        const empleado = this.empleados.find(e => e.id === empleadoId);
+        if (!empleado) return;
+
+        const vacacionesEmpleado = this.vacaciones.filter(v => v.empleadoId === empleadoId);
+        
+        let detalleHTML = `
+            <div class="modal-detalle-vacaciones">
+                <h3>${empleado.nombre}</h3>
+                <p><strong>Fecha Ingreso:</strong> ${this.formatearFecha(empleado.fechaIngreso)}</p>
+                <p><strong>Días Acumulados:</strong> ${this.calcularVacaciones(empleadoId)} días</p>
+                <p><strong>Días Tomados:</strong> ${this.calcularDiasVacacionesTomadas(empleadoId)} días</p>
+                <p><strong>Días Disponibles:</strong> ${this.calcularVacaciones(empleadoId) - this.calcularDiasVacacionesTomadas(empleadoId)} días</p>
+                <hr>
+                <h4>Historial de Vacaciones</h4>
+        `;
+
+        if (vacacionesEmpleado.length === 0) {
+            detalleHTML += '<p class="text-muted">No hay vacaciones registradas</p>';
+        } else {
+            detalleHTML += '<table class="table"><thead><tr><th>Fecha Inicio</th><th>Fecha Fin</th><th>Días</th><th>Estado</th><th>Detalle</th><th>Acciones</th></tr></thead><tbody>';
+            vacacionesEmpleado.forEach(v => {
+                const estado = v.tomada ? '<span class="badge badge-success">Tomadas</span>' : '<span class="badge badge-warning">Pendientes</span>';
+                detalleHTML += `
+                    <tr>
+                        <td>${this.formatearFecha(v.fechaInicio)}</td>
+                        <td>${this.formatearFecha(v.fechaFin)}</td>
+                        <td>${v.dias} días</td>
+                        <td>${estado}</td>
+                        <td>${v.detalle || '-'}</td>
+                        <td>
+                            <button class="btn btn-sm btn-info" onclick="sistema.marcarVacacionComoTomada('${v.id}')" ${v.tomada ? 'disabled' : ''}>
+                                <i class="fas fa-check"></i> Marcar como Tomada
+                            </button>
+                            <button class="btn btn-sm btn-danger" onclick="sistema.eliminarVacacion('${v.id}'); document.querySelector('.modal.active').remove();">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+            detalleHTML += '</tbody></table>';
+        }
+
+        detalleHTML += '</div>';
+
+        // Crear modal temporal
+        const modal = document.createElement('div');
+        modal.className = 'modal active';
+        modal.innerHTML = `
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Detalle de Vacaciones</h2>
+                    <span class="close" onclick="this.closest('.modal').remove()">&times;</span>
+                </div>
+                <div class="modal-body">
+                    ${detalleHTML}
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" onclick="this.closest('.modal').remove()">Cerrar</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    }
+
+    marcarVacacionComoTomada(id) {
+        const index = this.vacaciones.findIndex(v => v.id === id);
+        if (index !== -1) {
+            this.vacaciones[index].tomada = true;
+            this.guardarDatos();
+            this.renderVacaciones();
+            notify.success('Vacaciones marcadas como tomadas correctamente');
+        }
     }
 
     calcularAguinaldo(empleadoId, fechaInicio, fechaFin) {
@@ -1063,34 +1239,54 @@ class SistemaPlanillas {
     }
 
     async eliminarFeriado(id) {
+        console.log('🗑️ Eliminando feriado:', id);
         const feriado = this.feriados.find(f => f.id === id);
         const nombreFeriado = feriado ? feriado.descripcion : 'este feriado';
+        
+        console.log('📋 Feriado a eliminar:', feriado);
+        console.log('🤔 Mostrando confirmación...');
         
         const confirmado = await confirmDialog.confirmAction(
             `¿Está seguro de eliminar ${nombreFeriado}?`,
             'Eliminar Feriado'
         );
         
+        console.log('✅ Usuario confirmó:', confirmado);
+        
         if (confirmado) {
             try {
+                console.log('⏳ Mostrando loading overlay...');
                 loadingOverlay.show();
                 await new Promise(resolve => setTimeout(resolve, 300));
                 
-            this.feriados = this.feriados.filter(f => f.id !== id);
-            this.guardarDatos();
-            this.renderFeriados();
+                console.log('🔄 Filtrando feriados...');
+                this.feriados = this.feriados.filter(f => f.id !== id);
+                this.guardarDatos();
+                this.renderFeriados();
                 
                 loadingOverlay.hide();
                 notify.success(`Feriado ${nombreFeriado} eliminado correctamente`);
+                console.log('✅ Feriado eliminado exitosamente');
             } catch (error) {
+                console.error('❌ Error al eliminar feriado:', error);
                 loadingOverlay.hide();
                 notify.error('Error al eliminar el feriado');
             }
+        } else {
+            console.log('❌ Usuario canceló la eliminación');
         }
     }
 
     renderFeriados() {
+        console.log('🎨 Renderizando feriados...');
         const tbody = document.getElementById('tablaFeriados');
+        
+        if (!tbody) {
+            console.error('❌ No se encontró el elemento tablaFeriados');
+            return;
+        }
+        
+        console.log('📊 Total de feriados:', this.feriados.length);
         
         if (this.feriados.length === 0) {
             tbody.innerHTML = `
@@ -1101,24 +1297,31 @@ class SistemaPlanillas {
                     </td>
                 </tr>
             `;
+            console.log('📝 Mostrando mensaje de vacío');
             return;
         }
 
-        tbody.innerHTML = this.feriados.map(feriado => `
-            <tr>
-                <td>${this.formatearFecha(feriado.fecha)}</td>
-                <td>${feriado.descripcion}</td>
-                <td>${feriado.recargo}%</td>
-                <td>
-                    <button class="btn btn-sm btn-primary" onclick="sistema.abrirEditarFeriado('${feriado.id}')">
-                        <i class="fas fa-edit"></i>
-                    </button>
-                    <button class="btn btn-sm btn-danger" onclick="sistema.eliminarFeriado('${feriado.id}')">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </td>
-            </tr>
-        `).join('');
+        const html = this.feriados.map(feriado => {
+            console.log('🔧 Generando HTML para feriado:', feriado.id, feriado.descripcion);
+            return `
+                <tr>
+                    <td>${this.formatearFecha(feriado.fecha)}</td>
+                    <td>${feriado.descripcion}</td>
+                    <td>${feriado.recargo}%</td>
+                    <td>
+                        <button class="btn btn-sm btn-primary" onclick="sistema.abrirEditarFeriado('${feriado.id}')">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="btn btn-sm btn-danger" onclick="sistema.eliminarFeriado('${feriado.id}')">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+        
+        tbody.innerHTML = html;
+        console.log('✅ Feriados renderizados correctamente');
     }
 
     // ============================================
@@ -1972,18 +2175,23 @@ class SistemaPlanillas {
             const diaIndex = diasSemana.indexOf(diaLower);
             
             if (diaIndex >= 0) {
-                const patron2 = new RegExp(`(\\w+)\\s*a\\s*(\\w+)\\s*:?\\s*(\\d{1,2})\\s*:?\\s*\\d{0,2}\\s*a\\s*(\\d{1,2})\\s*:?\\s*\\d{0,2}`, 'i');
-                const match2 = horarioLower.match(patron2);
-                if (match2) {
+                // Intentar encontrar múltiples rangos o días en el horario
+                const patron2 = new RegExp(`(\\w+)\\s*a\\s*(\\w+)\\s*:?\\s*(\\d{1,2})(?::?(\\d{2}))?\\s*a\\s*(\\d{1,2})(?::?(\\d{2}))?`, 'gi');
+                let match2;
+                while ((match2 = patron2.exec(horarioLower)) !== null) {
                     const diaInicio = diasSemana.indexOf(match2[1].toLowerCase());
                     const diaFin = diasSemana.indexOf(match2[2].toLowerCase());
                     const horaInicio = parseInt(match2[3]);
-                    const horaFin = parseInt(match2[4]);
+                    const minInicio = match2[4] ? parseInt(match2[4]) : 0;
+                    const horaFin = parseInt(match2[5]);
+                    const minFin = match2[6] ? parseInt(match2[6]) : 0;
                     
                     // Verificar si el día actual está en el rango
-                    if (diaIndex >= diaInicio && diaIndex <= diaFin) {
-                        const horas = Math.abs(horaFin - horaInicio);
-                        return horas;
+                    if (diaInicio >= 0 && diaFin >= 0 && diaIndex >= diaInicio && diaIndex <= diaFin) {
+                        let horas = horaFin - horaInicio;
+                        const minutos = minFin - minInicio;
+                        horas += minutos / 60;
+                        return Math.abs(horas);
                     }
                 }
             }
@@ -2050,23 +2258,24 @@ class SistemaPlanillas {
                     return horasDelHorario;
                 }
             
-            // Si no se encuentra en el horario, usar patrones por defecto
+            // Si no se encuentra en el horario, usar valores por defecto genéricos
+            // IMPORTANTE: Siempre es mejor que el horario del empleado esté bien definido
+            // Estos son valores de respaldo que pueden no coincidir con el horario real
             const diasSemana = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
             const diaIndex = diasSemana.indexOf(diaSemana.toLowerCase());
             
             if (jornada === 'diurna_acumulativa' || jornada === 'acumulativa') {
-                if (diaIndex >= 1 && diaIndex <= 4) { // Lunes a Jueves
+                // Por defecto: 10 horas para días laborales típicos, 0 para fines de semana
+                // NOTA: Esto es un fallback - el horario del empleado debe estar definido correctamente
+                if (diaIndex >= 1 && diaIndex <= 5) { // Lunes a Viernes
                     return 10;
-                } else if (diaIndex === 5) { // Viernes
-                    return 8;
                 } else { // Sábado y Domingo
                     return 0;
                 }
             } else if (jornada === 'mixta_acumulativa') {
-                if (diaIndex >= 1 && diaIndex <= 4) { // Lunes a Jueves
+                // Por defecto: 9 horas para días laborales típicos
+                if (diaIndex >= 1 && diaIndex <= 5) { // Lunes a Viernes
                     return 9;
-                } else if (diaIndex === 5) { // Viernes
-                    return 7;
                 } else { // Sábado y Domingo
                     return 0;
                 }
@@ -2216,6 +2425,7 @@ class SistemaPlanillas {
         const selects = [
             document.getElementById('asistenciaEmpleado'),
             document.getElementById('bonoEmpleado'),
+            document.getElementById('vacacionEmpleado'),
             document.getElementById('filtroEmpleadoAsistencia'),
             document.getElementById('filtroEmpleadoBono')
         ];
@@ -2324,14 +2534,20 @@ class SistemaPlanillas {
     }
 
     abrirEditarFeriado(id) {
+        console.log('🔧 Abriendo edición de feriado:', id);
         const feriado = this.feriados.find(f => f.id === id);
-        if (!feriado) return;
+        if (!feriado) {
+            console.error('❌ Feriado no encontrado:', id);
+            return;
+        }
 
+        console.log('✅ Feriado encontrado:', feriado);
         document.getElementById('feriadoId').value = feriado.id;
         document.getElementById('feriadoFecha').value = feriado.fecha;
         document.getElementById('feriadoDescripcion').value = feriado.descripcion;
         document.getElementById('feriadoRecargo').value = feriado.recargo;
 
+        console.log('🎯 Abriendo modal...');
         this.abrirModal('modalFeriado');
     }
 
@@ -2670,6 +2886,52 @@ class SistemaPlanillas {
             this.cerrarModal('modalFeriado');
         });
 
+        // Vacaciones
+        document.getElementById('btnNuevaVacacion')?.addEventListener('click', () => {
+            document.getElementById('formVacaciones').reset();
+            document.getElementById('vacacionId').value = '';
+            document.getElementById('vacacionTomada').checked = false;
+            this.actualizarSelectsEmpleados();
+            this.abrirModal('modalVacaciones');
+        });
+
+        // Calcular días automáticamente cuando cambian las fechas
+        const calcularDiasVacaciones = () => {
+            const fechaInicio = document.getElementById('vacacionFechaInicio').value;
+            const fechaFin = document.getElementById('vacacionFechaFin').value;
+            
+            if (fechaInicio && fechaFin) {
+                const inicio = new Date(fechaInicio);
+                const fin = new Date(fechaFin);
+                const diferencia = Math.ceil((fin - inicio) / (1000 * 60 * 60 * 24)) + 1;
+                document.getElementById('vacacionDias').value = diferencia > 0 ? diferencia : 0;
+            }
+        };
+
+        document.getElementById('vacacionFechaInicio')?.addEventListener('change', calcularDiasVacaciones);
+        document.getElementById('vacacionFechaFin')?.addEventListener('change', calcularDiasVacaciones);
+
+        document.getElementById('formVacaciones')?.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const id = document.getElementById('vacacionId').value;
+            const datos = {
+                empleadoId: document.getElementById('vacacionEmpleado').value,
+                fechaInicio: document.getElementById('vacacionFechaInicio').value,
+                fechaFin: document.getElementById('vacacionFechaFin').value,
+                dias: parseInt(document.getElementById('vacacionDias').value),
+                detalle: document.getElementById('vacacionDetalle').value,
+                tomada: document.getElementById('vacacionTomada').checked
+            };
+
+            if (id) {
+                this.editarVacacion(id, datos);
+            } else {
+                this.agregarVacacion(datos);
+            }
+
+            this.cerrarModal('modalVacaciones');
+        });
+
         // Configuración
         document.getElementById('btnGuardarConfig')?.addEventListener('click', () => {
             this.config.ccss = parseFloat(document.getElementById('configCCSS').value);
@@ -2797,6 +3059,9 @@ class SistemaPlanillas {
                 break;
             case 'feriados':
                 this.renderFeriados();
+                break;
+            case 'vacaciones':
+                this.renderVacaciones();
                 break;
             case 'reportes':
                 // La sección de reportes se mantiene como está por defecto
@@ -3300,6 +3565,12 @@ async function initializeSistema() {
         
         // Pequeño delay para asegurar que el DOM esté listo
         await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // Cerrar cualquier modal que esté abierto
+        document.querySelectorAll('.modal').forEach(modal => {
+            modal.classList.remove('active', 'show');
+            modal.style.display = 'none';
+        });
         
         await sistema.renderEmpleados();
         await sistema.actualizarSelectsEmpleados();
