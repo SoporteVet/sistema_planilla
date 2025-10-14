@@ -525,6 +525,7 @@ class SistemaPlanillas {
         const esSegundaQuincena = fechaFinObj.getDate() >= 15;
         
         // Obtener asistencias del empleado en el período
+        // Solo incluir días que estén registrados en asistencias
         const asistencias = this.asistencias.filter(a => 
             a.empleadoId === empleado.id &&
             a.fecha >= fechaInicio &&
@@ -568,25 +569,19 @@ class SistemaPlanillas {
                 
                 if (empleado.jornada === 'diurna') {
                     // Jornada diurna: 8 horas por día
-                    const horasRegulares = Math.min(horas, horasPorDia);
-                    horasNormales += horasRegulares;
-                    if (horas > horasPorDia) {
-                        horasExtra += horas - horasPorDia;
-                    }
+                    // Las horas trabajadas se pagan normalmente
+                    // Las horas extra SOLO se toman del campo "Horas Extra"
+                    horasNormales += horas;
                 } else if (empleado.jornada === 'nocturna') {
-                    // Jornada nocturna: 6 horas por día
-                    const horasRegulares = Math.min(horas, horasPorDia);
-                    horasNormales += horasRegulares;
-                    if (horas > horasPorDia) {
-                        horasExtra += horas - horasPorDia;
-                    }
+                    // Jornada nocturna: 6 horas trabajadas = 6 horas pagadas
+                    // Se pagan exactamente las horas trabajadas (relación 1:1)
+                    // Las horas extra SOLO se toman del campo "Horas Extra"
+                    horasNormales += horas;
                 } else if (empleado.jornada === 'mixta') {
                     // Jornada mixta: 7 horas por día
-                    const horasRegulares = Math.min(horas, horasPorDia);
-                    horasNormales += horasRegulares;
-                    if (horas > horasPorDia) {
-                        horasExtra += horas - horasPorDia;
-                    }
+                    // Las horas trabajadas se pagan normalmente
+                    // Las horas extra SOLO se toman del campo "Horas Extra"
+                    horasNormales += horas;
                 } else if (empleado.jornada === 'diurna_acumulativa') {
                     // Jornada diurna acumulativa:
                     // Se trabajan 10 horas físicas pero se PAGAN 8 horas
@@ -617,11 +612,18 @@ class SistemaPlanillas {
                             horasPagadas = horas;
                         } else {
                             // Días con más de 8 horas visuales (típicamente 10h)
-                            // Por cada hora menos trabajada, se resta 1 hora de pago
+                            // Si trabaja las horas completas esperadas → pagar 8 horas
+                            // Si trabaja menos → restar proporcionalmente
                             // 10h visuales → 8h pagadas (si trabaja las 10 completas)
                             // 9h visuales → 7h pagadas (1h menos)
-                            const horasFaltantes = horasVisualesNormales - horas;
-                            horasPagadas = Math.max(0, horasPorDia - horasFaltantes);
+                            if (horas >= horasVisualesNormales) {
+                                // Trabajó las horas completas: pagar jornada completa (8h)
+                                horasPagadas = horasPorDia;
+                            } else {
+                                // Trabajó menos: calcular proporción
+                                const horasFaltantes = horasVisualesNormales - horas;
+                                horasPagadas = Math.max(0, horasPorDia - horasFaltantes);
+                            }
                         }
                         
                         horasNormales += horasPagadas;
@@ -663,10 +665,19 @@ class SistemaPlanillas {
                     }
                     // NO calcular horas extra automáticamente
                 } else if (empleado.jornada === 'acumulativa') {
-                    // Compatibilidad con jornadas antiguas
-                    horasNormales += Math.min(horas, 8);
-                    if (horas > 8) {
-                        horasExtra += horas - 8;
+                    // Jornada acumulativa (antigua):
+                    // Similar a diurna_acumulativa: se trabajan más horas pero solo se pagan 8
+                    // Las horas extra SOLO se toman del campo "Horas Extra"
+                    
+                    const horasOriginales = parseFloat(asist.horas || 0);
+                    
+                    // Si el día fue registrado con 0 horas (día libre), pagar jornada completa
+                    if (horasOriginales === 0) {
+                        horasNormales += horasPorDia; // 8 horas
+                    } else {
+                        // Pagar máximo 8 horas por día trabajado
+                        const horasPagadas = Math.min(horas, 8);
+                        horasNormales += horasPagadas;
                     }
                 } else {
                     // Jornada no reconocida, usar horas directamente
@@ -691,26 +702,8 @@ class SistemaPlanillas {
             // INS no paga (0%)
         });
 
-        // Para jornadas acumulativas: completar días faltantes del período
-        // En jornadas acumulativas TODOS los días se pagan (trabajados o libres)
-        if (empleado.jornada === 'diurna_acumulativa' || empleado.jornada === 'mixta_acumulativa' || empleado.jornada === 'acumulativa') {
-            // Calcular días del período
-            const fechaInicioObj = new Date(fechaInicio + 'T00:00:00');
-            const fechaFinObj = new Date(fechaFin + 'T00:00:00');
-            const diasDelPeriodo = Math.round((fechaFinObj - fechaInicioObj) / (1000 * 60 * 60 * 24)) + 1;
-            
-            // Contar días ya procesados en asistencias
-            const diasRegistrados = asistencias.length;
-            
-            // Calcular días faltantes (días libres no registrados)
-            const diasFaltantes = diasDelPeriodo - diasRegistrados;
-            
-            if (diasFaltantes > 0) {
-                // Agregar las horas de los días libres no registrados
-                const horasPorDia = this.getHorasJornada(empleado.jornada);
-                horasNormales += diasFaltantes * horasPorDia;
-            }
-        }
+        // NOTA: En jornadas acumulativas solo se cuentan los días registrados en asistencias
+        // No se agregan días automáticamente para evitar contar días fuera del período
 
         salarioBase = Math.round((horasNormales * empleado.salarioHora) * 100000000) / 100000000;
         
