@@ -287,3 +287,9 @@ if (rememberMe) {
   });
 }
 
+// Inicializar autenticación cuando se carga la página
+document.addEventListener('DOMContentLoaded', () => {
+  initializeAuth();
+});
+
+

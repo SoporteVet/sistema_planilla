@@ -38,9 +38,9 @@ class SistemaPlanillas {
             nocturna: {
                 horasPorDia: 6,
                 horasTrabajadas: 6,
-                horasPagadas: 6,
-                horasMensuales: 180,
-                horasQuincenales: 90,
+                horasPagadas: 8,  // Se pagan 8 horas aunque se trabajen 6
+                horasMensuales: 240,  // 8h × 30 días = 240
+                horasQuincenales: 120,  // 8h × 15 días = 120
                 diasPorSemana: 6
             },
             diurna_acumulativa: {
@@ -573,10 +573,16 @@ class SistemaPlanillas {
                     // Las horas extra SOLO se toman del campo "Horas Extra"
                     horasNormales += horas;
                 } else if (empleado.jornada === 'nocturna') {
-                    // Jornada nocturna: 6 horas trabajadas = 6 horas pagadas
-                    // Se pagan exactamente las horas trabajadas (relación 1:1)
+                    // Jornada nocturna: 6 horas trabajadas = 8 horas pagadas
+                    // Se trabajan 6 horas pero se pagan 8 horas (equivalencia diurna)
                     // Las horas extra SOLO se toman del campo "Horas Extra"
-                    horasNormales += horas;
+                    if (horas >= 6) {
+                        // Si trabajó 6 horas o más, pagar 8 horas completas
+                        horasNormales += 8;
+                    } else {
+                        // Si trabajó menos de 6 horas, pagar proporcionalmente
+                        horasNormales += (horas / 6) * 8;
+                    }
                 } else if (empleado.jornada === 'mixta') {
                     // Jornada mixta: 7 horas por día
                     // Las horas trabajadas se pagan normalmente
@@ -632,32 +638,30 @@ class SistemaPlanillas {
                 } else if (empleado.jornada === 'mixta_acumulativa') {
                     // Jornada mixta acumulativa:
                     // Se trabajan entre 8-9 horas físicas pero se PAGAN 8 horas
-                    // Los días libres también se pagan 8 horas
+                    // Los días libres NO se pagan automáticamente
                     
                     const horasOriginales = parseFloat(asist.horas || 0);
                     
-                    // Si el día fue registrado con 0 horas (día libre), pagar jornada completa
+                    // Si el día fue registrado con 0 horas (día libre), NO pagar automáticamente
                     if (horasOriginales === 0) {
-                        // Día libre en jornada acumulativa: se paga la jornada completa
-                        horasNormales += horasPorDia; // 8 horas
+                        // Día libre en jornada mixta acumulativa: NO se paga automáticamente
+                        // Solo se paga si está explícitamente marcado como día libre en el tipo de asistencia
+                        // (esto se maneja en la sección de 'libre' más abajo)
+                        horasNormales += 0; // No pagar horas por día libre no registrado
                     } else {
                         // Día trabajado: calcular según las horas trabajadas
                         const fecha = asist.fecha;
                         const diaSemana = this.getDiaSemana(fecha);
                         const horasVisualesNormales = this.getHorasVisualesJornada(empleado.jornada, diaSemana, empleado.horario);
                         
-                        // Si trabajó las horas completas o más, pagar 8 horas
-                        // Si trabajó menos, pagar proporcionalmente
+                        // Si trabajó 8 horas o más, pagar 8 horas completas
+                        // Si trabajó menos de 8 horas, pagar las horas trabajadas
                         let horasPagadas;
-                        if (horas >= horasVisualesNormales) {
-                            // Día completo: siempre 8 horas pagadas
+                        if (horas >= horasPorDia) {
+                            // Trabajó 8 horas o más: siempre pagar 8 horas
                             horasPagadas = horasPorDia; // 8 horas
-                        } else if (horasVisualesNormales > 0) {
-                            // Trabajó menos: calcular proporción
-                            const proporcion = horasPorDia / horasVisualesNormales; // 8/9 ≈ 0.889
-                            horasPagadas = horas * proporcion;
                         } else {
-                            // Según horario es día libre, pero está trabajando: pagar proporcionalmente
+                            // Trabajó menos de 8 horas: pagar las horas trabajadas
                             horasPagadas = horas;
                         }
                         
@@ -727,9 +731,17 @@ class SistemaPlanillas {
                 // Sumar las horas trabajadas (no las de permiso)
                 horasNormales += horasTrabajadas;
             } else if (asist.tipo === 'incapacidad_ccss') {
-                // CCSS paga el 50% del día
+                // CCSS: primeros 3 días la empresa paga 50%, después del día 3 paga 100%
                 const horasDia = this.getHorasJornada(empleado.jornada);
-                horasNormales += horasDia * (this.config.incapacidadCCSS / 100);
+                const diaIncapacidad = this.contarDiasIncapacidadCCSS(empleado.id, asist.fecha);
+                
+                if (diaIncapacidad <= 3) {
+                    // Primeros 3 días: empresa paga 50%
+                    horasNormales += horasDia * 0.5;
+                } else {
+                    // Después del día 3: empresa paga 100%
+                    horasNormales += horasDia;
+                }
             } else if (asist.tipo === 'vacaciones') {
                 // Vacaciones: se pagan las horas de la jornada completa
                 const horasDia = this.getHorasJornada(empleado.jornada);
@@ -1622,10 +1634,12 @@ class SistemaPlanillas {
         // Calcular valores
         const salarioDiario = parseFloat(empleado.salarioHora) * this.getHorasJornada(empleado.jornada);
         const diasLaborados = this.contarDiasLaborados(empleado.id, fechaInicio, fechaFin);
-        const subtotalQuincenal = parseFloat(calculos.salarioBase);
         
-        // Salario mensual de referencia (sin rebajos) - solo para mostrar
+        // Salario mensual de referencia (sin rebajos)
         const salarioMensual = salarioDiario * 30; // Salario diario x 30 días
+        
+        // Subtotal quincenal: mitad del salario mensual (sin rebajos)
+        const subtotalQuincenal = salarioMensual / 2;
         
         const horasFeriado = this.calcularHorasFeriado(empleado.id, fechaInicio, fechaFin);
         const totalFeriado = horasFeriado * parseFloat(empleado.salarioHora) * 2;
@@ -2029,6 +2043,37 @@ class SistemaPlanillas {
         });
         
         return diasLaborados;
+    }
+
+    contarDiasIncapacidadCCSS(empleadoId, fechaActual) {
+        // Obtener todas las incapacidades CCSS del empleado ordenadas por fecha
+        const incapacidades = this.asistencias
+            .filter(a => a.empleadoId === empleadoId && a.tipo === 'incapacidad_ccss')
+            .sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
+        
+        // Encontrar el grupo de incapacidades consecutivas que incluye la fecha actual
+        let diasConsecutivos = 0;
+        let fechaInicio = null;
+        
+        for (let i = 0; i < incapacidades.length; i++) {
+            const fechaIncap = new Date(incapacidades[i].fecha);
+            const fechaAnterior = i > 0 ? new Date(incapacidades[i-1].fecha) : null;
+            
+            // Si es la primera incapacidad o hay un salto de más de 1 día, reiniciar contador
+            if (!fechaAnterior || (fechaIncap - fechaAnterior) > (24 * 60 * 60 * 1000)) {
+                diasConsecutivos = 1;
+                fechaInicio = fechaIncap;
+            } else {
+                diasConsecutivos++;
+            }
+            
+            // Si encontramos la fecha actual, retornar el día dentro de esta secuencia
+            if (fechaIncap.getTime() === new Date(fechaActual).getTime()) {
+                return diasConsecutivos;
+            }
+        }
+        
+        return 1; // Si no se encuentra en una secuencia, asumir día 1
     }
 
     calcularDeduccionesHorasComprobante(empleadoId, fechaInicio, fechaFin, salarioHora) {
