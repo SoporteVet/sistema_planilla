@@ -1,0 +1,179 @@
+/* 
+ * Correcciones específicas para centrado de modales
+ * Este archivo asegura que todos los modales aparezcan perfectamente centrados
+ */
+
+/* Resetear cualquier estilo inline que pueda interferir */
+.modal {
+    display: none !important;
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    z-index: 2000 !important;
+    background-color: rgba(15, 23, 42, 0.5) !important;
+    backdrop-filter: blur(4px) !important;
+    padding: 20px !important;
+    box-sizing: border-box !important;
+    margin: 0 !important;
+}
+
+.modal.show {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+/* Asegurar que el contenido del modal esté centrado */
+.modal-content {
+    background-color: var(--bg-primary, #ffffff) !important;
+    border-radius: var(--border-radius, 12px) !important;
+    width: 100% !important;
+    max-width: 600px !important;
+    max-height: calc(100vh - 40px) !important;
+    overflow-y: auto !important;
+    box-shadow: var(--shadow-xl, 0 20px 25px -5px rgba(0, 0, 0, 0.1)) !important;
+    margin: 0 !important;
+    position: relative !important;
+    transform: none !important;
+    animation: modalSlideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+@keyframes modalSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+/* Responsive para móviles */
+@media (max-width: 768px) {
+    .modal {
+        padding: 16px !important;
+    }
+    
+    .modal-content {
+        width: 100% !important;
+        max-width: none !important;
+        max-height: calc(100vh - 32px) !important;
+        margin: 0 !important;
+    }
+}
+
+/* Asegurar que no haya scroll en el body cuando un modal está abierto */
+body.modal-open {
+    overflow: hidden !important;
+}
+
+/* Prevenir que los estilos inline interfieran */
+.modal[style*="display: block"] {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+.modal[style*="display: none"] {
+    display: none !important;
+}
+
+/* Forzar centrado incluso si hay estilos inline conflictivos */
+.modal.show,
+.modal.active,
+.modal[class*="show"],
+.modal[class*="active"] {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    z-index: 2000 !important;
+}
+
+/* Asegurar que el contenido no tenga márgenes que rompan el centrado */
+.modal-content,
+.modal-dialog,
+.modal-body {
+    margin: 0 !important;
+    transform: none !important;
+}
+
+/* Corrección específica para modales que usan display: block */
+.modal[style*="display: block"] .modal-content {
+    margin: 0 auto !important;
+    position: relative !important;
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+}
+
+/* Override para cualquier estilo inline que pueda estar causando problemas */
+.modal[style] {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+.modal-content[style] {
+    margin: 0 !important;
+    transform: none !important;
+}
+
+/* Asegurar que los modales específicos estén centrados */
+#modalEmpleado,
+#modalAsistencia,
+#modalBono,
+#modalFeriado,
+#modalVacaciones,
+#custom-confirm-modal {
+    display: none !important;
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    z-index: 2000 !important;
+    background-color: rgba(15, 23, 42, 0.5) !important;
+    backdrop-filter: blur(4px) !important;
+    padding: 20px !important;
+    box-sizing: border-box !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+#modalEmpleado.show,
+#modalAsistencia.show,
+#modalBono.show,
+#modalFeriado.show,
+#modalVacaciones.show,
+#custom-confirm-modal.show {
+    display: flex !important;
+}
+
+/* Debug: Agregar borde rojo temporal para verificar centrado */
+.modal-content::before {
+    content: '';
+    position: absolute;
+    top: -2px;
+    left: -2px;
+    right: -2px;
+    bottom: -2px;
+    border: 2px solid rgba(255, 0, 0, 0.3);
+    border-radius: inherit;
+    pointer-events: none;
+    z-index: -1;
+}
+
+/* Remover el borde de debug en producción */
+body:not(.debug) .modal-content::before {
+    display: none;
+}
+
+

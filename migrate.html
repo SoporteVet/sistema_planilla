@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Migración a Firebase - Sistema Planillas CR</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 16px;
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+        
+        h1 {
+            color: #2C2C54;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 16px;
+        }
+        
+        .info-box {
+            background: #f0f4ff;
+            border-left: 4px solid #667eea;
+            padding: 16px;
+            margin-bottom: 24px;
+            border-radius: 8px;
+        }
+        
+        .info-box h3 {
+            color: #2C2C54;
+            margin-bottom: 8px;
+            font-size: 16px;
+        }
+        
+        .info-box p {
+            color: #555;
+            line-height: 1.6;
+            margin-bottom: 8px;
+        }
+        
+        .info-box ul {
+            margin-left: 20px;
+            color: #555;
+            line-height: 1.8;
+        }
+        
+        .warning-box {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 16px;
+            margin-bottom: 24px;
+            border-radius: 8px;
+        }
+        
+        .warning-box strong {
+            color: #856404;
+        }
+        
+        .warning-box p {
+            color: #856404;
+            margin-top: 8px;
+        }
+        
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 16px 32px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .log-container {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 24px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            max-height: 400px;
+            overflow-y: auto;
+            display: none;
+        }
+        
+        .log-container.show {
+            display: block;
+        }
+        
+        .log-line {
+            margin-bottom: 4px;
+            line-height: 1.5;
+        }
+        
+        .log-success { color: #4ec9b0; }
+        .log-error { color: #f48771; }
+        .log-warning { color: #dcdcaa; }
+        .log-info { color: #569cd6; }
+        
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 12px;
+            margin: 20px 0;
+        }
+        
+        .stat-card {
+            background: #f8f9fa;
+            padding: 16px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .stat-number {
+            font-size: 32px;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .stat-label {
+            font-size: 12px;
+            color: #666;
+            margin-top: 4px;
+        }
+        
+        .success-message {
+            background: #d4edda;
+            border-left: 4px solid #28a745;
+            padding: 16px;
+            margin-top: 24px;
+            border-radius: 8px;
+            display: none;
+        }
+        
+        .success-message.show {
+            display: block;
+        }
+        
+        .success-message h3 {
+            color: #155724;
+            margin-bottom: 8px;
+        }
+        
+        .success-message p {
+            color: #155724;
+            margin-bottom: 8px;
+        }
+        
+        .success-message a {
+            color: #155724;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Migración a Firebase</h1>
+        <p class="subtitle">Transfiere tus datos de localStorage a Firebase Realtime Database</p>
+        
+        <div class="info-box">
+            <h3>ℹ️ ¿Qué hace esta herramienta?</h3>
+            <p>Esta herramienta migrará todos tus datos actuales del navegador (localStorage) a Firebase Realtime Database para que puedas:</p>
+            <ul>
+                <li>Acceder a tus datos desde cualquier dispositivo</li>
+                <li>Sincronizar información en tiempo real</li>
+                <li>Tener un respaldo seguro en la nube</li>
+            </ul>
+        </div>
+        
+        <div class="warning-box">
+            <strong>⚠️ Importante:</strong>
+            <p>Se creará un respaldo automático de tus datos antes de la migración. Solo necesitas ejecutar esto UNA VEZ.</p>
+        </div>
+        
+        <div id="stats" style="display: none;">
+            <h3 style="margin-bottom: 16px; color: #2C2C54;">📊 Datos encontrados:</h3>
+            <div class="stats">
+                <div class="stat-card">
+                    <div class="stat-number" id="stat-empleados">0</div>
+                    <div class="stat-label">Empleados</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="stat-asistencias">0</div>
+                    <div class="stat-label">Asistencias</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="stat-bonos">0</div>
+                    <div class="stat-label">Bonos/Rebajos</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="stat-feriados">0</div>
+                    <div class="stat-label">Feriados</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="stat-planillas">0</div>
+                    <div class="stat-label">Planillas</div>
+                </div>
+            </div>
+        </div>
+        
+        <button id="btn-migrate" class="btn">Iniciar Migración</button>
+        
+        <div id="log-container" class="log-container"></div>
+        
+        <div id="success-message" class="success-message">
+            <h3>✅ ¡Migración completada exitosamente!</h3>
+            <p>Todos tus datos han sido transferidos a Firebase.</p>
+            <p><a href="index.html">← Volver al Sistema de Planillas</a></p>
+        </div>
+    </div>
+    
+    <script type="module">
+        import { initFirebase } from './js/firebase/init.js';
+        import { firebaseConfig } from './js/firebase/config.js';
+        
+        const btnMigrate = document.getElementById('btn-migrate');
+        const logContainer = document.getElementById('log-container');
+        const successMessage = document.getElementById('success-message');
+        const statsDiv = document.getElementById('stats');
+        
+        function log(message, type = 'info') {
+            const line = document.createElement('div');
+            line.className = `log-line log-${type}`;
+            
+            const icon = {
+                info: 'ℹ️',
+                success: '✅',
+                error: '❌',
+                warning: '⚠️'
+            }[type] || 'ℹ️';
+            
+            line.textContent = `${icon} ${message}`;
+            logContainer.appendChild(line);
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+        
+        // Cargar estadísticas al iniciar
+        window.addEventListener('DOMContentLoaded', () => {
+            const empleados = JSON.parse(localStorage.getItem('empleados') || '[]');
+            const asistencias = JSON.parse(localStorage.getItem('asistencias') || '[]');
+            const bonos = JSON.parse(localStorage.getItem('bonos') || '[]');
+            const feriados = JSON.parse(localStorage.getItem('feriados') || '[]');
+            const planillas = JSON.parse(localStorage.getItem('historialPlanillas') || '[]');
+            
+            document.getElementById('stat-empleados').textContent = empleados.length;
+            document.getElementById('stat-asistencias').textContent = asistencias.length;
+            document.getElementById('stat-bonos').textContent = bonos.length;
+            document.getElementById('stat-feriados').textContent = feriados.length;
+            document.getElementById('stat-planillas').textContent = planillas.length;
+            
+            if (empleados.length > 0 || asistencias.length > 0 || bonos.length > 0) {
+                statsDiv.style.display = 'block';
+            }
+        });
+        
+        btnMigrate.addEventListener('click', async () => {
+            btnMigrate.disabled = true;
+            btnMigrate.textContent = 'Migrando...';
+            logContainer.classList.add('show');
+            
+            try {
+                log('🔄 Iniciando migración a Firebase...', 'info');
+                
+                // Inicializar Firebase
+                const firebaseInstance = initFirebase(firebaseConfig);
+                const { db, api } = await firebaseInstance.ensureLoaded();
+                log('Conexión a Firebase establecida', 'success');
+                
+                // Obtener datos de localStorage
+                const empleados = JSON.parse(localStorage.getItem('empleados') || '[]');
+                const asistencias = JSON.parse(localStorage.getItem('asistencias') || '[]');
+                const bonos = JSON.parse(localStorage.getItem('bonos') || '[]');
+                const feriados = JSON.parse(localStorage.getItem('feriados') || '[]');
+                const historialPlanillas = JSON.parse(localStorage.getItem('historialPlanillas') || '[]');
+                const config = JSON.parse(localStorage.getItem('config') || '{}');
+                
+                log(`Datos encontrados: ${empleados.length} empleados, ${asistencias.length} asistencias, ${bonos.length} bonos, ${feriados.length} feriados, ${historialPlanillas.length} planillas`, 'info');
+                
+                // Crear respaldo
+                const backup = {
+                    empleados,
+                    asistencias,
+                    bonos,
+                    feriados,
+                    historialPlanillas,
+                    config,
+                    migrationDate: new Date().toISOString()
+                };
+                localStorage.setItem('backup_before_firebase', JSON.stringify(backup));
+                log('Respaldo creado en localStorage', 'success');
+                
+                // Migrar empleados
+                if (empleados.length > 0) {
+                    const empleadosObj = {};
+                    empleados.forEach(emp => {
+                        empleadosObj[emp.id] = emp;
+                    });
+                    await api.set(api.ref(db, 'empleados'), empleadosObj);
+                    log(`${empleados.length} empleados migrados`, 'success');
+                }
+                
+                // Migrar asistencias
+                if (asistencias.length > 0) {
+                    const asistenciasObj = {};
+                    asistencias.forEach(asist => {
+                        const id = asist.id || `att_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+                        asistenciasObj[id] = { ...asist, id };
+                    });
+                    await api.set(api.ref(db, 'asistencias'), asistenciasObj);
+                    log(`${asistencias.length} asistencias migradas`, 'success');
+                }
+                
+                // Migrar bonos/rebajos
+                if (bonos.length > 0) {
+                    const bonosObj = {};
+                    bonos.forEach(bono => {
+                        const id = bono.id || `bon_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+                        bonosObj[id] = { ...bono, id };
+                    });
+                    await api.set(api.ref(db, 'bonos'), bonosObj);
+                    log(`${bonos.length} bonos/rebajos migrados`, 'success');
+                }
+                
+                // Migrar feriados
+                if (feriados.length > 0) {
+                    const feriadosObj = {};
+                    feriados.forEach(feriado => {
+                        const id = feriado.id || `fer_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+                        feriadosObj[id] = { ...feriado, id };
+                    });
+                    await api.set(api.ref(db, 'feriados'), feriadosObj);
+                    log(`${feriados.length} feriados migrados`, 'success');
+                }
+                
+                // Migrar historial de planillas
+                if (historialPlanillas.length > 0) {
+                    const planillasObj = {};
+                    historialPlanillas.forEach(planilla => {
+                        const id = planilla.id || `pla_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+                        planillasObj[id] = { ...planilla, id };
+                    });
+                    await api.set(api.ref(db, 'historialPlanillas'), planillasObj);
+                    log(`${historialPlanillas.length} planillas migradas`, 'success');
+                }
+                
+                // Migrar configuración
+                if (Object.keys(config).length > 0) {
+                    await api.set(api.ref(db, 'config'), config);
+                    log('Configuración migrada', 'success');
+                }
+                
+                log('🎉 ¡Migración completada exitosamente!', 'success');
+                log('Puedes verificar tus datos en Firebase Console', 'info');
+                log('https://console.firebase.google.com/project/sistemaplanilla/database', 'info');
+                
+                successMessage.classList.add('show');
+                btnMigrate.textContent = '✅ Migración Completada';
+                
+            } catch (error) {
+                log(`Error durante la migración: ${error.message}`, 'error');
+                console.error('Error completo:', error);
+                btnMigrate.disabled = false;
+                btnMigrate.textContent = 'Reintentar Migración';
+            }
+        });
+    </script>
+</body>
+</html>
+
+
+

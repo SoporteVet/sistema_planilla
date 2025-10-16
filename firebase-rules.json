@@ -1,0 +1,24 @@
+{
+  "rules": {
+    ".read": true,
+    ".write": true,
+    "empleados": {
+      ".indexOn": ["id", "nombre", "cedula"]
+    },
+    "asistencias": {
+      ".indexOn": ["employeeId", "fecha", "id"]
+    },
+    "bonos": {
+      ".indexOn": ["employeeId", "tipo", "id"]
+    },
+    "feriados": {
+      ".indexOn": ["fecha", "id"]
+    },
+    "historialPlanillas": {
+      ".indexOn": ["fecha", "id"]
+    }
+  }
+}
+
+
+
