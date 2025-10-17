@@ -14,6 +14,7 @@ function employeeRowTemplate(emp) {
       <td>${emp.nombre}</td>
       <td>${emp.cedula}</td>
       <td>${emp.puesto || ''}</td>
+      <td>${emp.email || ''}</td>
       <td><span class="badge info">${emp.jornada}</span></td>
       <td>${formatCurrency(emp.salarioHora)}</td>
       <td>${emp.fechaIngreso || ''}</td>
@@ -29,7 +30,7 @@ function renderTable(container, employees, filterText) {
   const normalized = (filterText || '').toLowerCase();
   const filtered = !normalized
     ? employees
-    : employees.filter(e => [e.nombre, e.cedula, e.puesto].filter(Boolean).some(v => String(v).toLowerCase().includes(normalized)));
+    : employees.filter(e => [e.nombre, e.cedula, e.puesto, e.email].filter(Boolean).some(v => String(v).toLowerCase().includes(normalized)));
 
   container.innerHTML = `
     <table class="table">
@@ -38,6 +39,7 @@ function renderTable(container, employees, filterText) {
           <th>Nombre</th>
           <th>Cédula</th>
           <th>Puesto</th>
+          <th>Email</th>
           <th>Jornada</th>
           <th>₡/Hora</th>
           <th>Ingreso</th>
@@ -45,7 +47,7 @@ function renderTable(container, employees, filterText) {
         </tr>
       </thead>
       <tbody>
-        ${filtered.map(employeeRowTemplate).join('') || '<tr><td colspan="7">Sin registros</td></tr>'}
+        ${filtered.map(employeeRowTemplate).join('') || '<tr><td colspan="8">Sin registros</td></tr>'}
       </tbody>
     </table>
   `;
@@ -60,6 +62,7 @@ function readForm(form) {
     jornada: data.jornada,
     salarioHora: Number(data.salarioHora || 0),
     fechaIngreso: data.fechaIngreso,
+    email: data.email?.trim(),
   };
 }
 
@@ -118,6 +121,10 @@ export async function renderEmployeesView(root, { showToast }) {
             <div>
               <label>Fecha ingreso</label>
               <input name="fechaIngreso" type="date" />
+            </div>
+            <div>
+              <label>Email</label>
+              <input name="email" type="email" placeholder="correo@ejemplo.com" />
             </div>
             <div>
               <label>&nbsp;</label>
@@ -260,6 +267,10 @@ export async function renderEmployeesView(root, { showToast }) {
           <label for="fechaIngreso">Fecha ingreso</label>
           <input type="date" name="fechaIngreso" id="fechaIngreso" />
         </div>
+        <div class="form-group">
+          <label for="email">Email</label>
+          <input type="email" name="email" id="email" placeholder="correo@ejemplo.com" />
+        </div>
       `);
 
       // Set current values
@@ -269,7 +280,8 @@ export async function renderEmployeesView(root, { showToast }) {
         puesto: current.puesto || '',
         jornada: current.jornada,
         salarioHora: current.salarioHora,
-        fechaIngreso: current.fechaIngreso || ''
+        fechaIngreso: current.fechaIngreso || '',
+        email: current.email || ''
       });
 
       // Handle save
@@ -281,6 +293,7 @@ export async function renderEmployeesView(root, { showToast }) {
           jornada: data.jornada,
           salarioHora: Number(data.salarioHora || 0),
           fechaIngreso: data.fechaIngreso,
+          email: data.email?.trim(),
         };
 
         const errors = validateEmployee(updates);

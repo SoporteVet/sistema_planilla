@@ -45,6 +45,7 @@ export async function renderPayrollView(root, { showToast }) {
         <thead>
           <tr>
             <th>Empleado</th>
+            <th>Email</th>
             <th>Vacaciones acumuladas (días)</th>
             <th>Bruto</th>
             <th>CCSS (10.67%)</th>
@@ -61,6 +62,18 @@ export async function renderPayrollView(root, { showToast }) {
   const periodSel = root.querySelector('#period');
 
   let employees = await storage.listEmployees();
+  
+  // Migrar empleados existentes para agregar campo de email si no existe
+  const needsMigration = employees.some(emp => emp.email === undefined);
+  if (needsMigration) {
+    for (const emp of employees) {
+      if (emp.email === undefined) {
+        await storage.updateEmployee(emp.id, { ...emp, email: '' });
+      }
+    }
+    employees = await storage.listEmployees(); // Recargar datos actualizados
+  }
+  
   let holidays = [];
   let disabilities = [];
   let allAttendance = [];
@@ -105,6 +118,7 @@ export async function renderPayrollView(root, { showToast }) {
     const period = periodSel.value;
     const days = buildDays(period);
 
+
     const rows = employees.map(emp => {
       // Merge attendance into days (if any)
       const attendance = allAttendance.filter(a => a.employeeId === emp.id);
@@ -134,6 +148,7 @@ export async function renderPayrollView(root, { showToast }) {
     tbody.innerHTML = rows.map(r => `
       <tr>
         <td>${r.emp.nombre}</td>
+        <td>${r.emp.email || ''}</td>
         <td>${r.vacaciones}</td>
         <td>${formatCurrency(r.bruto)}</td>
         <td>${formatCurrency(r.ccss)}</td>
@@ -195,9 +210,10 @@ export async function renderPayrollView(root, { showToast }) {
       const tds = tr.querySelectorAll('td');
       return {
         nombre: tds[0].textContent,
-        bruto: tds[2].textContent,
-        ccss: tds[3].textContent,
-        neto: tds[4].textContent,
+        email: tds[1].textContent,
+        bruto: tds[3].textContent,
+        ccss: tds[4].textContent,
+        neto: tds[5].textContent,
       };
     });
     exportPayrollToPDF(rows, { title: 'Planilla', period: periodSel.value }, 'planilla.pdf');

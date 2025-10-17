@@ -17,17 +17,19 @@ export function exportPayrollToPDF(rows, meta = {}, filename = 'planilla.pdf') {
   doc.text(`Periodo: ${meta.period || ''}`, 14, y); y += 6;
 
   doc.text('Empleado', 14, y);
-  doc.text('Bruto', 80, y);
-  doc.text('CCSS', 110, y);
-  doc.text('Neto', 140, y);
+  doc.text('Email', 60, y);
+  doc.text('Bruto', 100, y);
+  doc.text('CCSS', 130, y);
+  doc.text('Neto', 160, y);
   y += 4;
   doc.line(14, y, 190, y); y += 6;
 
   rows.forEach(r => {
     doc.text(String(r.nombre), 14, y);
-    doc.text(String(r.bruto), 80, y);
-    doc.text(String(r.ccss), 110, y);
-    doc.text(String(r.neto), 140, y);
+    doc.text(String(r.email || ''), 60, y);
+    doc.text(String(r.bruto), 100, y);
+    doc.text(String(r.ccss), 130, y);
+    doc.text(String(r.neto), 160, y);
     y += 6;
     if (y > 280) { doc.addPage(); y = 14; }
   });

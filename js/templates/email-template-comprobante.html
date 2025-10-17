@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comprobante de Pago</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.4;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f4f4f4;
+            font-size: 11px;
+        }
+        .email-container {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+        }
+        .logo {
+            width: 120px;
+            height: 120px;
+            margin-left: -20px;
+        }
+        .logo img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+        .company-info {
+            flex: 1;
+            text-align: right;
+        }
+        .company-info h2 {
+            margin: 0;
+            color: #007bff;
+        }
+        .company-info p {
+            margin: 5px 0;
+            color: #666;
+        }
+        .title {
+            text-align: center;
+            background: #007bff;
+            color: white;
+            padding: 8px 20px;
+            border-radius: 15px;
+            font-weight: bold;
+            font-size: 14px;
+            margin-bottom: 15px;
+        }
+        table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            margin-bottom: 15px;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        table.info-table th {
+            background: #007bff;
+            color: white;
+            padding: 8px;
+            text-align: left;
+            font-weight: bold;
+            border: none;
+        }
+        table.info-table td {
+            padding: 6px 8px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        table.info-table tr:nth-child(even) {
+            background: #f9f9f9;
+        }
+        .section-title {
+            background: #007bff;
+            color: white;
+            padding: 8px;
+            font-weight: bold;
+            text-align: center;
+            margin-top: 15px;
+            margin-bottom: 10px;
+            border-radius: 10px;
+        }
+        table.detail-table {
+            border: 2px solid #007bff;
+        }
+        table.detail-table thead {
+            background: #007bff;
+            color: white;
+        }
+        table.detail-table th {
+            padding: 8px;
+            border: 1px solid white;
+            font-weight: bold;
+            text-align: center;
+            border-radius: 5px;
+        }
+        table.detail-table td {
+            padding: 6px 8px;
+            border: 1px solid #ddd;
+            text-align: right;
+            border-radius: 5px;
+        }
+        table.detail-table td:first-child {
+            text-align: left;
+        }
+        .deductions-header {
+            background: #E74C3C !important;
+            color: white;
+        }
+        .salary-net {
+            background: #007bff;
+            color: white;
+            font-size: 16px;
+            font-weight: bold;
+            text-align: center;
+            padding: 12px;
+            margin-top: 15px;
+            border-radius: 15px;
+        }
+        .notes {
+            margin-top: 20px;
+            padding: 10px;
+            background: #f0f8ff;
+            border-left: 4px solid #007bff;
+            font-size: 10px;
+            border-radius: 10px;
+        }
+        .download-section {
+            text-align: center;
+            margin: 30px 0;
+            padding: 20px;
+            background: #e8f4f8;
+            border-radius: 8px;
+        }
+        .download-button {
+            display: inline-block;
+            background: #28a745;
+            color: white;
+            padding: 15px 30px;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: bold;
+            font-size: 16px;
+            margin: 10px 0;
+        }
+        .download-button:hover {
+            background: #218838;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+            color: #666;
+            font-size: 10px;
+        }
+        @media (max-width: 600px) {
+            .header {
+                flex-direction: column;
+                text-align: center;
+            }
+            .company-info {
+                text-align: center;
+                margin-top: 15px;
+            }
+            .logo {
+                margin-left: 0;
+            }
+            body {
+                padding: 10px;
+            }
+            .email-container {
+                padding: 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <div class="header">
+            <div class="logo">
+                <img src="{{logo_url}}" alt="Logo" onerror="this.onerror=null; this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%22 height=%22100%22%3E%3Crect fill=%22%23007bff%22 width=%22100%22 height=%22100%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 fill=%22white%22 font-size=%2212%22%3EVeterinaria%3C/text%3E%3C/svg%3E'">
+            </div>
+            <div class="company-info">
+                <h2>{{empresa}}</h2>
+                <p>San Rafael Abajo de Desamparados</p>
+                <p>Tel: 4000-1365 | WhatsApp: 8839-2214</p>
+            </div>
+        </div>
+
+        <div class="title">Comprobante de Pago</div>
+
+        <table class="info-table">
+            <tr>
+                <th colspan="2">DATOS DEL COLABORADOR</th>
+            </tr>
+            <tr>
+                <td><strong>Nombre del colaborador</strong></td>
+                <td>{{empleado_nombre}}</td>
+            </tr>
+            <tr>
+                <td><strong>Identificación</strong></td>
+                <td>{{empleado_cedula}}</td>
+            </tr>
+            <tr>
+                <td><strong>Departamento</strong></td>
+                <td>{{empleado_departamento}}</td>
+            </tr>
+            <tr>
+                <td><strong>Puesto</strong></td>
+                <td>{{empleado_puesto}}</td>
+            </tr>
+            <tr>
+                <td><strong>Periodo de pago</strong></td>
+                <td>{{periodo}}</td>
+            </tr>
+            <tr>
+                <td><strong>Depositado en</strong></td>
+                <td>{{depositado_en}}</td>
+            </tr>
+            <tr>
+                <td><strong>Cuenta</strong></td>
+                <td></td>
+            </tr>
+        </table>
+
+        <div class="section-title">Detalle de Ingresos en el mes</div>
+
+        <table class="detail-table">
+            <thead>
+                <tr>
+                    <th style="width: 50%;">INGRESOS</th>
+                    <th style="width: 25%;"></th>
+                    <th style="width: 25%;" class="deductions-header">DEDUCCIONES</th>
+                    <th style="width: 25%;"></th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Salario Mensual</td>
+                    <td>₡ {{salario_mensual}}</td>
+                    <td>C.C.S.S. {{ccss_porcentaje}}%</td>
+                    <td>₡ {{ccss}}</td>
+                </tr>
+                <tr>
+                    <td>Salario diario</td>
+                    <td>₡ {{salario_diario}}</td>
+                    <td>Impuesto de Renta</td>
+                    <td>₡ {{impuesto_renta}}</td>
+                </tr>
+                <tr>
+                    <td>Salario x hora</td>
+                    <td>₡ {{salario_hora}}</td>
+                    <td>Rebajo por horas</td>
+                    <td>₡ {{rebajo_horas}}</td>
+                </tr>
+                <tr>
+                    <td></td>
+                    <td></td>
+                    <td>Otras deducciones</td>
+                    <td>₡ {{otras_deducciones}}</td>
+                </tr>
+                <tr>
+                    <td>Días laborados</td>
+                    <td>{{dias_laborados}}</td>
+                    <td></td>
+                    <td></td>
+                </tr>
+                <tr>
+                    <td>Subtotal quincenal</td>
+                    <td>₡ {{subtotal_quincenal}}</td>
+                    <td></td>
+                    <td></td>
+                </tr>
+                <tr>
+                    <td>Horas laboradas feriado</td>
+                    <td>{{horas_feriado}}</td>
+                    <td></td>
+                    <td></td>
+                </tr>
+                <tr>
+                    <td>Total</td>
+                    <td>₡ {{total_feriado}}</td>
+                    <td></td>
+                    <td></td>
+                </tr>
+                <tr>
+                    <td>Horas extras feriado</td>
+                    <td>{{horas_extra_feriado}}</td>
+                    <td></td>
+                    <td></td>
+                </tr>
+                <tr>
+                    <td>Total</td>
+                    <td>₡ {{total_extra_feriado}}</td>
+                    <td></td>
+                    <td></td>
+                </tr>
+                <tr>
+                    <td>Horas extras</td>
+                    <td>{{horas_extras}}</td>
+                    <td></td>
+                    <td></td>
+                </tr>
+                <tr>
+                    <td>Total</td>
+                    <td>₡ {{monto_horas_extras}}</td>
+                    <td></td>
+                    <td></td>
+                </tr>
+                <tr>
+                    <td>Sub-total Pagado</td>
+                    <td>₡ {{subtotal_pagado}}</td>
+                    <td></td>
+                    <td></td>
+                </tr>
+                <tr style="font-weight: bold; background: #e8f4f8;">
+                    <td>SALARIO BRUTO</td>
+                    <td>₡ {{salario_bruto}}</td>
+                    <td>Total de Deducciones</td>
+                    <td>₡ {{total_deducciones}}</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="salary-net">
+            SALARIO NETO: ₡ {{salario_neto}}
+        </div>
+
+        <div class="notes">
+            <strong>Observaciones:</strong><br>
+            {{observaciones}}
+        </div>
+
+        <div class="download-section">
+            <h3>Descargar Comprobante Completo</h3>
+            <p>{{download_instructions}}</p>
+            <a href="{{download_link}}" class="download-button" target="_blank">
+                📄 Descargar Comprobante PDF
+            </a>
+            <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 15px 0; border-left: 4px solid #007bff;">
+                <p><strong>Instrucciones de descarga:</strong></p>
+                <ol style="margin: 10px 0; padding-left: 20px;">
+                    <li>Haga clic en el botón "Descargar Comprobante PDF"</li>
+                    <li>Se abrirá una nueva pestaña del navegador</li>
+                    <li>El archivo se descargará automáticamente</li>
+                </ol>
+                <p><small>Si el enlace no funciona, responda a este email para recibir el comprobante como archivo adjunto.</small></p>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p><strong>{{empresa}}</strong></p>
+            <p>San Rafael Abajo de Desamparados</p>
+            <p>Tel: 4000-1365 | WhatsApp: 8839-2214</p>
+            <p>Fecha de envío: {{fecha_envio}}</p>
+            <p><em>Este es un mensaje automático, por favor no responder a este correo.</em></p>
+        </div>
+    </div>
+</body>
+</html>

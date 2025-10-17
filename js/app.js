@@ -72,6 +72,8 @@ class SistemaPlanillas {
         this.initEventListeners();
         this.actualizarFecha();
         this.cargarFeriadosDefecto();
+        this.cargarConfiguracionEmailJS();
+        this.inicializarDescargaPDF();
     }
 
     // ============================================
@@ -134,6 +136,225 @@ class SistemaPlanillas {
             if (historialGuardado) {
                 this.historialPlanillas = JSON.parse(historialGuardado);
             }
+        }
+    }
+
+    /**
+     * Configura EmailJS con las credenciales proporcionadas
+     */
+    configurarEmailJS() {
+        const userId = document.getElementById('emailjsUserId').value.trim();
+        const serviceId = document.getElementById('emailjsServiceId').value.trim();
+        const templateId = document.getElementById('emailjsTemplateId').value.trim();
+
+        if (!userId || !serviceId || !templateId) {
+            notify.error('Por favor, complete todos los campos de configuración de EmailJS');
+            return;
+        }
+
+        // Actualizar la configuración
+        if (typeof window.EMAILJS_CONFIG !== 'undefined') {
+            window.EMAILJS_CONFIG.USER_ID = userId;
+            window.EMAILJS_CONFIG.SERVICE_ID = serviceId;
+            window.EMAILJS_CONFIG.TEMPLATE_ID = templateId;
+        }
+
+        // Guardar en localStorage
+        const emailjsConfig = {
+            userId: userId,
+            serviceId: serviceId,
+            templateId: templateId
+        };
+        localStorage.setItem('emailjsConfig', JSON.stringify(emailjsConfig));
+
+        // Actualizar el estado visual
+        this.actualizarEstadoEmailJS(true);
+        notify.success('Configuración de EmailJS guardada exitosamente');
+    }
+
+    /**
+     * Prueba el envío de EmailJS con un email de prueba
+     */
+    async probarEmailJS() {
+        if (!this.verificarConfiguracionEmailJS()) {
+            return;
+        }
+
+        try {
+            notify.info('Enviando email de prueba...');
+
+            const templateParams = {
+                to_email: 'prueba@ejemplo.com',
+                to_name: 'Usuario de Prueba',
+                from_name: 'Sistema de Planillas',
+                subject: 'Prueba de EmailJS - Comprobante de Pago',
+                empleado_nombre: 'Usuario de Prueba',
+                empleado_cedula: '123456789',
+                empleado_puesto: 'Puesto de Prueba',
+                periodo: 'Enero 2024',
+                fecha_inicio: '2024-01-01',
+                fecha_fin: '2024-01-31',
+                salario_base: '₡ 500,000.00',
+                salario_bruto: '₡ 500,000.00',
+                salario_neto: '₡ 450,000.00',
+                ccss: '₡ 50,000.00',
+                horas_extras: 0,
+                monto_horas_extras: '₡ 0.00',
+                bonificaciones: '₡ 0.00',
+                deducciones: '₡ 0.00',
+                download_link: 'https://ejemplo.com/comprobante.pdf',
+                empresa: 'Sistema de Planillas',
+                fecha_envio: new Date().toLocaleDateString('es-CR')
+            };
+
+            const response = await emailjs.send(
+                window.EMAILJS_CONFIG.SERVICE_ID,
+                window.EMAILJS_CONFIG.TEMPLATE_ID,
+                templateParams
+            );
+
+            if (response.status === 200) {
+                notify.success('Email de prueba enviado exitosamente');
+            } else {
+                throw new Error(`Error del servidor: ${response.status}`);
+            }
+
+        } catch (error) {
+            console.error('Error enviando email de prueba:', error);
+            notify.error(`Error enviando email de prueba: ${error.message}`);
+        }
+    }
+
+    /**
+     * Verifica si EmailJS está configurado correctamente
+     */
+    verificarConfiguracionEmailJS() {
+        if (typeof window.isEmailJSConfigured === 'undefined' || !window.isEmailJSConfigured()) {
+            notify.error('EmailJS no está configurado. Configure las credenciales primero.');
+            return false;
+        }
+
+        if (typeof emailjs === 'undefined') {
+            notify.error('EmailJS no está cargado. Verifique que el script esté incluido correctamente.');
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Actualiza el estado visual de la configuración de EmailJS
+     */
+    actualizarEstadoEmailJS(configurado) {
+        const statusDiv = document.getElementById('emailjsStatus');
+        if (statusDiv) {
+            if (configurado) {
+                statusDiv.innerHTML = '<div class="alert alert-success"><i class="fas fa-check-circle"></i> EmailJS configurado correctamente</div>';
+                statusDiv.style.display = 'block';
+            } else {
+                statusDiv.innerHTML = '<div class="alert alert-warning"><i class="fas fa-exclamation-triangle"></i> EmailJS no configurado</div>';
+                statusDiv.style.display = 'block';
+            }
+        }
+    }
+
+    /**
+     * Carga la configuración de EmailJS desde localStorage
+     */
+    cargarConfiguracionEmailJS() {
+        const emailjsConfig = localStorage.getItem('emailjsConfig');
+        if (emailjsConfig) {
+            try {
+                const config = JSON.parse(emailjsConfig);
+                document.getElementById('emailjsUserId').value = config.userId || '';
+                document.getElementById('emailjsServiceId').value = config.serviceId || '';
+                document.getElementById('emailjsTemplateId').value = config.templateId || '';
+
+                // Actualizar la configuración global
+                if (typeof window.EMAILJS_CONFIG !== 'undefined') {
+                    window.EMAILJS_CONFIG.USER_ID = config.userId;
+                    window.EMAILJS_CONFIG.SERVICE_ID = config.serviceId;
+                    window.EMAILJS_CONFIG.TEMPLATE_ID = config.templateId;
+                }
+
+                this.actualizarEstadoEmailJS(true);
+            } catch (error) {
+                console.error('Error cargando configuración de EmailJS:', error);
+            }
+        } else {
+            this.actualizarEstadoEmailJS(false);
+        }
+    }
+
+    /**
+     * Inicializa el sistema de descarga de PDFs desde enlaces
+     */
+    inicializarDescargaPDF() {
+        // Verificar si hay un parámetro de descarga en la URL
+        const hash = window.location.hash;
+        if (hash && hash.includes('download=')) {
+            const fileId = hash.split('download=')[1];
+            this.descargarPDFDesdeEnlace(fileId);
+        }
+
+        // Escuchar cambios en el hash para descargas futuras
+        window.addEventListener('hashchange', () => {
+            const newHash = window.location.hash;
+            if (newHash && newHash.includes('download=')) {
+                const fileId = newHash.split('download=')[1];
+                this.descargarPDFDesdeEnlace(fileId);
+            }
+        });
+    }
+
+    /**
+     * Descarga un PDF desde un enlace guardado en localStorage
+     */
+    descargarPDFDesdeEnlace(fileId) {
+        try {
+            const pdfData = localStorage.getItem(`pdf_${fileId}`);
+            if (!pdfData) {
+                notify.error('El enlace de descarga ha expirado o no es válido');
+                return;
+            }
+
+            const data = JSON.parse(pdfData);
+            
+            // Verificar si el archivo ha expirado
+            if (Date.now() > data.expires) {
+                localStorage.removeItem(`pdf_${fileId}`);
+                notify.error('El enlace de descarga ha expirado');
+                return;
+            }
+
+            // Convertir base64 a blob y descargar
+            const byteCharacters = atob(data.data);
+            const byteNumbers = new Array(byteCharacters.length);
+            for (let i = 0; i < byteCharacters.length; i++) {
+                byteNumbers[i] = byteCharacters.charCodeAt(i);
+            }
+            const byteArray = new Uint8Array(byteNumbers);
+            const blob = new Blob([byteArray], { type: 'application/pdf' });
+
+            // Crear enlace de descarga
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = data.fileName;
+            link.style.display = 'none';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+
+            // Limpiar el hash de la URL
+            window.history.replaceState({}, document.title, window.location.pathname);
+
+            notify.success(`Descargando ${data.fileName}...`);
+
+        } catch (error) {
+            console.error('Error descargando PDF desde enlace:', error);
+            notify.error('Error al descargar el archivo');
         }
     }
 
@@ -858,7 +1079,7 @@ class SistemaPlanillas {
         if (planilla.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="9" class="empty-state">
+                    <td colspan="10" class="empty-state">
                         <i class="fas fa-file-invoice-dollar"></i>
                         <p>No hay datos para mostrar</p>
                     </td>
@@ -872,6 +1093,7 @@ class SistemaPlanillas {
         tbody.innerHTML = planilla.map(item => `
             <tr>
                 <td>${item.empleado.nombre}</td>
+                <td>${item.empleado.email || ''}</td>
                 <td>₡${this.formatearMoneda(item.salarioBase)}</td>
                 <td>₡${this.formatearMoneda(item.montoHorasExtra)}</td>
                 <td>₡${this.formatearMoneda(item.bonos)}</td>
@@ -883,9 +1105,19 @@ class SistemaPlanillas {
                     <button class="btn btn-sm btn-info" onclick="sistema.generarConstanciaSalarial('${item.empleado.id}')" title="Constancia Salarial">
                         <i class="fas fa-file-pdf"></i>
                     </button>
-                    <button class="btn btn-sm btn-success" onclick="sistema.generarComprobantePago('${item.empleado.id}', '${document.getElementById('periodoPlanilla').value}', '${document.getElementById('fechaInicioPlanilla').value}', '${document.getElementById('fechaFinPlanilla').value}')" title="Comprobante de Pago">
-                        <i class="fas fa-receipt"></i>
-                    </button>
+                    <div class="dropdown">
+                        <button class="btn btn-sm btn-success dropdown-toggle" type="button" data-bs-toggle="dropdown" title="Comprobante de Pago">
+                            <i class="fas fa-receipt"></i>
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="#" onclick="sistema.generarComprobantePago('${item.empleado.id}', '${document.getElementById('periodoPlanilla').value}', '${document.getElementById('fechaInicioPlanilla').value}', '${document.getElementById('fechaFinPlanilla').value}')">
+                                <i class="fas fa-download"></i> Descargar PDF
+                            </a></li>
+                            <li><a class="dropdown-item" href="#" onclick="sistema.generarComprobantePago('${item.empleado.id}', '${document.getElementById('periodoPlanilla').value}', '${document.getElementById('fechaInicioPlanilla').value}', '${document.getElementById('fechaFinPlanilla').value}', true)">
+                                <i class="fas fa-envelope"></i> Enviar por Email
+                            </a></li>
+                        </ul>
+                    </div>
                 </td>
             </tr>
         `).join('');
@@ -1529,6 +1761,7 @@ class SistemaPlanillas {
     exportarExcel(planilla) {
         const data = planilla.map(item => ({
             'Empleado': item.empleado.nombre,
+            'Email': item.empleado.email || '',
             'Cédula': item.empleado.cedula,
             'Salario Base': parseFloat(item.salarioBase),
             'Horas Extra': parseFloat(item.montoHorasExtra),
@@ -1605,10 +1838,16 @@ class SistemaPlanillas {
         doc.save(`constancia_${empleado.nombre.replace(/\s/g, '_')}.pdf`);
     }
 
-    generarComprobantePago(empleadoId, periodo, fechaInicio, fechaFin) {
+    generarComprobantePago(empleadoId, periodo, fechaInicio, fechaFin, enviarPorCorreo = false) {
         const empleado = this.empleados.find(e => e.id === empleadoId);
         if (!empleado) {
             notify.error('Empleado no encontrado');
+            return;
+        }
+
+        // Verificar si se puede enviar por correo
+        if (enviarPorCorreo && (!empleado.email || empleado.email.trim() === '')) {
+            notify.error('El empleado no tiene un email válido para enviar el comprobante');
             return;
         }
 
@@ -1988,7 +2227,18 @@ class SistemaPlanillas {
                 pdf.addImage(imgData, 'JPEG', x, y, imgWidth, imgHeight);
 
                 const fileName = `Comprobante_${empleado.nombre.replace(/\s/g, '_')}_${nombreMes.replace(/\s/g, '_')}.pdf`;
-                pdf.save(fileName);
+                
+                if (enviarPorCorreo) {
+                    // Enviar por correo electrónico
+                    this.enviarComprobantePorCorreo(empleado, calculos, {
+                        periodo: nombreMes,
+                        fechaInicio: fechaInicio,
+                        fechaFin: fechaFin
+                    }, pdf);
+                } else {
+                    // Descargar PDF normalmente
+                    pdf.save(fileName);
+                }
 
                 // Eliminar el elemento temporal
                 document.body.removeChild(comprobanteHTML);
@@ -1998,6 +2248,547 @@ class SistemaPlanillas {
                 document.body.removeChild(comprobanteHTML);
             });
         }, 100);
+    }
+
+    /**
+     * Envía un comprobante de pago por correo electrónico usando EmailJS
+     * @param {Object} empleado - Datos del empleado
+     * @param {Object} calculos - Cálculos de salario
+     * @param {Object} planilla - Información de la planilla
+     * @param {Object} pdf - Objeto PDF de jsPDF
+     */
+    async enviarComprobantePorCorreo(empleado, calculos, planilla, pdf) {
+        try {
+            // Verificar si el servicio de email está disponible
+            if (typeof window.EmailService === 'undefined') {
+                notify.error('Servicio de email no disponible. Verifique que el script esté cargado correctamente.');
+                return;
+            }
+
+            // Mostrar notificación de envío
+            notify.info('Enviando comprobante por correo...');
+
+            // Crear instancia del servicio de email
+            const emailService = new window.EmailService();
+
+            // Enviar comprobante usando el servicio optimizado
+            const resultado = await emailService.enviarComprobante(empleado, calculos, planilla, pdf);
+
+            if (resultado.success) {
+                notify.success(`Comprobante enviado exitosamente a ${empleado.email}. El PDF se ha descargado automáticamente.`);
+                
+                // Registrar el envío en logs
+                this.registrarEnvioComprobante({
+                    empleadoId: empleado.id,
+                    empleadoNombre: empleado.nombre,
+                    email: empleado.email,
+                    periodo: planilla.periodo,
+                    fechaEnvio: new Date().toISOString(),
+                    estado: 'enviado',
+                    messageId: resultado.messageId,
+                    fileName: resultado.fileName
+                });
+            } else {
+                throw new Error('Error enviando comprobante');
+            }
+
+        } catch (error) {
+            console.error('Error enviando comprobante por correo:', error);
+            notify.error(`Error enviando comprobante: ${error.message}`);
+            
+            // Registrar el error en logs
+            this.registrarEnvioComprobante({
+                empleadoId: empleado.id,
+                empleadoNombre: empleado.nombre,
+                email: empleado.email,
+                periodo: planilla.periodo,
+                fechaEnvio: new Date().toISOString(),
+                estado: 'error',
+                error: error.message
+            });
+        }
+    }
+
+    /**
+     * Registra el envío de comprobante en el sistema
+     * @param {Object} logData - Datos del envío
+     */
+    registrarEnvioComprobante(logData) {
+        try {
+            // Obtener logs existentes
+            let logs = JSON.parse(localStorage.getItem('logsEnvioComprobantes') || '[]');
+            
+            // Agregar nuevo log
+            logs.push({
+                id: Date.now().toString(),
+                ...logData
+            });
+            
+            // Mantener solo los últimos 1000 logs
+            if (logs.length > 1000) {
+                logs = logs.slice(-1000);
+            }
+            
+            // Guardar logs
+            localStorage.setItem('logsEnvioComprobantes', JSON.stringify(logs));
+            
+        } catch (error) {
+            console.error('Error registrando envío de comprobante:', error);
+        }
+    }
+
+    /**
+     * Obtiene los logs de envío de comprobantes
+     * @returns {Array} - Lista de logs
+     */
+    obtenerLogsEnvioComprobantes() {
+        try {
+            return JSON.parse(localStorage.getItem('logsEnvioComprobantes') || '[]');
+        } catch (error) {
+            console.error('Error obteniendo logs de envío:', error);
+            return [];
+        }
+    }
+
+    /**
+     * Envía comprobantes de pago a todos los empleados de la planilla actual
+     * @param {string} periodo - Período de la planilla
+     * @param {string} fechaInicio - Fecha de inicio
+     * @param {string} fechaFin - Fecha de fin
+     */
+    async enviarComprobantesMasivo(periodo, fechaInicio, fechaFin) {
+        try {
+            // Verificar si el servicio de email está disponible
+            if (typeof window.emailService === 'undefined') {
+                notify.error('Servicio de correo no disponible. Asegúrese de cargar el AppsScriptEmailService.');
+                return;
+            }
+
+            if (!window.emailService.estaConfigurado()) {
+                notify.error('Google Apps Script no configurado correctamente. Verifique el Script ID.');
+                return;
+            }
+
+            // Confirmar envío masivo
+            const confirmacion = confirm(
+                `¿Está seguro de que desea enviar comprobantes de pago a todos los empleados?\n\n` +
+                `Período: ${periodo}\n` +
+                `Del ${this.formatearFecha(fechaInicio)} al ${this.formatearFecha(fechaFin)}\n\n` +
+                `Esta acción enviará correos a todos los empleados que tengan email válido.`
+            );
+
+            if (!confirmacion) {
+                return;
+            }
+
+            // Mostrar notificación de inicio
+            notify.info('Iniciando envío masivo de comprobantes...');
+
+            // Preparar datos de empleados para envío
+            const empleadosConEmail = this.empleados.filter(emp => 
+                emp.email && emp.email.trim() !== ''
+            );
+
+            if (empleadosConEmail.length === 0) {
+                notify.error('No hay empleados con email válido para enviar comprobantes.');
+                return;
+            }
+
+            // Mostrar progreso
+            const modalProgreso = this.mostrarModalProgreso(empleadosConEmail.length);
+
+            try {
+                // Actualizar progreso
+                this.actualizarProgresoModal(modalProgreso, 0, empleadosConEmail.length, 'Preparando datos...');
+
+                // Preparar datos para envío masivo con Google Apps Script
+                const empleadosConDatos = empleadosConEmail.map(empleado => {
+                    const calculos = this.calcularSalarioEmpleado(empleado, fechaInicio, fechaFin);
+                    
+                    return {
+                        empleado: {
+                            nombre: empleado.nombre,
+                            cedula: empleado.cedula,
+                            email: empleado.email,
+                            puesto: empleado.puesto || 'N/A',
+                            departamento: empleado.departamento || 'N/A'
+                        },
+                        datosPago: {
+                            salarioBase: parseFloat(calculos.salarioBase || 0),
+                            salarioBruto: parseFloat(calculos.salarioBruto || 0),
+                            salarioNeto: parseFloat(calculos.salarioNeto || 0),
+                            ccss: parseFloat(calculos.ccss || 0),
+                            horasTrabajadas: empleado.horasTrabajadas || 0,
+                            salarioHora: parseFloat(empleado.salarioHora || 0),
+                            horasExtras: parseFloat(calculos.horasExtra || 0),
+                            montoHorasExtras: parseFloat(calculos.montoHorasExtra || 0),
+                            bonificaciones: parseFloat(calculos.bonificaciones || 0),
+                            deducciones: parseFloat(calculos.rebajos || 0)
+                        }
+                    };
+                });
+
+                // Actualizar progreso
+                this.actualizarProgresoModal(modalProgreso, empleadosConEmail.length, empleadosConEmail.length, 'Enviando a Google Apps Script...');
+
+                // Enviar usando Google Apps Script
+                const resultado = await window.emailService.enviarComprobantesMasivo(
+                    empleadosConDatos,
+                    { periodo, fechaInicio, fechaFin }
+                );
+
+                // Cerrar modal de progreso
+                this.cerrarModalProgreso(modalProgreso);
+
+                if (resultado.success) {
+                    // Registrar envíos exitosos
+                    resultado.resultados.forEach(res => {
+                        this.registrarEnvioComprobante({
+                            empleadoId: res.empleado,
+                            empleadoNombre: res.empleado,
+                            email: res.email,
+                            periodo: periodo,
+                            fechaEnvio: new Date().toISOString(),
+                            estado: res.success ? 'enviado' : 'error',
+                            error: res.error || '',
+                            messageId: res.success ? 'apps_script' : ''
+                        });
+                    });
+
+                    // Mostrar resumen final
+                    this.mostrarResumenEnvioMasivo(
+                        resultado.resumen.exitosos, 
+                        resultado.resumen.errores, 
+                        resultado.resultados
+                    );
+                } else {
+                    notify.error(`Error en envío masivo: ${resultado.error}`);
+                }
+
+            } catch (error) {
+                // Cerrar modal de progreso
+                this.cerrarModalProgreso(modalProgreso);
+                
+                console.error('Error en envío masivo:', error);
+                notify.error(`Error en envío masivo: ${error.message}`);
+            }
+
+        } catch (error) {
+            console.error('Error en envío masivo:', error);
+            notify.error(`Error en envío masivo: ${error.message}`);
+        }
+    }
+
+    /**
+     * Genera un PDF como blob para envío por correo
+     * @param {Object} empleado - Datos del empleado
+     * @param {Object} datosPago - Datos de pago
+     * @param {Object} planilla - Información de la planilla
+     * @returns {Promise<Blob>} - PDF como blob
+     */
+    async generarPDFBlob(empleado, datosPago, planilla) {
+        return new Promise((resolve, reject) => {
+            // Crear un contenedor temporal para el comprobante
+            const comprobanteHTML = document.createElement('div');
+            comprobanteHTML.id = 'comprobante-email-temp';
+            comprobanteHTML.style.position = 'fixed';
+            comprobanteHTML.style.left = '-9999px';
+            comprobanteHTML.style.top = '0';
+            comprobanteHTML.style.width = '210mm';
+            comprobanteHTML.style.background = 'white';
+            comprobanteHTML.style.padding = '20px';
+            comprobanteHTML.style.fontFamily = 'Arial, sans-serif';
+
+            // Generar HTML del comprobante (reutilizar lógica existente)
+            const fechaInicioObj = new Date(planilla.fechaInicio + 'T00:00:00');
+            const fechaFinObj = new Date(planilla.fechaFin + 'T00:00:00');
+            const nombreMes = fechaFinObj.toLocaleDateString('es-CR', { month: 'long', year: 'numeric' });
+
+            comprobanteHTML.innerHTML = `
+                <style>
+                    .comprobante { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background: white; }
+                    .header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 30px; }
+                    .empresa-info { font-size: 18px; font-weight: bold; margin-bottom: 10px; }
+                    .periodo { background-color: #f0f0f0; padding: 15px; margin: 20px 0; border-radius: 5px; text-align: center; font-weight: bold; }
+                    .employee-info { display: flex; justify-content: space-between; margin-bottom: 30px; }
+                    .employee-details, .payment-details { width: 48%; }
+                    .section-title { font-size: 16px; font-weight: bold; background-color: #333; color: white; padding: 8px; margin: 20px 0 10px 0; }
+                    .payment-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+                    .payment-table th, .payment-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                    .payment-table th { background-color: #f2f2f2; font-weight: bold; }
+                    .total-row { font-weight: bold; background-color: #e6e6e6; }
+                    .salary-net { text-align: center; font-size: 18px; font-weight: bold; background-color: #4CAF50; color: white; padding: 15px; margin: 20px 0; border-radius: 5px; }
+                    .footer { margin-top: 40px; text-align: center; font-size: 12px; color: #666; }
+                </style>
+                
+                <div class="comprobante">
+                    <div class="header">
+                        <div class="empresa-info">Veterinaria San Martín de Porres</div>
+                        <div>Cédula Jurídica: 3-105-761559</div>
+                        <div>150 metros este del Mall, Zona Centro, San José, Desamparados, San Rafael Abajo, 10311</div>
+                        <div>Tel: 4000-1365 | Email: info@vetsanmartin.com</div>
+                    </div>
+                    
+                    <div class="periodo">PERÍODO DE PAGO: ${this.formatearFecha(planilla.fechaInicio)} al ${this.formatearFecha(planilla.fechaFin)}</div>
+                    
+                    <div class="employee-info">
+                        <div class="employee-details">
+                            <strong>EMPLEADO:</strong><br>
+                            Nombre: ${empleado.nombre}<br>
+                            Cédula: ${empleado.cedula}<br>
+                            Puesto: ${empleado.puesto || 'N/A'}<br>
+                            Departamento: ${empleado.departamento || 'N/A'}
+                        </div>
+                        <div class="payment-details">
+                            <strong>DETALLES DE PAGO:</strong><br>
+                            Fecha de emisión: ${this.formatearFecha(new Date().toISOString().split('T')[0])}<br>
+                            Método de pago: ${empleado.metodo_pago || 'Transferencia bancaria'}<br>
+                            Cuenta: ${empleado.numero_cuenta || 'N/A'}
+                        </div>
+                    </div>
+                    
+                    <div class="section-title">DETALLE DE SALARIOS Y BENEFICIOS</div>
+                    <table class="payment-table">
+                        <tr><th>Concepto</th><th>Horas/Días</th><th>Tarifa</th><th>Monto</th></tr>
+                        <tr>
+                            <td>Salario base</td>
+                            <td>${datosPago.horasTrabajadas || 0}</td>
+                            <td>₡${datosPago.salarioHora || 0}</td>
+                            <td>₡${this.formatearMoneda(datosPago.salarioBase || 0)}</td>
+                        </tr>
+                        ${datosPago.horasExtras > 0 ? `
+                        <tr>
+                            <td>Horas extras</td>
+                            <td>${datosPago.horasExtras}</td>
+                            <td>₡${(datosPago.salarioHora * 1.5).toFixed(2)}</td>
+                            <td>₡${this.formatearMoneda(datosPago.montoHorasExtras || 0)}</td>
+                        </tr>
+                        ` : ''}
+                    </table>
+                    
+                    <div class="section-title">DETALLE DE DEDUCCIONES</div>
+                    <table class="payment-table">
+                        <tr><th>Concepto</th><th>Porcentaje</th><th>Monto</th></tr>
+                        <tr>
+                            <td>CCSS (Caja Costarricense de Seguro Social)</td>
+                            <td>10.67%</td>
+                            <td>₡${this.formatearMoneda(datosPago.ccss || 0)}</td>
+                        </tr>
+                    </table>
+                    
+                    <div class="section-title">RESUMEN DE PAGO</div>
+                    <table class="payment-table">
+                        <tr><td><strong>Salario Bruto</strong></td><td colspan="3"><strong>₡${this.formatearMoneda(datosPago.salarioBruto)}</strong></td></tr>
+                        <tr><td>Menos: Deducciones</td><td colspan="3">₡${this.formatearMoneda((datosPago.ccss || 0) + (datosPago.deducciones || 0))}</td></tr>
+                        <tr class="total-row"><td><strong>Salario Neto a Pagar</strong></td><td colspan="3"><strong>₡${this.formatearMoneda(datosPago.salarioNeto)}</strong></td></tr>
+                    </table>
+                    
+                    <div class="footer">
+                        <p>Este comprobante ha sido generado automáticamente por el sistema de planillas.</p>
+                        <p>Para consultas contactar a: info@vetsanmartin.com</p>
+                        <p>Fecha de generación: ${this.formatearFecha(new Date().toISOString().split('T')[0])}</p>
+                    </div>
+                </div>
+            `;
+
+            document.body.appendChild(comprobanteHTML);
+
+            // Generar PDF con html2canvas
+            setTimeout(() => {
+                html2canvas(comprobanteHTML, {
+                    scale: 2,
+                    useCORS: true,
+                    backgroundColor: '#ffffff',
+                    logging: false
+                }).then(canvas => {
+                    const imgData = canvas.toDataURL('image/jpeg', 1.0);
+                    const { jsPDF } = window.jspdf;
+                    const pdf = new jsPDF('p', 'mm', 'a4');
+                    
+                    const imgWidth = 190;
+                    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+                    const x = (pdf.internal.pageSize.getWidth() - imgWidth) / 2;
+                    const y = 5;
+
+                    pdf.addImage(imgData, 'JPEG', x, y, imgWidth, imgHeight);
+
+                    // Convertir a blob
+                    const pdfBlob = pdf.output('blob');
+                    
+                    // Limpiar
+                    document.body.removeChild(comprobanteHTML);
+                    
+                    resolve(pdfBlob);
+                }).catch(error => {
+                    document.body.removeChild(comprobanteHTML);
+                    reject(error);
+                });
+            }, 100);
+        });
+    }
+
+    /**
+     * Muestra un modal de progreso para el envío masivo
+     * @param {number} total - Total de empleados a procesar
+     * @returns {HTMLElement} - Elemento del modal
+     */
+    mostrarModalProgreso(total) {
+        const modal = document.createElement('div');
+        modal.id = 'modal-progreso-envio';
+        modal.className = 'modal fade';
+        modal.innerHTML = `
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Enviando Comprobantes de Pago</h5>
+                    </div>
+                    <div class="modal-body text-center">
+                        <div class="spinner-border text-primary mb-3" role="status">
+                            <span class="visually-hidden">Enviando...</span>
+                        </div>
+                        <div id="progreso-texto">Preparando envío...</div>
+                        <div class="progress mt-3">
+                            <div id="progreso-barra" class="progress-bar" role="progressbar" style="width: 0%"></div>
+                        </div>
+                        <div id="progreso-detalle" class="mt-2 text-muted"></div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+        
+        // Mostrar modal
+        const bootstrapModal = new bootstrap.Modal(modal);
+        bootstrapModal.show();
+
+        return modal;
+    }
+
+    /**
+     * Actualiza el progreso del modal
+     * @param {HTMLElement} modal - Elemento del modal
+     * @param {number} actual - Progreso actual
+     * @param {number} total - Total
+     * @param {string} empleadoActual - Nombre del empleado actual
+     */
+    actualizarProgresoModal(modal, actual, total, empleadoActual) {
+        const porcentaje = Math.round((actual / total) * 100);
+        
+        const texto = modal.querySelector('#progreso-texto');
+        const barra = modal.querySelector('#progreso-barra');
+        const detalle = modal.querySelector('#progreso-detalle');
+
+        texto.textContent = `Enviando comprobante ${actual} de ${total}`;
+        barra.style.width = `${porcentaje}%`;
+        barra.textContent = `${porcentaje}%`;
+        detalle.textContent = `Procesando: ${empleadoActual}`;
+    }
+
+    /**
+     * Cierra el modal de progreso
+     * @param {HTMLElement} modal - Elemento del modal
+     */
+    cerrarModalProgreso(modal) {
+        const bootstrapModal = bootstrap.Modal.getInstance(modal);
+        if (bootstrapModal) {
+            bootstrapModal.hide();
+        }
+        modal.remove();
+    }
+
+    /**
+     * Muestra el resumen del envío masivo
+     * @param {number} exitosos - Número de envíos exitosos
+     * @param {number} errores - Número de errores
+     * @param {Array} resultados - Resultados detallados
+     */
+    mostrarResumenEnvioMasivo(exitosos, errores, resultados) {
+        const modal = document.createElement('div');
+        modal.className = 'modal fade';
+        modal.innerHTML = `
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Resumen de Envío de Comprobantes</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <div class="card text-center ${exitosos > 0 ? 'border-success' : ''}">
+                                    <div class="card-body">
+                                        <h5 class="card-title text-success">${exitosos}</h5>
+                                        <p class="card-text">Enviados</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="card text-center ${errores > 0 ? 'border-danger' : ''}">
+                                    <div class="card-body">
+                                        <h5 class="card-title text-danger">${errores}</h5>
+                                        <p class="card-text">Errores</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="card text-center">
+                                    <div class="card-body">
+                                        <h5 class="card-title">${exitosos + errores}</h5>
+                                        <p class="card-text">Total</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        ${errores > 0 ? `
+                        <div class="alert alert-warning">
+                            <h6>Empleados con errores:</h6>
+                            <ul class="mb-0">
+                                ${resultados.filter(r => !r.success).map(r => 
+                                    `<li><strong>${r.empleado}</strong> (${r.email}): ${r.error}</li>`
+                                ).join('')}
+                            </ul>
+                        </div>
+                        ` : ''}
+                        
+                        ${exitosos > 0 ? `
+                        <div class="alert alert-success">
+                            <h6>Comprobantes enviados exitosamente a:</h6>
+                            <ul class="mb-0">
+                                ${resultados.filter(r => r.success).map(r => 
+                                    `<li><strong>${r.empleado}</strong> (${r.email})</li>`
+                                ).join('')}
+                            </ul>
+                        </div>
+                        ` : ''}
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+        
+        // Mostrar modal
+        const bootstrapModal = new bootstrap.Modal(modal);
+        bootstrapModal.show();
+
+        // Limpiar modal cuando se cierre
+        modal.addEventListener('hidden.bs.modal', () => {
+            modal.remove();
+        });
+    }
+
+    /**
+     * Pausa la ejecución por un tiempo determinado
+     * @param {number} ms - Milisegundos a pausar
+     * @returns {Promise} - Promise que se resuelve después del tiempo
+     */
+    delay(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
     }
 
     contarDiasLaborados(empleadoId, fechaInicio, fechaFin) {
@@ -2993,6 +3784,20 @@ class SistemaPlanillas {
             this.guardarPlanillaEnHistorial();
         });
 
+        // Botón de envío masivo de comprobantes
+        document.getElementById('btnEnviarMasivo')?.addEventListener('click', () => {
+            const periodo = document.getElementById('periodoPlanilla').value;
+            const fechaInicio = document.getElementById('fechaInicioPlanilla').value;
+            const fechaFin = document.getElementById('fechaFinPlanilla').value;
+            
+            if (!fechaInicio || !fechaFin) {
+                notify.error('Por favor seleccione las fechas de inicio y fin del período');
+                return;
+            }
+            
+            this.enviarComprobantesMasivo(periodo, fechaInicio, fechaFin);
+        });
+
         // Pestañas de Empleados
         document.querySelectorAll('.tab-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
@@ -3147,6 +3952,15 @@ class SistemaPlanillas {
             this.config.incapacidadINS = parseInt(document.getElementById('configIncapINS').value);
             this.guardarDatos();
             notify.success('Configuración guardada exitosamente');
+        });
+
+        // Configuración EmailJS
+        document.getElementById('btnConfigurarEmailJS')?.addEventListener('click', () => {
+            this.configurarEmailJS();
+        });
+
+        document.getElementById('btnProbarEmailJS')?.addEventListener('click', () => {
+            this.probarEmailJS();
         });
 
         document.getElementById('btnLimpiarDatos')?.addEventListener('click', async () => {
