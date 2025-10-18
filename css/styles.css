@@ -1649,6 +1649,150 @@ button:disabled,
     outline-offset: 2px;
 }
 
+/* Dropdown personalizado - Estilo Alegra */
+.dropdown {
+    position: relative;
+    display: inline-block;
+}
+
+.dropdown-toggle {
+    background-color: var(--success-color);
+    border: none;
+    cursor: pointer;
+    position: relative;
+    color: var(--text-white);
+    transition: var(--transition-fast);
+}
+
+.dropdown-toggle:hover {
+    background-color: #00C26D;
+    color: var(--text-white);
+}
+
+.dropdown-menu {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    z-index: 1000;
+    min-width: 160px;
+    padding: 8px 0;
+    margin: 4px 0 0;
+    background-color: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-sm);
+    box-shadow: var(--shadow-lg);
+    display: none;
+    opacity: 0;
+    transform: translateY(-10px);
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.dropdown-menu.show {
+    display: block;
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.dropdown-item {
+    display: block;
+    width: 100%;
+    padding: 10px 16px;
+    color: var(--text-primary);
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 500;
+    transition: var(--transition-fast);
+    border: none;
+    background: none;
+    text-align: left;
+    cursor: pointer;
+}
+
+.dropdown-item:hover {
+    background-color: var(--bg-hover);
+    color: var(--primary-color);
+}
+
+.dropdown-item i {
+    margin-right: 8px;
+    width: 16px;
+    text-align: center;
+    color: var(--text-secondary);
+}
+
+.dropdown-item:hover i {
+    color: var(--primary-color);
+}
+
+/* Botones de acción en tabla */
+.table-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    justify-content: center;
+}
+
+
+.table-actions .btn {
+    margin: 0;
+}
+
+/* Mejoras para botones de dropdown */
+.dropdown-toggle::after {
+    content: '';
+    display: inline-block;
+    margin-left: 8px;
+    vertical-align: middle;
+    border-top: 4px solid;
+    border-right: 4px solid transparent;
+    border-left: 4px solid transparent;
+    transition: transform 0.2s ease;
+}
+
+.dropdown-menu.show + .dropdown-toggle::after {
+    transform: rotate(180deg);
+}
+
+/* Asegurar que los botones tengan el tamaño correcto */
+.btn-sm {
+    padding: 6px 12px;
+    font-size: 13px;
+    min-width: 36px;
+    height: 36px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Mejorar la apariencia de los iconos en los botones */
+.btn i {
+    font-size: 14px;
+    display: inline-block;
+    width: 16px;
+    text-align: center;
+}
+
+/* Asegurar que los iconos de Font Awesome se muestren */
+.fas, .far, .fab {
+    font-family: "Font Awesome 6 Free" !important;
+    font-weight: 900;
+    font-style: normal;
+    font-variant: normal;
+    text-rendering: auto;
+    line-height: 1;
+}
+
+/* Estilos específicos para botones con iconos */
+.btn i.fas {
+    margin-right: 0;
+}
+
+/* Asegurar que el botón tenga contenido visible */
+.btn:not(:empty) {
+    min-width: 36px;
+    min-height: 36px;
+}
+
 /* Forzar centrado de modales */
 .modal {
     display: flex !important;

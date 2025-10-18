@@ -300,6 +300,10 @@
                     <option value="quincenal">Quincenal</option>
                     <option value="mensual">Mensual</option>
                 </select>
+                <select id="tipoPlanilla" class="form-control" title="Seleccione si es primera o segunda planilla del mes">
+                    <option value="primera">Primera Planilla (Sin Impuesto de Renta)</option>
+                    <option value="segunda">Segunda Planilla (Con Impuesto de Renta)</option>
+                </select>
                 <select id="filtroEmpresaPlanilla" class="form-control">
                     <option value="">Todas las empresas</option>
                     <option value="Veterinaria San Martin de Porres">Veterinaria San Martin de Porres</option>
@@ -335,6 +339,7 @@
                             <th>Empleado</th>
                             <th>Salario Base</th>
                             <th>Horas Extra</th>
+                            <th>Feriados</th>
                             <th>Bonos</th>
                             <th>Salario Bruto</th>
                             <th>CCSS (10.67%)</th>
@@ -425,6 +430,7 @@
                             <th>Fecha</th>
                             <th>Descripción</th>
                             <th>Recargo Extra</th>
+                            <th>Tipo de Pago</th>
                             <th>Acciones</th>
                         </tr>
                     </thead>
@@ -503,6 +509,9 @@
                     <button class="btn btn-warning" id="btnProbarEmailJS">
                         <i class="fas fa-paper-plane"></i> Probar Envío
                     </button>
+                    <button class="btn btn-secondary" id="btnProbarEmailJSSimple">
+                        <i class="fas fa-bug"></i> Prueba Simple
+                    </button>
                     <div id="emailjsStatus" class="mt-3" style="display: none;"></div>
                 </div>
 
@@ -546,7 +555,7 @@
                     </div>
                     <div class="form-group">
                         <label>Salario por Hora *</label>
-                        <input type="number" id="empleadoSalarioHora" class="form-control" step="0.01" required>
+                        <input type="number" id="empleadoSalarioHora" class="form-control" step="0.0000001" required>
                     </div>
                     <div class="form-group">
                         <label>Fecha de Ingreso *</label>
@@ -672,7 +681,7 @@
                     </div>
                     <div class="form-group">
                         <label>Monto *</label>
-                        <input type="number" id="bonoMonto" class="form-control" step="0.01" required>
+                        <input type="number" id="bonoMonto" class="form-control" step="0.0000001" required>
                     </div>
                     <div class="form-group">
                         <label>Fecha *</label>
@@ -714,8 +723,16 @@
                     </div>
                     <div class="form-group">
                         <label>Recargo Extra (%)</label>
-                        <input type="number" id="feriadoRecargo" class="form-control" step="1" value="50" min="0">
+                        <input type="number" id="feriadoRecargo" class="form-control" step="1" value="100" min="0">
                         <small>Porcentaje adicional sobre el salario normal para quienes trabajen este día</small>
+                    </div>
+                    <div class="form-group">
+                        <label>Tipo de Pago *</label>
+                        <select id="feriadoPagoObligatorio" class="form-control" required>
+                            <option value="true">Obligatorio</option>
+                            <option value="false">No Obligatorio</option>
+                        </select>
+                        <small>Los feriados obligatorios deben pagarse siempre, los no obligatorios son opcionales</small>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-close="modalFeriado">Cancelar</button>
@@ -750,7 +767,7 @@
     
     <!-- Configuración EmailJS -->
     <script src="js/config/emailjs-config.js"></script>
-    <script src="js/services/email-service.js"></script>
+    <script src="js/services/email-service-simple.js"></script>
     
     <!-- Sistema de Autenticación -->
     <script type="module" src="js/auth.js"></script>

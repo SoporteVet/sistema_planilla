@@ -1,29 +1,51 @@
 // Configuración de EmailJS
 // Reemplaza estos valores con tus credenciales de EmailJS
 const EMAILJS_CONFIG = {
-    // Tu User ID de EmailJS
-    USER_ID: 'aYx8Apc238hU1_CsI',
+    // Tu User ID de EmailJS (Public Key)
+    USER_ID: 'ld-bX87wyBkLDCYoc',
     
-    // ID del servicio de email (Gmail, Outlook, etc.)
-    SERVICE_ID: 'service_o0w19e9',
+    // ID del servicio de email (Service ID)
+    SERVICE_ID: 'service_aupbtwq',
     
-    // ID de la plantilla de email
-    TEMPLATE_ID: 'template_150nx99',
+    // ID de la plantilla de email (Template ID)
+    TEMPLATE_ID: 'template_t0p0r4w',
     
     // URL base para descarga de PDFs (puede ser tu servidor o un servicio de almacenamiento)
     PDF_DOWNLOAD_BASE_URL: window.location.origin
 };
 
-// Inicializar EmailJS
-if (typeof emailjs !== 'undefined') {
-    emailjs.init(EMAILJS_CONFIG.USER_ID);
+// Inicializar EmailJS cuando esté disponible
+function initializeEmailJS() {
+    if (typeof emailjs !== 'undefined' && EMAILJS_CONFIG.USER_ID) {
+        try {
+            emailjs.init(EMAILJS_CONFIG.USER_ID);
+            console.log('EmailJS inicializado correctamente');
+            return true;
+        } catch (error) {
+            console.error('Error inicializando EmailJS:', error);
+            return false;
+        }
+    }
+    return false;
 }
+
+// Intentar inicializar inmediatamente
+initializeEmailJS();
+
+// También intentar cuando el DOM esté listo
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(initializeEmailJS, 1000);
+});
 
 // Función para verificar si EmailJS está configurado
 function isEmailJSConfigured() {
-    return EMAILJS_CONFIG.USER_ID !== 'YOUR_EMAILJS_USER_ID' && 
-           EMAILJS_CONFIG.SERVICE_ID !== 'YOUR_EMAILJS_SERVICE_ID' && 
-           EMAILJS_CONFIG.TEMPLATE_ID !== 'YOUR_EMAILJS_TEMPLATE_ID';
+    return EMAILJS_CONFIG.USER_ID !== 'user_xxxxxxxxxxxxx' && 
+           EMAILJS_CONFIG.SERVICE_ID !== 'service_xxxxxxxxxxxxx' && 
+           EMAILJS_CONFIG.TEMPLATE_ID !== 'template_xxxxxxxxxxxxx' &&
+           EMAILJS_CONFIG.USER_ID && 
+           EMAILJS_CONFIG.SERVICE_ID && 
+           EMAILJS_CONFIG.TEMPLATE_ID &&
+           typeof emailjs !== 'undefined';
 }
 
 // Función para generar un enlace de descarga temporal del PDF

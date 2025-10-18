@@ -72,8 +72,6 @@ class SistemaPlanillas {
         this.initEventListeners();
         this.actualizarFecha();
         this.cargarFeriadosDefecto();
-        this.cargarConfiguracionEmailJS();
-        this.inicializarDescargaPDF();
     }
 
     // ============================================
@@ -136,225 +134,6 @@ class SistemaPlanillas {
             if (historialGuardado) {
                 this.historialPlanillas = JSON.parse(historialGuardado);
             }
-        }
-    }
-
-    /**
-     * Configura EmailJS con las credenciales proporcionadas
-     */
-    configurarEmailJS() {
-        const userId = document.getElementById('emailjsUserId').value.trim();
-        const serviceId = document.getElementById('emailjsServiceId').value.trim();
-        const templateId = document.getElementById('emailjsTemplateId').value.trim();
-
-        if (!userId || !serviceId || !templateId) {
-            notify.error('Por favor, complete todos los campos de configuración de EmailJS');
-            return;
-        }
-
-        // Actualizar la configuración
-        if (typeof window.EMAILJS_CONFIG !== 'undefined') {
-            window.EMAILJS_CONFIG.USER_ID = userId;
-            window.EMAILJS_CONFIG.SERVICE_ID = serviceId;
-            window.EMAILJS_CONFIG.TEMPLATE_ID = templateId;
-        }
-
-        // Guardar en localStorage
-        const emailjsConfig = {
-            userId: userId,
-            serviceId: serviceId,
-            templateId: templateId
-        };
-        localStorage.setItem('emailjsConfig', JSON.stringify(emailjsConfig));
-
-        // Actualizar el estado visual
-        this.actualizarEstadoEmailJS(true);
-        notify.success('Configuración de EmailJS guardada exitosamente');
-    }
-
-    /**
-     * Prueba el envío de EmailJS con un email de prueba
-     */
-    async probarEmailJS() {
-        if (!this.verificarConfiguracionEmailJS()) {
-            return;
-        }
-
-        try {
-            notify.info('Enviando email de prueba...');
-
-            const templateParams = {
-                to_email: 'prueba@ejemplo.com',
-                to_name: 'Usuario de Prueba',
-                from_name: 'Sistema de Planillas',
-                subject: 'Prueba de EmailJS - Comprobante de Pago',
-                empleado_nombre: 'Usuario de Prueba',
-                empleado_cedula: '123456789',
-                empleado_puesto: 'Puesto de Prueba',
-                periodo: 'Enero 2024',
-                fecha_inicio: '2024-01-01',
-                fecha_fin: '2024-01-31',
-                salario_base: '₡ 500,000.00',
-                salario_bruto: '₡ 500,000.00',
-                salario_neto: '₡ 450,000.00',
-                ccss: '₡ 50,000.00',
-                horas_extras: 0,
-                monto_horas_extras: '₡ 0.00',
-                bonificaciones: '₡ 0.00',
-                deducciones: '₡ 0.00',
-                download_link: 'https://ejemplo.com/comprobante.pdf',
-                empresa: 'Sistema de Planillas',
-                fecha_envio: new Date().toLocaleDateString('es-CR')
-            };
-
-            const response = await emailjs.send(
-                window.EMAILJS_CONFIG.SERVICE_ID,
-                window.EMAILJS_CONFIG.TEMPLATE_ID,
-                templateParams
-            );
-
-            if (response.status === 200) {
-                notify.success('Email de prueba enviado exitosamente');
-            } else {
-                throw new Error(`Error del servidor: ${response.status}`);
-            }
-
-        } catch (error) {
-            console.error('Error enviando email de prueba:', error);
-            notify.error(`Error enviando email de prueba: ${error.message}`);
-        }
-    }
-
-    /**
-     * Verifica si EmailJS está configurado correctamente
-     */
-    verificarConfiguracionEmailJS() {
-        if (typeof window.isEmailJSConfigured === 'undefined' || !window.isEmailJSConfigured()) {
-            notify.error('EmailJS no está configurado. Configure las credenciales primero.');
-            return false;
-        }
-
-        if (typeof emailjs === 'undefined') {
-            notify.error('EmailJS no está cargado. Verifique que el script esté incluido correctamente.');
-            return false;
-        }
-
-        return true;
-    }
-
-    /**
-     * Actualiza el estado visual de la configuración de EmailJS
-     */
-    actualizarEstadoEmailJS(configurado) {
-        const statusDiv = document.getElementById('emailjsStatus');
-        if (statusDiv) {
-            if (configurado) {
-                statusDiv.innerHTML = '<div class="alert alert-success"><i class="fas fa-check-circle"></i> EmailJS configurado correctamente</div>';
-                statusDiv.style.display = 'block';
-            } else {
-                statusDiv.innerHTML = '<div class="alert alert-warning"><i class="fas fa-exclamation-triangle"></i> EmailJS no configurado</div>';
-                statusDiv.style.display = 'block';
-            }
-        }
-    }
-
-    /**
-     * Carga la configuración de EmailJS desde localStorage
-     */
-    cargarConfiguracionEmailJS() {
-        const emailjsConfig = localStorage.getItem('emailjsConfig');
-        if (emailjsConfig) {
-            try {
-                const config = JSON.parse(emailjsConfig);
-                document.getElementById('emailjsUserId').value = config.userId || '';
-                document.getElementById('emailjsServiceId').value = config.serviceId || '';
-                document.getElementById('emailjsTemplateId').value = config.templateId || '';
-
-                // Actualizar la configuración global
-                if (typeof window.EMAILJS_CONFIG !== 'undefined') {
-                    window.EMAILJS_CONFIG.USER_ID = config.userId;
-                    window.EMAILJS_CONFIG.SERVICE_ID = config.serviceId;
-                    window.EMAILJS_CONFIG.TEMPLATE_ID = config.templateId;
-                }
-
-                this.actualizarEstadoEmailJS(true);
-            } catch (error) {
-                console.error('Error cargando configuración de EmailJS:', error);
-            }
-        } else {
-            this.actualizarEstadoEmailJS(false);
-        }
-    }
-
-    /**
-     * Inicializa el sistema de descarga de PDFs desde enlaces
-     */
-    inicializarDescargaPDF() {
-        // Verificar si hay un parámetro de descarga en la URL
-        const hash = window.location.hash;
-        if (hash && hash.includes('download=')) {
-            const fileId = hash.split('download=')[1];
-            this.descargarPDFDesdeEnlace(fileId);
-        }
-
-        // Escuchar cambios en el hash para descargas futuras
-        window.addEventListener('hashchange', () => {
-            const newHash = window.location.hash;
-            if (newHash && newHash.includes('download=')) {
-                const fileId = newHash.split('download=')[1];
-                this.descargarPDFDesdeEnlace(fileId);
-            }
-        });
-    }
-
-    /**
-     * Descarga un PDF desde un enlace guardado en localStorage
-     */
-    descargarPDFDesdeEnlace(fileId) {
-        try {
-            const pdfData = localStorage.getItem(`pdf_${fileId}`);
-            if (!pdfData) {
-                notify.error('El enlace de descarga ha expirado o no es válido');
-                return;
-            }
-
-            const data = JSON.parse(pdfData);
-            
-            // Verificar si el archivo ha expirado
-            if (Date.now() > data.expires) {
-                localStorage.removeItem(`pdf_${fileId}`);
-                notify.error('El enlace de descarga ha expirado');
-                return;
-            }
-
-            // Convertir base64 a blob y descargar
-            const byteCharacters = atob(data.data);
-            const byteNumbers = new Array(byteCharacters.length);
-            for (let i = 0; i < byteCharacters.length; i++) {
-                byteNumbers[i] = byteCharacters.charCodeAt(i);
-            }
-            const byteArray = new Uint8Array(byteNumbers);
-            const blob = new Blob([byteArray], { type: 'application/pdf' });
-
-            // Crear enlace de descarga
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = data.fileName;
-            link.style.display = 'none';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(url);
-
-            // Limpiar el hash de la URL
-            window.history.replaceState({}, document.title, window.location.pathname);
-
-            notify.success(`Descargando ${data.fileName}...`);
-
-        } catch (error) {
-            console.error('Error descargando PDF desde enlace:', error);
-            notify.error('Error al descargar el archivo');
         }
     }
 
@@ -510,7 +289,7 @@ class SistemaPlanillas {
                 <td>${emp.empresa || 'No asignada'}</td>
                 <td>${emp.puesto}</td>
                 <td><span class="badge badge-info">${this.formatJornada(emp.jornada)}</span></td>
-                <td>₡${this.formatearMoneda(emp.salarioHora)}</td>
+                <td>₡${this.formatearSalarioHora(emp.salarioHora)}</td>
                 <td>${this.formatearFecha(emp.fechaIngreso)}</td>
                 <td>
                     <button class="btn btn-sm btn-primary" onclick="sistema.abrirEditarEmpleado('${emp.id}')">
@@ -719,7 +498,7 @@ class SistemaPlanillas {
     // CÁLCULO DE PLANILLAS
     // ============================================
 
-    calcularPlanilla(periodo, fechaInicio, fechaFin, empresaFiltro = '') {
+    calcularPlanilla(periodo, fechaInicio, fechaFin, empresaFiltro = '', aplicarImpuestoRenta = false) {
         const planilla = [];
 
         let empleadosAFiltrar = this.empleados;
@@ -730,7 +509,7 @@ class SistemaPlanillas {
         }
 
         empleadosAFiltrar.forEach(empleado => {
-            const calculos = this.calcularSalarioEmpleado(empleado, fechaInicio, fechaFin);
+            const calculos = this.calcularSalarioEmpleado(empleado, fechaInicio, fechaFin, aplicarImpuestoRenta);
             planilla.push({
                 empleado: empleado,
                 ...calculos
@@ -740,10 +519,9 @@ class SistemaPlanillas {
         return planilla;
     }
 
-    calcularSalarioEmpleado(empleado, fechaInicio, fechaFin) {
-        // Determinar si es la segunda quincena (planilla del 30)
-        const fechaFinObj = new Date(fechaFin + 'T00:00:00');
-        const esSegundaQuincena = fechaFinObj.getDate() >= 15;
+    calcularSalarioEmpleado(empleado, fechaInicio, fechaFin, aplicarImpuestoRenta = false) {
+        // El parámetro aplicarImpuestoRenta indica si se debe calcular el impuesto de renta
+        // (normalmente solo en la segunda planilla del mes)
         
         // Obtener asistencias del empleado en el período
         // Solo incluir días que estén registrados en asistencias
@@ -988,6 +766,14 @@ class SistemaPlanillas {
         // Horas extra con recargo del 50% según ley costarricense
         montoHorasExtra = Math.round((horasExtra * empleado.salarioHora * 1.5) * 100000000) / 100000000;
 
+        // Calcular horas de feriado (doble pago - 100% recargo)
+        const horasFeriado = this.calcularHorasFeriado(empleado.id, fechaInicio, fechaFin);
+        const montoFeriado = Math.round((horasFeriado * empleado.salarioHora * 2) * 100000000) / 100000000;
+
+        // Calcular horas extra de feriado (triple pago - 200% recargo)
+        const horasExtraFeriado = this.calcularHorasExtraFeriado(empleado.id, fechaInicio, fechaFin);
+        const montoExtraFeriado = Math.round((horasExtraFeriado * empleado.salarioHora * 3) * 100000000) / 100000000;
+
         // Obtener bonos y rebajos del período
         const bonosEmpleado = this.bonos.filter(b => 
             b.empleadoId === empleado.id &&
@@ -1003,15 +789,15 @@ class SistemaPlanillas {
             .filter(b => b.tipo === 'rebajo')
             .reduce((sum, b) => sum + parseFloat(b.monto), 0);
 
-        // Calcular salario bruto
-        const salarioBruto = Math.round((salarioBase + montoHorasExtra + totalBonos) * 100000000) / 100000000;
+        // Calcular salario bruto (suma de salario base + horas extra + feriados + bonos)
+        const salarioBruto = Math.round((salarioBase + montoHorasExtra + montoFeriado + montoExtraFeriado + totalBonos) * 100000000) / 100000000;
 
         // Calcular deducciones CCSS
         const ccss = Math.round((salarioBruto * (this.config.ccss / 100)) * 100000000) / 100000000;
         
-        // Calcular impuesto de renta (solo en la segunda quincena)
+        // Calcular impuesto de renta (solo cuando se indica que se debe aplicar, generalmente en la segunda planilla)
         let impuestoRenta = 0;
-        if (esSegundaQuincena) {
+        if (aplicarImpuestoRenta) {
             // Calcular salario mensual estimado (quincenal x 2)
             const salarioMensualEstimado = salarioBruto * 2;
             // Calcular impuesto mensual
@@ -1020,7 +806,7 @@ class SistemaPlanillas {
             impuestoRenta = impuestoMensual / 2;
         }
 
-        // Calcular salario neto
+        // Calcular salario neto (salario bruto - deducciones - rebajos)
         const salarioNeto = Math.round((salarioBruto - ccss - impuestoRenta - totalRebajos) * 100000000) / 100000000;
 
         return {
@@ -1028,6 +814,10 @@ class SistemaPlanillas {
             horasExtra: horasExtra.toFixed(2),
             salarioBase: salarioBase.toFixed(2),
             montoHorasExtra: montoHorasExtra.toFixed(2),
+            horasFeriado: horasFeriado.toFixed(2),
+            montoFeriado: montoFeriado.toFixed(2),
+            horasExtraFeriado: horasExtraFeriado.toFixed(2),
+            montoExtraFeriado: montoExtraFeriado.toFixed(2),
             bonos: totalBonos.toFixed(2),
             rebajos: totalRebajos.toFixed(2),
             salarioBruto: salarioBruto.toFixed(2),
@@ -1079,7 +869,7 @@ class SistemaPlanillas {
         if (planilla.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="10" class="empty-state">
+                    <td colspan="11" class="empty-state">
                         <i class="fas fa-file-invoice-dollar"></i>
                         <p>No hay datos para mostrar</p>
                     </td>
@@ -1092,31 +882,38 @@ class SistemaPlanillas {
 
         tbody.innerHTML = planilla.map(item => `
             <tr>
-                <td>${item.empleado.nombre}</td>
-                <td>${item.empleado.email || ''}</td>
+                <td>
+                    <div>
+                        <div style="font-weight: 600;">${item.empleado.nombre}</div>
+                        <div style="font-size: 12px; color: var(--text-secondary);">${item.empleado.email || ''}</div>
+                    </div>
+                </td>
                 <td>₡${this.formatearMoneda(item.salarioBase)}</td>
                 <td>₡${this.formatearMoneda(item.montoHorasExtra)}</td>
+                <td>₡${this.formatearMoneda(item.montoFeriado || 0)}</td>
                 <td>₡${this.formatearMoneda(item.bonos)}</td>
                 <td><strong>₡${this.formatearMoneda(item.salarioBruto)}</strong></td>
                 <td>₡${this.formatearMoneda(item.ccss)}</td>
                 <td>₡${this.formatearMoneda(item.rebajos)}</td>
                 <td><strong>₡${this.formatearMoneda(item.salarioNeto)}</strong></td>
                 <td>
-                    <button class="btn btn-sm btn-info" onclick="sistema.generarConstanciaSalarial('${item.empleado.id}')" title="Constancia Salarial">
-                        <i class="fas fa-file-pdf"></i>
-                    </button>
-                    <div class="dropdown">
-                        <button class="btn btn-sm btn-success dropdown-toggle" type="button" data-bs-toggle="dropdown" title="Comprobante de Pago">
-                            <i class="fas fa-receipt"></i>
+                    <div class="table-actions">
+                        <button class="btn btn-sm btn-info" onclick="sistema.generarConstanciaSalarial('${item.empleado.id}')" title="Constancia Salarial">
+                            <i class="fas fa-file-pdf"></i>
                         </button>
-                        <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" href="#" onclick="sistema.generarComprobantePago('${item.empleado.id}', '${document.getElementById('periodoPlanilla').value}', '${document.getElementById('fechaInicioPlanilla').value}', '${document.getElementById('fechaFinPlanilla').value}')">
-                                <i class="fas fa-download"></i> Descargar PDF
-                            </a></li>
-                            <li><a class="dropdown-item" href="#" onclick="sistema.generarComprobantePago('${item.empleado.id}', '${document.getElementById('periodoPlanilla').value}', '${document.getElementById('fechaInicioPlanilla').value}', '${document.getElementById('fechaFinPlanilla').value}', true)">
-                                <i class="fas fa-envelope"></i> Enviar por Email
-                            </a></li>
-                        </ul>
+                        <div class="dropdown">
+                            <button class="btn btn-sm btn-success dropdown-toggle" type="button" onclick="sistema.toggleDropdown(this)" title="Comprobante de Pago">
+                                <i class="fas fa-receipt"></i>
+                            </button>
+                            <div class="dropdown-menu">
+                                <button class="dropdown-item" onclick="sistema.generarComprobantePago('${item.empleado.id}', '${document.getElementById('periodoPlanilla').value}', '${document.getElementById('fechaInicioPlanilla').value}', '${document.getElementById('fechaFinPlanilla').value}', false, document.getElementById('tipoPlanilla').value === 'segunda')">
+                                    <i class="fas fa-download"></i> Descargar PDF
+                                </button>
+                                <button class="dropdown-item" onclick="sistema.generarComprobantePago('${item.empleado.id}', '${document.getElementById('periodoPlanilla').value}', '${document.getElementById('fechaInicioPlanilla').value}', '${document.getElementById('fechaFinPlanilla').value}', true, document.getElementById('tipoPlanilla').value === 'segunda')">
+                                    <i class="fas fa-envelope"></i> Enviar por Email
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </td>
             </tr>
@@ -1488,21 +1285,63 @@ class SistemaPlanillas {
     // GESTIÓN DE FERIADOS
     // ============================================
 
+    /**
+     * Calcula la fecha de Pascua para un año dado
+     * @param {number} año - Año para calcular Pascua
+     * @returns {Date} - Fecha de Pascua
+     */
+    calcularPascua(año) {
+        const a = año % 19;
+        const b = Math.floor(año / 100);
+        const c = año % 100;
+        const d = Math.floor(b / 4);
+        const e = b % 4;
+        const f = Math.floor((b + 8) / 25);
+        const g = Math.floor((b - f + 1) / 3);
+        const h = (19 * a + b - d - g + 15) % 30;
+        const i = Math.floor(c / 4);
+        const k = c % 4;
+        const l = (32 + 2 * e + 2 * i - h - k) % 7;
+        const m = Math.floor((a + 11 * h + 22 * l) / 451);
+        const n = Math.floor((h + l - 7 * m + 114) / 31);
+        const p = (h + l - 7 * m + 114) % 31;
+        
+        return new Date(año, n - 1, p + 1);
+    }
+
     cargarFeriadosDefecto() {
-        if (this.feriados.length === 0) {
-            const anioActual = new Date().getFullYear();
-            this.feriados = [
-                { id: '1', fecha: `${anioActual}-01-01`, descripcion: 'Año Nuevo', recargo: 50 },
-                { id: '2', fecha: `${anioActual}-04-11`, descripcion: 'Día de Juan Santamaría', recargo: 50 },
-                { id: '3', fecha: `${anioActual}-05-01`, descripcion: 'Día Internacional del Trabajo', recargo: 50 },
-                { id: '4', fecha: `${anioActual}-07-25`, descripcion: 'Anexión del Partido de Nicoya', recargo: 50 },
-                { id: '5', fecha: `${anioActual}-08-02`, descripcion: 'Día de la Virgen de los Ángeles', recargo: 50 },
-                { id: '6', fecha: `${anioActual}-08-15`, descripcion: 'Día de la Madre', recargo: 50 },
-                { id: '7', fecha: `${anioActual}-09-15`, descripcion: 'Día de la Independencia', recargo: 50 },
-                { id: '8', fecha: `${anioActual}-12-25`, descripcion: 'Navidad', recargo: 50 }
-            ];
-            this.guardarDatos();
-        }
+        // Limpiar feriados existentes para asegurar actualización
+        this.feriados = [];
+        
+        // Siempre actualizar los feriados con la lista oficial
+        // Esto asegura que se mantengan actualizados
+        const anioActual = new Date().getFullYear();
+        
+        // Calcular fechas de Semana Santa para el año actual
+        const easterDate = this.calcularPascua(anioActual);
+        const juevesSanto = new Date(easterDate);
+        juevesSanto.setDate(easterDate.getDate() - 3);
+        const viernesSanto = new Date(easterDate);
+        viernesSanto.setDate(easterDate.getDate() - 2);
+        
+        this.feriados = [
+                // Feriados de pago obligatorio
+                { id: Date.now().toString(), fecha: `${anioActual}-01-01`, descripcion: 'Año Nuevo', recargo: 100, pagoObligatorio: true },
+                { id: (Date.now() + 1).toString(), fecha: `${anioActual}-04-11`, descripcion: 'Día de la Batalla de Rivas', recargo: 100, pagoObligatorio: true },
+                { id: (Date.now() + 2).toString(), fecha: juevesSanto.toISOString().split('T')[0], descripcion: 'Jueves Santo', recargo: 100, pagoObligatorio: true },
+                { id: (Date.now() + 3).toString(), fecha: viernesSanto.toISOString().split('T')[0], descripcion: 'Viernes Santo', recargo: 100, pagoObligatorio: true },
+                { id: (Date.now() + 4).toString(), fecha: `${anioActual}-05-01`, descripcion: 'Día del Trabajador', recargo: 100, pagoObligatorio: true },
+                { id: (Date.now() + 5).toString(), fecha: `${anioActual}-07-25`, descripcion: 'Día de la Anexión del Partido de Nicoya', recargo: 100, pagoObligatorio: true },
+                { id: (Date.now() + 6).toString(), fecha: `${anioActual}-08-15`, descripcion: 'Día de la Madre', recargo: 100, pagoObligatorio: true },
+                { id: (Date.now() + 7).toString(), fecha: `${anioActual}-09-15`, descripcion: 'Día de la Independencia', recargo: 100, pagoObligatorio: true },
+                { id: (Date.now() + 8).toString(), fecha: `${anioActual}-12-25`, descripcion: 'Navidad', recargo: 100, pagoObligatorio: true },
+                
+                // Feriados de pago NO obligatorio
+                { id: (Date.now() + 9).toString(), fecha: `${anioActual}-08-02`, descripcion: 'Día de la Virgen de los Ángeles', recargo: 100, pagoObligatorio: false },
+                { id: (Date.now() + 10).toString(), fecha: `${anioActual}-08-31`, descripcion: 'Día de la Persona Negra y la Cultura Afrocostarricense', recargo: 100, pagoObligatorio: false },
+                { id: (Date.now() + 11).toString(), fecha: `${anioActual}-12-01`, descripcion: 'Día de la Abolición del Ejército', recargo: 100, pagoObligatorio: false }
+        ];
+        this.guardarDatos();
     }
 
     agregarFeriado(feriado) {
@@ -1523,8 +1362,22 @@ class SistemaPlanillas {
 
     async eliminarFeriado(id) {
         console.log('🗑️ Eliminando feriado:', id);
-        const feriado = this.feriados.find(f => f.id === id);
-        const nombreFeriado = feriado ? feriado.descripcion : 'este feriado';
+        console.log('📋 Feriados disponibles:', this.feriados);
+        
+        if (!id) {
+            console.error('❌ ID de feriado no proporcionado');
+            notify.error('Error: ID de feriado no válido');
+            return;
+        }
+        
+        const feriado = this.feriados.find(f => f && f.id === id);
+        if (!feriado) {
+            console.error('❌ Feriado no encontrado con ID:', id);
+            notify.error('Feriado no encontrado');
+            return;
+        }
+        
+        const nombreFeriado = feriado.descripcion || 'este feriado';
         
         console.log('📋 Feriado a eliminar:', feriado);
         console.log('🤔 Mostrando confirmación...');
@@ -1574,7 +1427,7 @@ class SistemaPlanillas {
         if (this.feriados.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="4" class="empty-state">
+                    <td colspan="5" class="empty-state">
                         <i class="fas fa-calendar-alt"></i>
                         <p>No hay feriados registrados</p>
                     </td>
@@ -1586,11 +1439,16 @@ class SistemaPlanillas {
 
         const html = this.feriados.map(feriado => {
             console.log('🔧 Generando HTML para feriado:', feriado.id, feriado.descripcion);
+            const tipoPago = feriado.pagoObligatorio ? 
+                '<span class="badge badge-success">Obligatorio</span>' : 
+                '<span class="badge badge-warning">No Obligatorio</span>';
+            
             return `
                 <tr>
                     <td>${this.formatearFecha(feriado.fecha)}</td>
                     <td>${feriado.descripcion}</td>
                     <td>${feriado.recargo}%</td>
+                    <td>${tipoPago}</td>
                     <td>
                         <button class="btn btn-sm btn-primary" onclick="sistema.abrirEditarFeriado('${feriado.id}')">
                             <i class="fas fa-edit"></i>
@@ -1828,7 +1686,7 @@ class SistemaPlanillas {
         doc.text(`se desempeña como ${empleado.puesto} desde el ${this.formatearFecha(empleado.fechaIngreso)}.`, 20, y + 10);
         doc.text(``, 20, y + 20);
         doc.text(`Jornada laboral: ${this.formatJornada(empleado.jornada)}`, 20, y + 30);
-        doc.text(`Salario por hora: ₡${this.formatearMoneda(empleado.salarioHora)}`, 20, y + 40);
+        doc.text(`Salario por hora: ₡${this.formatearSalarioHora(empleado.salarioHora)}`, 20, y + 40);
         doc.text(``, 20, y + 50);
         doc.text(`Se extiende la presente constancia a solicitud del interesado,`, 20, y + 60);
         doc.text(`para los fines que estime conveniente.`, 20, y + 70);
@@ -1838,7 +1696,7 @@ class SistemaPlanillas {
         doc.save(`constancia_${empleado.nombre.replace(/\s/g, '_')}.pdf`);
     }
 
-    generarComprobantePago(empleadoId, periodo, fechaInicio, fechaFin, enviarPorCorreo = false) {
+    generarComprobantePago(empleadoId, periodo, fechaInicio, fechaFin, enviarPorCorreo = false, aplicarImpuestoRenta = false) {
         const empleado = this.empleados.find(e => e.id === empleadoId);
         if (!empleado) {
             notify.error('Empleado no encontrado');
@@ -1852,7 +1710,7 @@ class SistemaPlanillas {
         }
 
         // Calcular los datos de la planilla para este empleado
-        const calculos = this.calcularSalarioEmpleado(empleado, fechaInicio, fechaFin);
+        const calculos = this.calcularSalarioEmpleado(empleado, fechaInicio, fechaFin, aplicarImpuestoRenta);
 
         // Crear un contenedor temporal para el comprobante
         const comprobanteHTML = document.createElement('div');
@@ -2121,7 +1979,7 @@ class SistemaPlanillas {
                     </tr>
                     <tr>
                         <td>Salario x hora</td>
-                        <td>₡ ${this.formatearMoneda(empleado.salarioHora)}</td>
+                        <td>₡ ${this.formatearSalarioHora(empleado.salarioHora)}</td>
                         <td>Rebajo por horas</td>
                         <td>₡ ${this.formatearMoneda(deduccionesHoras.total)}</td>
                     </tr>
@@ -2251,7 +2109,7 @@ class SistemaPlanillas {
     }
 
     /**
-     * Envía un comprobante de pago por correo electrónico usando EmailJS
+     * Envía un comprobante de pago por correo electrónico
      * @param {Object} empleado - Datos del empleado
      * @param {Object} calculos - Cálculos de salario
      * @param {Object} planilla - Información de la planilla
@@ -2259,23 +2117,34 @@ class SistemaPlanillas {
      */
     async enviarComprobantePorCorreo(empleado, calculos, planilla, pdf) {
         try {
-            // Verificar si el servicio de email está disponible
-            if (typeof window.EmailService === 'undefined') {
-                notify.error('Servicio de email no disponible. Verifique que el script esté cargado correctamente.');
+            // Verificar si EmailJS está disponible
+            if (typeof EmailServiceSimple === 'undefined') {
+                notify.error('EmailJS no está disponible. Asegúrese de que el servicio de email esté cargado.');
+                return;
+            }
+
+            // Crear instancia del servicio para verificar configuración
+            const emailService = new EmailServiceSimple();
+            
+            // Verificar configuración de EmailJS
+            if (!emailService.verificarConfiguracion()) {
+                notify.error('EmailJS no está configurado correctamente. Verifique las credenciales en js/config/emailjs-config.js');
                 return;
             }
 
             // Mostrar notificación de envío
             notify.info('Enviando comprobante por correo...');
 
-            // Crear instancia del servicio de email
-            const emailService = new window.EmailService();
-
-            // Enviar comprobante usando el servicio optimizado
-            const resultado = await emailService.enviarComprobante(empleado, calculos, planilla, pdf);
+            // Enviar usando EmailJS
+            const resultado = await emailService.enviarComprobante(
+                empleado, 
+                calculos, 
+                planilla, 
+                pdf
+            );
 
             if (resultado.success) {
-                notify.success(`Comprobante enviado exitosamente a ${empleado.email}. El PDF se ha descargado automáticamente.`);
+                notify.success(`Comprobante enviado exitosamente a ${empleado.email}`);
                 
                 // Registrar el envío en logs
                 this.registrarEnvioComprobante({
@@ -2285,11 +2154,21 @@ class SistemaPlanillas {
                     periodo: planilla.periodo,
                     fechaEnvio: new Date().toISOString(),
                     estado: 'enviado',
-                    messageId: resultado.messageId,
-                    fileName: resultado.fileName
+                    messageId: resultado.messageId
                 });
             } else {
-                throw new Error('Error enviando comprobante');
+                notify.error(`Error enviando comprobante: ${resultado.error}`);
+                
+                // Registrar el error en logs
+                this.registrarEnvioComprobante({
+                    empleadoId: empleado.id,
+                    empleadoNombre: empleado.nombre,
+                    email: empleado.email,
+                    periodo: planilla.periodo,
+                    fechaEnvio: new Date().toISOString(),
+                    estado: 'error',
+                    error: resultado.error
+                });
             }
 
         } catch (error) {
@@ -2355,17 +2234,22 @@ class SistemaPlanillas {
      * @param {string} periodo - Período de la planilla
      * @param {string} fechaInicio - Fecha de inicio
      * @param {string} fechaFin - Fecha de fin
+     * @param {boolean} aplicarImpuestoRenta - Si se debe aplicar impuesto de renta
      */
-    async enviarComprobantesMasivo(periodo, fechaInicio, fechaFin) {
+    async enviarComprobantesMasivo(periodo, fechaInicio, fechaFin, aplicarImpuestoRenta = false) {
         try {
-            // Verificar si el servicio de email está disponible
-            if (typeof window.emailService === 'undefined') {
-                notify.error('Servicio de correo no disponible. Asegúrese de cargar el AppsScriptEmailService.');
+            // Verificar si EmailJS está disponible
+            if (typeof EmailServiceSimple === 'undefined') {
+                notify.error('EmailJS no está disponible. Asegúrese de que el servicio de email esté cargado.');
                 return;
             }
 
-            if (!window.emailService.estaConfigurado()) {
-                notify.error('Google Apps Script no configurado correctamente. Verifique el Script ID.');
+            // Crear instancia del servicio para verificar configuración
+            const emailService = new EmailServiceSimple();
+            
+            // Verificar configuración de EmailJS
+            if (!emailService.verificarConfiguracion()) {
+                notify.error('EmailJS no está configurado correctamente. Verifique las credenciales en js/config/emailjs-config.js');
                 return;
             }
 
@@ -2401,9 +2285,9 @@ class SistemaPlanillas {
                 // Actualizar progreso
                 this.actualizarProgresoModal(modalProgreso, 0, empleadosConEmail.length, 'Preparando datos...');
 
-                // Preparar datos para envío masivo con Google Apps Script
+                // Preparar datos para envío masivo con EmailJS
                 const empleadosConDatos = empleadosConEmail.map(empleado => {
-                    const calculos = this.calcularSalarioEmpleado(empleado, fechaInicio, fechaFin);
+                    const calculos = this.calcularSalarioEmpleado(empleado, fechaInicio, fechaFin, aplicarImpuestoRenta);
                     
                     return {
                         empleado: {
@@ -2428,14 +2312,76 @@ class SistemaPlanillas {
                     };
                 });
 
-                // Actualizar progreso
-                this.actualizarProgresoModal(modalProgreso, empleadosConEmail.length, empleadosConEmail.length, 'Enviando a Google Apps Script...');
+                // Crear instancia del servicio de email simplificado
+                const emailService = new EmailServiceSimple();
+                
+                // Enviar emails individualmente usando EmailJS
+                let exitosos = 0;
+                let fallidos = 0;
+                const resultados = [];
 
-                // Enviar usando Google Apps Script
-                const resultado = await window.emailService.enviarComprobantesMasivo(
-                    empleadosConDatos,
-                    { periodo, fechaInicio, fechaFin }
-                );
+                for (let i = 0; i < empleadosConDatos.length; i++) {
+                    const empleadoData = empleadosConDatos[i];
+                    const empleado = empleadoData.empleado;
+                    const calculos = empleadoData.calculos;
+                    
+                    // Actualizar progreso
+                    this.actualizarProgresoModal(
+                        modalProgreso, 
+                        i + 1, 
+                        empleadosConDatos.length, 
+                        `Enviando a ${empleado.nombre}...`
+                    );
+
+                    try {
+                        // Generar PDF para este empleado
+                        const pdf = this.generarComprobantePDF(empleado, calculos, { periodo, fechaInicio, fechaFin });
+                        
+                        // Enviar email
+                        const resultado = await emailService.enviarComprobante(
+                            empleado,
+                            calculos,
+                            { periodo, fechaInicio, fechaFin },
+                            pdf
+                        );
+
+                        if (resultado.success) {
+                            exitosos++;
+                            resultados.push({
+                                empleado: empleado.nombre,
+                                email: empleado.email,
+                                success: true,
+                                messageId: resultado.messageId || 'emailjs'
+                            });
+                        } else {
+                            fallidos++;
+                            resultados.push({
+                                empleado: empleado.nombre,
+                                email: empleado.email,
+                                success: false,
+                                error: resultado.error || 'Error desconocido'
+                            });
+                        }
+                    } catch (error) {
+                        fallidos++;
+                        resultados.push({
+                            empleado: empleado.nombre,
+                            email: empleado.email,
+                            success: false,
+                            error: error.message
+                        });
+                    }
+
+                    // Pequeña pausa para no sobrecargar EmailJS
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                }
+
+                const resultado = {
+                    success: exitosos > 0,
+                    exitosos: exitosos,
+                    fallidos: fallidos,
+                    resultados: resultados
+                };
 
                 // Cerrar modal de progreso
                 this.cerrarModalProgreso(modalProgreso);
@@ -2451,7 +2397,7 @@ class SistemaPlanillas {
                             fechaEnvio: new Date().toISOString(),
                             estado: res.success ? 'enviado' : 'error',
                             error: res.error || '',
-                            messageId: res.success ? 'apps_script' : ''
+                            messageId: res.success ? (res.messageId || 'emailjs') : ''
                         });
                     });
 
@@ -2560,7 +2506,7 @@ class SistemaPlanillas {
                         <tr>
                             <td>Horas extras</td>
                             <td>${datosPago.horasExtras}</td>
-                            <td>₡${(datosPago.salarioHora * 1.5).toFixed(2)}</td>
+                            <td>₡${this.formatearSalarioHora(datosPago.salarioHora * 1.5)}</td>
                             <td>₡${this.formatearMoneda(datosPago.montoHorasExtras || 0)}</td>
                         </tr>
                         ` : ''}
@@ -2868,6 +2814,7 @@ class SistemaPlanillas {
     }
 
     calcularDeduccionesHorasComprobante(empleadoId, fechaInicio, fechaFin, salarioHora) {
+        const empleado = this.empleados.find(e => e.id === empleadoId);
         const asistencias = this.asistencias.filter(a => 
             a.empleadoId === empleadoId &&
             a.fecha >= fechaInicio &&
@@ -2881,7 +2828,20 @@ class SistemaPlanillas {
         asistencias.forEach(asist => {
             const horasFaltantes = parseFloat(asist.horas || 0);
             if (horasFaltantes > 0) {
-                const deduccion = horasFaltantes * salarioHora;
+                let deduccion;
+                
+                // Para jornada diurna acumulativa: se trabajan 10 horas físicas pero se pagan 8
+                if (empleado && empleado.jornada === 'diurna_acumulativa') {
+                    // Solo rebajar por las horas que faltaron de las 10 horas físicas requeridas
+                    const horasFisicasRequeridas = 10;
+                    const horasFaltantesFisicas = Math.min(horasFaltantes, horasFisicasRequeridas);
+                    // Rebajar por las horas físicas faltantes al salario por hora
+                    deduccion = horasFaltantesFisicas * salarioHora;
+                } else {
+                    // Para otras jornadas: rebajar normalmente
+                    deduccion = horasFaltantes * salarioHora;
+                }
+                
                 totalDeducciones += deduccion;
                 
                 const fechaFormateada = this.formatearFecha(asist.fecha);
@@ -3342,6 +3302,10 @@ class SistemaPlanillas {
         return parseFloat(valor).toLocaleString('es-CR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
 
+    formatearSalarioHora(valor) {
+        return parseFloat(valor).toLocaleString('es-CR', { minimumFractionDigits: 2, maximumFractionDigits: 7 });
+    }
+
     formatearFecha(fecha) {
         if (!fecha) return '';
         const date = new Date(fecha + 'T00:00:00');
@@ -3459,6 +3423,40 @@ class SistemaPlanillas {
         }
     }
 
+    /**
+     * Alterna la visibilidad del dropdown
+     * @param {HTMLElement} button - Botón que activa el dropdown
+     */
+    toggleDropdown(button) {
+        const dropdown = button.closest('.dropdown');
+        const menu = dropdown.querySelector('.dropdown-menu');
+        
+        // Cerrar todos los otros dropdowns abiertos
+        document.querySelectorAll('.dropdown-menu.show').forEach(openMenu => {
+            if (openMenu !== menu) {
+                openMenu.classList.remove('show');
+            }
+        });
+        
+        // Alternar el dropdown actual
+        menu.classList.toggle('show');
+        
+        // Cerrar dropdown al hacer clic fuera
+        if (menu.classList.contains('show')) {
+            const closeDropdown = (e) => {
+                if (!dropdown.contains(e.target)) {
+                    menu.classList.remove('show');
+                    document.removeEventListener('click', closeDropdown);
+                }
+            };
+            
+            // Usar setTimeout para evitar que se cierre inmediatamente
+            setTimeout(() => {
+                document.addEventListener('click', closeDropdown);
+            }, 10);
+        }
+    }
+
     abrirEditarEmpleado(id) {
         const empleado = this.empleados.find(e => e.id === id);
         if (!empleado) return;
@@ -3512,9 +3510,18 @@ class SistemaPlanillas {
 
     abrirEditarFeriado(id) {
         console.log('🔧 Abriendo edición de feriado:', id);
-        const feriado = this.feriados.find(f => f.id === id);
+        console.log('📋 Feriados disponibles:', this.feriados);
+        
+        if (!id) {
+            console.error('❌ ID de feriado no proporcionado');
+            notify.error('Error: ID de feriado no válido');
+            return;
+        }
+        
+        const feriado = this.feriados.find(f => f && f.id === id);
         if (!feriado) {
-            console.error('❌ Feriado no encontrado:', id);
+            console.error('❌ Feriado no encontrado con ID:', id);
+            notify.error('Feriado no encontrado');
             return;
         }
 
@@ -3523,6 +3530,7 @@ class SistemaPlanillas {
         document.getElementById('feriadoFecha').value = feriado.fecha;
         document.getElementById('feriadoDescripcion').value = feriado.descripcion;
         document.getElementById('feriadoRecargo').value = feriado.recargo;
+        document.getElementById('feriadoPagoObligatorio').value = feriado.pagoObligatorio ? 'true' : 'false';
 
         console.log('🎯 Abriendo modal...');
         this.abrirModal('modalFeriado');
@@ -3758,13 +3766,16 @@ class SistemaPlanillas {
             const fechaInicio = document.getElementById('fechaInicioPlanilla').value;
             const fechaFin = document.getElementById('fechaFinPlanilla').value;
             const empresaFiltro = document.getElementById('filtroEmpresaPlanilla').value;
+            const tipoPlanilla = document.getElementById('tipoPlanilla').value;
 
             if (!fechaInicio || !fechaFin) {
                 notify.warning('Por favor seleccione las fechas de inicio y fin');
                 return;
             }
 
-            const planilla = this.calcularPlanilla(periodo, fechaInicio, fechaFin, empresaFiltro);
+            // Aplicar impuesto de renta solo si es segunda planilla
+            const aplicarImpuestoRenta = (tipoPlanilla === 'segunda');
+            const planilla = this.calcularPlanilla(periodo, fechaInicio, fechaFin, empresaFiltro, aplicarImpuestoRenta);
             this.renderPlanilla(planilla);
         });
 
@@ -3789,13 +3800,16 @@ class SistemaPlanillas {
             const periodo = document.getElementById('periodoPlanilla').value;
             const fechaInicio = document.getElementById('fechaInicioPlanilla').value;
             const fechaFin = document.getElementById('fechaFinPlanilla').value;
+            const tipoPlanilla = document.getElementById('tipoPlanilla').value;
             
             if (!fechaInicio || !fechaFin) {
                 notify.error('Por favor seleccione las fechas de inicio y fin del período');
                 return;
             }
             
-            this.enviarComprobantesMasivo(periodo, fechaInicio, fechaFin);
+            // Aplicar impuesto de renta solo si es segunda planilla
+            const aplicarImpuestoRenta = (tipoPlanilla === 'segunda');
+            this.enviarComprobantesMasivo(periodo, fechaInicio, fechaFin, aplicarImpuestoRenta);
         });
 
         // Pestañas de Empleados
@@ -3887,7 +3901,8 @@ class SistemaPlanillas {
             const datos = {
                 fecha: document.getElementById('feriadoFecha').value,
                 descripcion: document.getElementById('feriadoDescripcion').value,
-                recargo: parseInt(document.getElementById('feriadoRecargo').value)
+                recargo: parseInt(document.getElementById('feriadoRecargo').value),
+                pagoObligatorio: document.getElementById('feriadoPagoObligatorio').value === 'true'
             };
 
             if (id) {
@@ -3952,15 +3967,6 @@ class SistemaPlanillas {
             this.config.incapacidadINS = parseInt(document.getElementById('configIncapINS').value);
             this.guardarDatos();
             notify.success('Configuración guardada exitosamente');
-        });
-
-        // Configuración EmailJS
-        document.getElementById('btnConfigurarEmailJS')?.addEventListener('click', () => {
-            this.configurarEmailJS();
-        });
-
-        document.getElementById('btnProbarEmailJS')?.addEventListener('click', () => {
-            this.probarEmailJS();
         });
 
         document.getElementById('btnLimpiarDatos')?.addEventListener('click', async () => {
@@ -4246,7 +4252,7 @@ class SistemaPlanillas {
                 <td>${e.cedula}</td>
                 <td>${e.puesto || ''}</td>
                 <td>${e.jornada}</td>
-                <td>${this.formatearMoneda(e.salarioHora || 0)}</td>
+                <td>${this.formatearSalarioHora(e.salarioHora || 0)}</td>
             </tr>
         `).join('');
 
