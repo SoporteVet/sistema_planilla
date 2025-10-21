@@ -304,6 +304,354 @@ class SistemaPlanillas {
     }
 
     // ============================================
+    // GESTIÓN DE AGUINALDOS
+    // ============================================
+
+    async renderAguinaldos() {
+        console.log('🔄 Iniciando renderAguinaldos...');
+        const sectionAguinaldos = document.getElementById('section-aguinaldos');
+        if (!sectionAguinaldos) {
+            console.log('❌ No se encontró section-aguinaldos');
+            return;
+        }
+
+        // Asegurar que los datos estén cargados
+        if (!this.empleados || this.empleados.length === 0) {
+            console.log('🔄 Cargando datos del sistema...');
+            await this.cargarDatos();
+        }
+
+        // Usar los empleados que ya están cargados en el sistema principal
+        const empleados = this.empleados || [];
+        console.log('📊 Empleados del sistema:', empleados.length);
+        console.log('👥 Empleados:', empleados);
+
+        // Cargar solo los salarios de aguinaldo desde Firebase
+        try {
+            const { storage } = await import('./storage/index.js');
+            const salariosMensuales = await storage.listAguinaldoSalarios() || [];
+            
+            console.log('💰 Salarios mensuales encontrados:', salariosMensuales.length);
+            console.log('📋 Salarios:', salariosMensuales);
+
+            // Llenar dropdown de empleados
+            const filtroEmpleado = document.getElementById('filtroEmpleadoAguinaldo');
+            if (filtroEmpleado) {
+                filtroEmpleado.innerHTML = '<option value="">Todos los empleados</option>' +
+                    empleados.map(emp => `<option value="${emp.id}">${emp.nombre}</option>`).join('');
+            }
+
+            // Renderizar tabla
+            this.renderTablaAguinaldos(empleados, salariosMensuales);
+
+        } catch (error) {
+            console.error('❌ Error al cargar salarios de aguinaldos:', error);
+            if (window.showNotification) {
+                window.showNotification('Error al cargar salarios de aguinaldos', 'error');
+            }
+        }
+    }
+
+    renderTablaAguinaldos(empleados, salariosMensuales) {
+        console.log('🔄 Iniciando renderTablaAguinaldos...');
+        const tbody = document.getElementById('tablaAguinaldos');
+        if (!tbody) {
+            console.log('❌ No se encontró tablaAguinaldos');
+            return;
+        }
+
+        const anoActual = document.getElementById('filtroAnoAguinaldo')?.value || '2025';
+        const empleadoFiltro = document.getElementById('filtroEmpleadoAguinaldo')?.value || '';
+        
+        console.log('📅 Año actual:', anoActual);
+        console.log('👤 Filtro empleado:', empleadoFiltro);
+
+        // Filtrar empleados
+        let empleadosFiltrados = empleados;
+        if (empleadoFiltro) {
+            empleadosFiltrados = empleados.filter(emp => emp.id === empleadoFiltro);
+        }
+        
+        console.log('👥 Empleados filtrados:', empleadosFiltrados.length);
+
+        // Crear datos de aguinaldos para cada empleado
+        const datosAguinaldos = empleadosFiltrados.map(empleado => {
+            const salariosDelAno = salariosMensuales.filter(s => 
+                s.employeeId === empleado.id && s.ano === parseInt(anoActual)
+            );
+
+            // Crear objeto con salarios por mes
+            const salariosPorMes = {};
+            for (let i = 1; i <= 12; i++) {
+                const salario = salariosDelAno.find(s => s.mes === i);
+                salariosPorMes[i] = salario ? Number(salario.salarioBruto) : 0;
+            }
+
+            // Calcular total bruto y aguinaldo
+            const totalBruto = Object.values(salariosPorMes).reduce((sum, salario) => sum + salario, 0);
+            const aguinaldo = totalBruto / 12;
+
+            return {
+                empleado,
+                salariosPorMes,
+                totalBruto,
+                aguinaldo,
+                tieneSalarios: totalBruto > 0
+            };
+        });
+
+        // Renderizar tabla
+        tbody.innerHTML = datosAguinaldos.map(dato => {
+            const fila = `
+                <tr data-empleado-id="${dato.empleado.id}">
+                    <td>${dato.empleado.nombre}</td>
+                    ${Array.from({length: 12}, (_, i) => {
+                        const mes = i + 1;
+                        const salario = dato.salariosPorMes[mes];
+                        return `<td class="salario-mes" data-mes="${mes}" data-empleado="${dato.empleado.id}">
+                            ${salario > 0 ? this.formatearMoneda(salario) : '<span class="text-muted">-</span>'}
+                        </td>`;
+                    }).join('')}
+                    <td class="total-bruto">${this.formatearMoneda(dato.totalBruto)}</td>
+                    <td class="aguinaldo">${this.formatearMoneda(dato.aguinaldo)}</td>
+                    <td>
+                        <button class="btn btn-sm btn-primary" onclick="sistema.abrirEditarAguinaldo('${dato.empleado.id}')">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="btn btn-sm btn-danger" onclick="sistema.eliminarAguinaldo('${dato.empleado.id}')">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+            return fila;
+        }).join('') || '<tr><td colspan="16" style="text-align: center; color: #666;">No hay datos para mostrar</td></tr>';
+
+        // Actualizar resumen
+        this.actualizarResumenAguinaldos(datosAguinaldos);
+        
+        console.log('✅ Tabla renderizada con', datosAguinaldos.length, 'empleados');
+        console.log('📊 Datos de aguinaldos:', datosAguinaldos);
+    }
+
+    actualizarResumenAguinaldos(datosAguinaldos) {
+        const totalBruto = datosAguinaldos.reduce((sum, dato) => sum + dato.totalBruto, 0);
+        const totalAguinaldo = datosAguinaldos.reduce((sum, dato) => sum + dato.aguinaldo, 0);
+        const empleadosConSalarios = datosAguinaldos.filter(dato => dato.tieneSalarios).length;
+
+        const totalBrutoEl = document.getElementById('totalBrutoAguinaldo');
+        const totalAguinaldoEl = document.getElementById('totalAguinaldo');
+        const totalEmpleadosEl = document.getElementById('totalEmpleadosAguinaldo');
+
+        if (totalBrutoEl) totalBrutoEl.textContent = this.formatearMoneda(totalBruto);
+        if (totalAguinaldoEl) totalAguinaldoEl.textContent = this.formatearMoneda(totalAguinaldo);
+        if (totalEmpleadosEl) totalEmpleadosEl.textContent = empleadosConSalarios;
+
+        const resumen = document.getElementById('aguinaldoSummary');
+        if (resumen) {
+            resumen.style.display = totalBruto > 0 ? 'block' : 'none';
+        }
+    }
+
+    async abrirEditarAguinaldo(empleadoId) {
+        try {
+            // Cargar salarios existentes del empleado
+            const { storage } = await import('./storage/index.js');
+            const salariosMensuales = await storage.listAguinaldoSalarios() || [];
+            const anoActual = document.getElementById('filtroAnoAguinaldo')?.value || '2025';
+            
+            // Buscar empleado
+            const empleado = this.empleados.find(e => e.id === empleadoId);
+            if (!empleado) {
+                if (window.showNotification) {
+                    window.showNotification('Empleado no encontrado', 'error');
+                }
+                return;
+            }
+
+            // Buscar salarios del empleado para el año actual
+            const salariosEmpleado = salariosMensuales.filter(s => 
+                s.employeeId === empleadoId && s.ano === parseInt(anoActual)
+            );
+
+            // Actualizar información del modal
+            document.getElementById('nombreEmpleado').textContent = empleado.nombre;
+            document.getElementById('anoSeleccionado').textContent = anoActual;
+
+            // Crear lista de salarios
+            this.mostrarListaSalarios(salariosEmpleado, empleadoId, anoActual);
+
+            // Abrir modal de selección
+            this.abrirModal('modalSeleccionMes');
+
+        } catch (error) {
+            console.error('Error al abrir edición de aguinaldo:', error);
+            if (window.showNotification) {
+                window.showNotification('Error al cargar datos para edición', 'error');
+            }
+        }
+    }
+
+    mostrarListaSalarios(salariosEmpleado, empleadoId, anoActual) {
+        const listaSalarios = document.getElementById('listaSalarios');
+        const meses = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+                      'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+
+        let html = '';
+        
+        for (let mes = 1; mes <= 12; mes++) {
+            const salarioExistente = salariosEmpleado.find(s => s.mes === mes);
+            const tieneSalario = !!salarioExistente;
+            
+            html += `
+                <div class="salario-item ${!tieneSalario ? 'sin-salario' : ''}" 
+                     data-mes="${mes}" 
+                     data-empleado-id="${empleadoId}" 
+                     data-ano="${anoActual}"
+                     data-salario-id="${salarioExistente?.id || ''}">
+                    <div class="salario-mes">${meses[mes]}</div>
+                    <div class="salario-monto ${!tieneSalario ? 'sin-salario' : ''}">
+                        ${tieneSalario ? this.formatearMoneda(salarioExistente.salarioBruto) : 'Sin salario'}
+                    </div>
+                    <div class="salario-accion">
+                        ${tieneSalario ? 'Haz clic para editar' : 'Haz clic para agregar'}
+                    </div>
+                </div>
+            `;
+        }
+
+        listaSalarios.innerHTML = html;
+
+        // Agregar event listeners a cada item
+        listaSalarios.querySelectorAll('.salario-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const mes = parseInt(item.dataset.mes);
+                const salarioId = item.dataset.salarioId;
+                
+                // Cerrar modal de selección
+                this.cerrarModal('modalSeleccionMes');
+                
+                // Abrir modal de edición/agregar
+                this.abrirModalEdicion(empleadoId, anoActual, mes, salarioId);
+            });
+        });
+    }
+
+    async abrirModalEdicion(empleadoId, anoActual, mes, salarioId) {
+        try {
+            // Configurar formulario básico
+            document.getElementById('formAguinaldo').reset();
+            document.getElementById('aguinaldoId').value = salarioId || '';
+            document.getElementById('aguinaldoEmpleado').value = empleadoId;
+            document.getElementById('aguinaldoAno').value = anoActual;
+            document.getElementById('aguinaldoMes').value = mes;
+            
+            // Si hay salario existente, cargar sus datos
+            if (salarioId) {
+                const { storage } = await import('./storage/index.js');
+                const salariosMensuales = await storage.listAguinaldoSalarios() || [];
+                const salarioExistente = salariosMensuales.find(s => s.id === salarioId);
+                
+                if (salarioExistente) {
+                    document.getElementById('aguinaldoSalarioBruto').value = salarioExistente.salarioBruto;
+                    document.getElementById('aguinaldoObservaciones').value = salarioExistente.observaciones || '';
+                }
+            }
+
+            this.actualizarSelectsEmpleados();
+            this.abrirModal('modalAguinaldo');
+            
+        } catch (error) {
+            console.error('Error al abrir modal de edición:', error);
+            if (window.showNotification) {
+                window.showNotification('Error al cargar datos para edición', 'error');
+            }
+        }
+    }
+
+    async eliminarAguinaldo(empleadoId) {
+        const anoActual = document.getElementById('filtroAnoAguinaldo')?.value || '2025';
+        
+        if (confirm(`¿Estás seguro de eliminar todos los salarios de ${anoActual} para este empleado?`)) {
+            try {
+                const { storage } = await import('./storage/index.js');
+                const salariosMensuales = await storage.listAguinaldoSalarios() || [];
+                const salariosAEliminar = salariosMensuales.filter(s => 
+                    s.employeeId === empleadoId && s.ano === parseInt(anoActual)
+                );
+
+                for (const salario of salariosAEliminar) {
+                    await storage.deleteAguinaldoSalario(salario.id);
+                }
+
+                if (window.showNotification) {
+                    window.showNotification('Salarios eliminados', 'success');
+                }
+                
+                // Recargar la vista
+                this.renderAguinaldos();
+            } catch (error) {
+                console.error('Error al eliminar salarios:', error);
+                if (window.showNotification) {
+                    window.showNotification('Error al eliminar salarios', 'error');
+                }
+            }
+        }
+    }
+
+    async agregarAguinaldoSalario(datos) {
+        try {
+            console.log('🔧 Agregando salario de aguinaldo:', datos);
+            
+            // Usar el storage para crear el salario
+            const { storage } = await import('./storage/index.js');
+            const resultado = await storage.createAguinaldoSalario(datos);
+            console.log('✅ Salario guardado:', resultado);
+            
+            if (window.showNotification) {
+                window.showNotification('Salario mensual agregado exitosamente', 'success');
+            }
+            
+            // Siempre recargar la vista de aguinaldos
+            console.log('🔄 Recargando vista de aguinaldos...');
+            await this.renderAguinaldos();
+            console.log('✅ Vista recargada');
+            
+        } catch (error) {
+            console.error('❌ Error al agregar salario de aguinaldo:', error);
+            if (window.showNotification) {
+                window.showNotification('Error al agregar salario mensual', 'error');
+            }
+        }
+    }
+
+    async editarAguinaldoSalario(id, datos) {
+        try {
+            console.log('🔧 Editando salario de aguinaldo:', { id, datos });
+            
+            // Usar el storage para actualizar el salario
+            const { storage } = await import('./storage/index.js');
+            const resultado = await storage.updateAguinaldoSalario(id, datos);
+            console.log('✅ Salario actualizado:', resultado);
+            
+            if (window.showNotification) {
+                window.showNotification('Salario mensual actualizado exitosamente', 'success');
+            }
+            
+            // Siempre recargar la vista de aguinaldos
+            console.log('🔄 Recargando vista de aguinaldos...');
+            await this.renderAguinaldos();
+            console.log('✅ Vista recargada');
+            
+        } catch (error) {
+            console.error('❌ Error al actualizar salario de aguinaldo:', error);
+            if (window.showNotification) {
+                window.showNotification('Error al actualizar salario mensual', 'error');
+            }
+        }
+    }
+
+    // ============================================
     // GESTIÓN DE ASISTENCIAS
     // ============================================
 
@@ -3368,7 +3716,8 @@ class SistemaPlanillas {
             document.getElementById('bonoEmpleado'),
             document.getElementById('vacacionEmpleado'),
             document.getElementById('filtroEmpleadoAsistencia'),
-            document.getElementById('filtroEmpleadoBono')
+            document.getElementById('filtroEmpleadoBono'),
+            document.getElementById('aguinaldoEmpleado')
         ];
 
         selects.forEach(select => {
@@ -3895,6 +4244,31 @@ class SistemaPlanillas {
             this.abrirModal('modalFeriado');
         });
 
+        // Aguinaldos
+        document.getElementById('btnNuevoAguinaldo')?.addEventListener('click', () => {
+            document.getElementById('formAguinaldo').reset();
+            document.getElementById('aguinaldoId').value = '';
+            this.actualizarSelectsEmpleados();
+            this.abrirModal('modalAguinaldo');
+        });
+
+        // Filtros de aguinaldos
+        document.getElementById('filtroEmpleadoAguinaldo')?.addEventListener('change', () => {
+            this.renderAguinaldos();
+        });
+
+        document.getElementById('filtroAnoAguinaldo')?.addEventListener('change', () => {
+            this.renderAguinaldos();
+        });
+
+        // Botón calcular aguinaldos
+        document.getElementById('btnCalcularAguinaldos')?.addEventListener('click', () => {
+            this.renderAguinaldos();
+            if (window.showNotification) {
+                window.showNotification('Aguinaldos calculados', 'success');
+            }
+        });
+
         document.getElementById('formFeriado')?.addEventListener('submit', (e) => {
             e.preventDefault();
             const id = document.getElementById('feriadoId').value;
@@ -3912,6 +4286,27 @@ class SistemaPlanillas {
             }
 
             this.cerrarModal('modalFeriado');
+        });
+
+        // Aguinaldos
+        document.getElementById('formAguinaldo')?.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const id = document.getElementById('aguinaldoId').value;
+            const datos = {
+                employeeId: document.getElementById('aguinaldoEmpleado').value,
+                ano: parseInt(document.getElementById('aguinaldoAno').value),
+                mes: parseInt(document.getElementById('aguinaldoMes').value),
+                salarioBruto: parseFloat(document.getElementById('aguinaldoSalarioBruto').value),
+                observaciones: document.getElementById('aguinaldoObservaciones').value
+            };
+
+            if (id) {
+                this.editarAguinaldoSalario(id, datos);
+            } else {
+                this.agregarAguinaldoSalario(datos);
+            }
+
+            this.cerrarModal('modalAguinaldo');
         });
 
         // Vacaciones
@@ -4093,6 +4488,10 @@ class SistemaPlanillas {
                 break;
             case 'reportes':
                 // La sección de reportes se mantiene como está por defecto
+                break;
+            case 'aguinaldos':
+                this.renderAguinaldos();
+                this.actualizarSelectsEmpleados();
                 break;
         }
     }

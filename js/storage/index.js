@@ -130,6 +130,28 @@ export const storage = {
     const a = await ensureAdapter();
     return a.deletePayrollRecord(id);
   },
+
+  // Aguinaldo Salarios
+  async listAguinaldoSalarios(employeeId) {
+    const a = await ensureAdapter();
+    return a.listAguinaldoSalarios(employeeId);
+  },
+  async subscribeToAguinaldoSalarios(callback) {
+    const a = await ensureAdapter();
+    return a.subscribeToAguinaldoSalarios(callback);
+  },
+  async createAguinaldoSalario(salario) {
+    const a = await ensureAdapter();
+    return a.createAguinaldoSalario(salario);
+  },
+  async updateAguinaldoSalario(id, updates) {
+    const a = await ensureAdapter();
+    return a.updateAguinaldoSalario(id, updates);
+  },
+  async deleteAguinaldoSalario(id) {
+    const a = await ensureAdapter();
+    return a.deleteAguinaldoSalario(id);
+  },
 };
 
 

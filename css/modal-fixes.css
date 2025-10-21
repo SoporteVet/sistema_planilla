@@ -71,7 +71,7 @@ body.modal-open {
 }
 
 /* Prevenir que los estilos inline interfieran */
-.modal[style*="display: block"] {
+.modal[style*="display: block"].show {
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
@@ -115,7 +115,7 @@ body.modal-open {
 }
 
 /* Override para cualquier estilo inline que pueda estar causando problemas */
-.modal[style] {
+.modal[style].show {
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
@@ -132,6 +132,7 @@ body.modal-open {
 #modalBono,
 #modalFeriado,
 #modalVacaciones,
+#modalAguinaldo,
 #custom-confirm-modal {
     display: none !important;
     position: fixed !important;
@@ -153,6 +154,7 @@ body.modal-open {
 #modalBono.show,
 #modalFeriado.show,
 #modalVacaciones.show,
+#modalAguinaldo.show,
 #custom-confirm-modal.show {
     display: flex !important;
 }

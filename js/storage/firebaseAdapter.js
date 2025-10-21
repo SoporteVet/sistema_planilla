@@ -124,6 +124,27 @@ export async function createFirebaseAdapter(firebaseConfig) {
       return row;
     },
     async deletePayrollRecord(id) { return await deleteById('payrollHistory', id); },
+
+    // Aguinaldo Salarios
+    async listAguinaldoSalarios(employeeId) {
+      const list = await readList('aguinaldoSalarios');
+      return employeeId ? list.filter(x => x.employeeId === employeeId) : list;
+    },
+    subscribeToAguinaldoSalarios(callback) { return subscribeToList('aguinaldoSalarios', callback); },
+    async createAguinaldoSalario(salario) {
+      const row = { ...salario, id: newId('agu') };
+      await writeObject('aguinaldoSalarios', row.id, row);
+      return row;
+    },
+    async updateAguinaldoSalario(id, updates) {
+      const ref = api.ref(db, `aguinaldoSalarios/${id}`);
+      const snap = await api.get(ref);
+      if (!snap.exists()) return null;
+      const next = { ...snap.val(), ...updates };
+      await api.set(ref, next);
+      return next;
+    },
+    async deleteAguinaldoSalario(id) { return await deleteById('aguinaldoSalarios', id); },
   };
 }
 

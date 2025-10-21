@@ -7,6 +7,7 @@ const KEYS = {
   holidays: 'sp.holidays',
   disabilities: 'sp.disabilities',
   payrollHistory: 'sp.payrollHistory',
+  aguinaldoSalarios: 'sp.aguinaldoSalarios',
 };
 
 function readArray(key) {
@@ -159,6 +160,33 @@ export function createLocalStorageAdapter() {
     deletePayrollRecord: (id) => {
       const all = readArray(KEYS.payrollHistory);
       writeArray(KEYS.payrollHistory, all.filter(p => p.id !== id));
+      return true;
+    },
+
+    // Aguinaldo Salarios
+    listAguinaldoSalarios: (employeeId) => {
+      const all = readArray(KEYS.aguinaldoSalarios);
+      return employeeId ? all.filter(s => s.employeeId === employeeId) : all;
+    },
+    createAguinaldoSalario: (salario) => {
+      const all = readArray(KEYS.aguinaldoSalarios);
+      const row = { id: generateId('agu'), ...salario };
+      all.push(row);
+      writeArray(KEYS.aguinaldoSalarios, all);
+      return row;
+    },
+    updateAguinaldoSalario: (id, updates) => {
+      const all = readArray(KEYS.aguinaldoSalarios);
+      const idx = all.findIndex(s => s.id === id);
+      if (idx === -1) return null;
+      const updated = { ...all[idx], ...updates };
+      all[idx] = updated;
+      writeArray(KEYS.aguinaldoSalarios, all);
+      return updated;
+    },
+    deleteAguinaldoSalario: (id) => {
+      const all = readArray(KEYS.aguinaldoSalarios);
+      writeArray(KEYS.aguinaldoSalarios, all.filter(s => s.id !== id));
       return true;
     },
   };
