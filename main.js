@@ -52,7 +52,7 @@ async function renderRoute(route) {
     return;
   }
   if (route === 'asistencias') {
-    const mod = await import('./views/attendance-unificado.js');
+    const mod = await import('./views/attendance.js');
     await mod.renderAttendanceView(appView, { showToast });
     return;
   }

@@ -56,7 +56,8 @@ class EmailServiceSimple {
     prepararDatosEmail(empleado, calculos, planilla) {
         // Calcular valores adicionales necesarios para la plantilla
         const salarioDiario = parseFloat(empleado.salarioHora || 0) * this.getHorasJornada(empleado.jornada);
-        const salarioMensual = salarioDiario * 30;
+        const diasLaboralesMensuales = 22; // 22 días laborales promedio en un mes
+        const salarioMensual = salarioDiario * diasLaboralesMensuales;
         const subtotalQuincenal = salarioMensual / 2;
         
         // Asegurar que todos los valores sean strings válidos

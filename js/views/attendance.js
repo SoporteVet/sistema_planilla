@@ -146,10 +146,8 @@ export async function renderAttendanceView(root, { showToast }) {
             const diasSemana = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
             const diaIndex = diasSemana.indexOf(diaSemana.toLowerCase());
             
-            if (diaIndex >= 1 && diaIndex <= 4) { // Lunes a Jueves
+            if (diaIndex >= 1 && diaIndex <= 5) { // Lunes a Viernes
               return 9;
-            } else if (diaIndex === 5) { // Viernes
-              return 7;
             } else { // Sábado y Domingo
               return 0;
             }
@@ -206,10 +204,8 @@ export async function renderAttendanceView(root, { showToast }) {
             const diasSemana = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
             const diaIndex = diasSemana.indexOf(diaSemana.toLowerCase());
             
-            if (diaIndex >= 1 && diaIndex <= 4) { // Lunes a Jueves
+            if (diaIndex >= 1 && diaIndex <= 5) { // Lunes a Viernes
               return 9;
-            } else if (diaIndex === 5) { // Viernes
-              return 7;
             } else { // Sábado y Domingo
               return 0;
             }

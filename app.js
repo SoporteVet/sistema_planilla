@@ -17,107 +17,41 @@ class SistemaPlanillas {
             incapacidadCCSS: 50,
             incapacidadINS: 0
         };
-        // Configuración de jornadas laborales según normativa de Costa Rica (2025)
+        // Configuración de jornadas laborales según normativa de Costa Rica
         this.jornadas = {
             diurna: {
-                nombre: 'Jornada Diurna',
-                horario: '5:00 a.m. a 7:00 p.m.',
                 horasPorDia: 8,
-                horasTrabajadas: 8,
-                horasPagadas: 8,
-                horasMaximasDiarias: 8,
-                horasMaximasSemanales: 48,
+                horasTrabajadas: 8, // Horas físicas trabajadas
+                horasPagadas: 8,    // Horas que se pagan
                 horasMensuales: 240,
                 horasQuincenales: 120,
-                diasPorSemana: 6,
-                diasLibres: 1,
-                observacion: 'Jornada estándar más común'
-            },
-            diurna_acumulativa: {
-                nombre: 'Jornada Diurna Acumulativa',
-                horario: '5:00 a.m. a 7:00 p.m.',
-                horasPorDia: 10,
-                horasTrabajadas: 10,
-                horasPagadas: 8,
-                horasMaximasDiarias: 10,
-                horasMaximasSemanales: 48,
-                horasMensuales: 240,
-                horasQuincenales: 120,
-                diasPorSemana: 5,
-                diasLibres: 2,
-                restriccion: 'Solo para trabajos que NO sean insalubres, peligrosos o pesados'
-            },
-            nocturna: {
-                nombre: 'Jornada Nocturna',
-                horario: '7:00 p.m. a 5:00 a.m.',
-                horasPorDia: 6,
-                horasTrabajadas: 6,
-                horasPagadas: 6,
-                horasMaximasDiarias: 6,
-                horasMaximasSemanales: 36,
-                horasMensuales: 180,
-                horasQuincenales: 90,
-                diasPorSemana: 6,
-                diasLibres: 1,
-                observacion: 'Se trabajan 6 horas y se pagan 6 horas'
+                diasPorSemana: 6
             },
             mixta: {
-                nombre: 'Jornada Mixta',
-                horario: 'Combinación de horas diurnas y nocturnas',
                 horasPorDia: 7,
                 horasTrabajadas: 7,
                 horasPagadas: 7,
-                horasMaximasDiarias: 7,
-                horasMaximasSemanales: 42,
                 horasMensuales: 210,
                 horasQuincenales: 105,
-                diasPorSemana: 6,
-                diasLibres: 1,
-                restriccion: 'Máximo 3.5 horas en período nocturno. Si excede, se convierte en jornada nocturna'
+                diasPorSemana: 6
             },
-            mixta_ampliada: {
-                nombre: 'Jornada Mixta Ampliada (Acumulativa)',
-                horario: 'Combinación de horas diurnas y nocturnas',
-                horasPorDia: 9,
-                horasTrabajadas: 9,
-                horasPagadas: 8,
-                horasMaximasDiarias: 9,
-                horasMaximasSemanales: 40,
-                horasMensuales: 240,
-                horasQuincenales: 120,
-                diasPorSemana: 5,
-                diasLibres: 2,
-                restriccion: 'Solo para trabajos NO insalubres o peligrosos. Máximo 3.5 horas nocturnas. Trabaja 9h pero se pagan 8h. 5 días trabajo, 2 días libres'
+            nocturna: {
+                horasPorDia: 6,
+                horasTrabajadas: 6,
+                horasPagadas: 8,  // Se pagan 8 horas aunque se trabajen 6
+                horasMensuales: 240,  // 8h × 30 días = 240
+                horasQuincenales: 120,  // 8h × 15 días = 120
+                diasPorSemana: 6
             },
-            parcial: {
-                nombre: 'Jornada Parcial',
-                horario: 'Según contrato',
-                horasPorDia: 4,
-                horasTrabajadas: 4,
-                horasPagadas: 4,
-                horasMaximasDiarias: 4,
-                horasMaximasSemanales: 24,
-                horasMensuales: 120,
-                horasQuincenales: 60,
-                diasPorSemana: 6,
-                diasLibres: 1,
-                observacion: 'Se aplica proporción del salario mínimo. Variable según contrato'
+            diurna_acumulativa: {
+                horasPorDia: 10,        // Horas físicas trabajadas
+                horasTrabajadas: 10,     // Trabaja 10 horas
+                horasPagadas: 8,         // Pero se le pagan solo 8 horas
+                horasMensuales: 240,     // 8h × 30 días = 240
+                horasQuincenales: 120,   // 8h × 15 días = 120
+                diasPorSemana: 5,        // Trabaja 5 días a la semana
+                diasLibres: 2            // 2 días libres (beneficio por acumular horas)
             },
-            medio_tiempo: {
-                nombre: 'Jornada de Medio Tiempo',
-                horario: 'Según contrato',
-                horasPorDia: 4,
-                horasTrabajadas: 4,
-                horasPagadas: 4,
-                horasMaximasDiarias: 4,
-                horasMaximasSemanales: 24,
-                horasMensuales: 120,
-                horasQuincenales: 60,
-                diasPorSemana: 6,
-                diasLibres: 1,
-                observacion: 'Equivale a la mitad de la jornada ordinaria'
-            },
-            // Alias para compatibilidad con código antiguo
             mixta_acumulativa: {
                 nombre: 'Jornada Mixta Acumulativa',
                 horario: 'Combinación de horas diurnas y nocturnas',
@@ -125,7 +59,7 @@ class SistemaPlanillas {
                 horasTrabajadas: 9,
                 horasPagadas: 8,
                 horasMaximasDiarias: 9,
-                horasMaximasSemanales: 40,
+                horasMaximasSemanales: 45,
                 horasMensuales: 240,
                 horasQuincenales: 120,
                 diasPorSemana: 5,
@@ -140,8 +74,6 @@ class SistemaPlanillas {
     async init() {
         await this.initializeFirebase();
         await this.cargarDatos();
-        await this.ejecutarMigracionCR(); // Nueva línea para migración
-        this.inicializarSistemaUnificado(); // Nueva línea para sistema unificado
         this.initEventListeners();
         this.actualizarFecha();
         this.cargarFeriadosDefecto();
@@ -208,278 +140,6 @@ class SistemaPlanillas {
                 this.historialPlanillas = JSON.parse(historialGuardado);
             }
         }
-    }
-
-    // ============================================
-    // MIGRACIÓN AL SISTEMA COSTA RICA
-    // ============================================
-
-    async ejecutarMigracionCR() {
-        console.log('🔄 Verificando migración al sistema costarricense...');
-        
-        try {
-            const necesitaMigracion = this.verificarNecesidadMigracion();
-            
-            if (necesitaMigracion) {
-                console.log('🔄 Ejecutando migración de empleados...');
-                const resultado = await this.migrarEmpleadosExistentes();
-                
-                if (resultado.actualizados > 0) {
-                    console.log(`✅ Migración completada: ${resultado.actualizados} empleados actualizados`);
-                    this.mostrarNotificacionMigracion(resultado);
-                }
-            } else {
-                console.log('✅ Los datos ya están actualizados para el sistema costarricense');
-            }
-        } catch (error) {
-            console.error('❌ Error durante la migración:', error);
-        }
-    }
-
-    verificarNecesidadMigracion() {
-        return this.empleados.some(emp => 
-            !emp.categoria || 
-            !emp.email || 
-            !emp.departamento ||
-            ['acumulativa', 'tiempo_completo', 'medio_tiempo', 'tiempo_parcial'].includes(emp.jornada)
-        );
-    }
-
-    async migrarEmpleadosExistentes() {
-        let empleadosActualizados = 0;
-        const migraciones = [];
-
-        for (const empleado of this.empleados) {
-            const migracion = this.migrarEmpleado(empleado);
-            if (migracion.necesitaActualizacion) {
-                // Actualizar el empleado en el array
-                const index = this.empleados.findIndex(e => e.id === empleado.id);
-                if (index !== -1) {
-                    this.empleados[index] = migracion.datosActualizados;
-                    empleadosActualizados++;
-                }
-                migraciones.push(migracion);
-            }
-        }
-
-        // Guardar los datos actualizados
-        if (empleadosActualizados > 0) {
-            await this.guardarDatos();
-        }
-
-        return {
-            total: this.empleados.length,
-            actualizados: empleadosActualizados,
-            migraciones: migraciones
-        };
-    }
-
-    migrarEmpleado(empleado) {
-        const migraciones = [];
-        const datosActualizados = { ...empleado };
-
-        // 1. Migrar jornada antigua a nueva nomenclatura
-        if (empleado.jornada) {
-            const jornadaMigrada = this.migrarJornada(empleado.jornada);
-            if (jornadaMigrada !== empleado.jornada) {
-                datosActualizados.jornada = jornadaMigrada;
-                migraciones.push(`Jornada migrada de "${empleado.jornada}" a "${jornadaMigrada}"`);
-            }
-        }
-
-        // 2. Agregar categoría basada en salario
-        if (!empleado.categoria) {
-            const categoria = this.determinarCategoria(empleado.salarioHora);
-            datosActualizados.categoria = categoria;
-            migraciones.push(`Categoría asignada: "${categoria}"`);
-        }
-
-        // 3. Agregar email si no existe
-        if (!empleado.email) {
-            datosActualizados.email = '';
-            migraciones.push('Campo email agregado');
-        }
-
-        // 4. Agregar departamento si no existe
-        if (!empleado.departamento) {
-            datosActualizados.departamento = 'Operativo';
-            migraciones.push('Departamento asignado: "Operativo"');
-        }
-
-        return {
-            empleado: empleado.nombre,
-            migraciones: migraciones,
-            datosActualizados: datosActualizados,
-            necesitaActualizacion: migraciones.length > 0
-        };
-    }
-
-    migrarJornada(jornadaAntigua) {
-        const mapeoJornadas = {
-            'diurna': 'diurna',
-            'nocturna': 'nocturna', 
-            'mixta': 'mixta',
-            'acumulativa': 'diurna_acumulativa',
-            'tiempo_completo': 'diurna',
-            'medio_tiempo': 'medio_tiempo',
-            'tiempo_parcial': 'parcial',
-            'jornada_completa': 'diurna',
-            'jornada_reducida': 'parcial'
-        };
-
-        return mapeoJornadas[jornadaAntigua] || 'diurna';
-    }
-
-    determinarCategoria(salarioHora) {
-        const salarioMensual = salarioHora * 240; // 8 horas × 30 días
-
-        // Salarios mínimos 2025 Costa Rica
-        const salariosMinimos = {
-            'trabajador_no_calificado': 367109,
-            'trabajador_semi_calificado': 399203,
-            'trabajador_calificado': 413024,
-            'trabajador_especializado': 476866,
-            'tecnico_educacion_diversificada': 432819,
-            'tecnico_educacion_superior': 533402,
-            'tecnico_diplomado': 576094,
-            'bachiller_universitario': 653427,
-            'licenciado_universitario': 784140
-        };
-
-        // Buscar la categoría que mejor se ajuste al salario
-        const categorias = Object.entries(salariosMinimos);
-        
-        for (const [key, salarioMinimo] of categorias) {
-            if (salarioMensual >= salarioMinimo) {
-                return key;
-            }
-        }
-
-        // Si no encuentra una categoría adecuada, usar la más baja
-        return 'trabajador_no_calificado';
-    }
-
-    mostrarNotificacionMigracion(resultado) {
-        // Crear notificación temporal
-        const notificacion = document.createElement('div');
-        notificacion.className = 'notificacion-migracion';
-        notificacion.innerHTML = `
-            <div class="notificacion-contenido">
-                <div class="notificacion-icono">✅</div>
-                <div class="notificacion-texto">
-                    <h4>Migración Completada</h4>
-                    <p>Se actualizaron ${resultado.actualizados} empleados al sistema costarricense</p>
-                </div>
-                <button class="notificacion-cerrar">&times;</button>
-            </div>
-        `;
-
-        // Estilos para la notificación
-        notificacion.style.cssText = `
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: #d4edda;
-            border: 1px solid #c3e6cb;
-            border-radius: 8px;
-            padding: 15px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            z-index: 10000;
-            max-width: 400px;
-            animation: slideInRight 0.3s ease-out;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        `;
-
-        document.body.appendChild(notificacion);
-
-        // Event listener para cerrar
-        notificacion.querySelector('.notificacion-cerrar').addEventListener('click', () => {
-            notificacion.remove();
-        });
-
-        // Auto-cerrar después de 5 segundos
-        setTimeout(() => {
-            if (document.body.contains(notificacion)) {
-                notificacion.remove();
-            }
-        }, 5000);
-    }
-
-    // ============================================
-    // SISTEMA UNIFICADO DE PLANILLAS
-    // ============================================
-
-    inicializarSistemaUnificado() {
-        console.log('🔄 Inicializando sistema unificado de planillas...');
-        
-        try {
-            // Verificar si el sistema unificado está disponible
-            if (typeof window.SistemaPlanillasUnificado !== 'undefined') {
-                this.sistemaUnificado = new window.SistemaPlanillasUnificado();
-                console.log('✅ Sistema unificado de planillas inicializado');
-                
-                // Hacer disponible globalmente
-                window.sistemaPlanillasUnificado = this.sistemaUnificado;
-                
-                // Mostrar información del sistema
-                this.mostrarInfoSistemaUnificado();
-            } else {
-                console.warn('⚠️ SistemaPlanillasUnificado no está disponible');
-            }
-        } catch (error) {
-            console.error('❌ Error inicializando sistema unificado:', error);
-        }
-    }
-
-    mostrarInfoSistemaUnificado() {
-        console.log('🇨🇷 SISTEMA UNIFICADO DE PLANILLAS COSTA RICA');
-        console.log('=============================================');
-        console.log('');
-        console.log('✅ Funcionalidades disponibles:');
-        console.log('  - 7 tipos de jornadas laborales según legislación CR');
-        console.log('  - 9 categorías salariales con mínimos legales 2025');
-        console.log('  - Cálculos unificados según normativa costarricense');
-        console.log('  - Validaciones legales automáticas');
-        console.log('  - Descuentos obligatorios (CCSS + Banco Popular)');
-        console.log('  - Reportes detallados paso a paso');
-        console.log('');
-        console.log('🔧 Acceso al sistema:');
-        console.log('  - window.sistemaPlanillasUnificado');
-        console.log('  - this.sistemaUnificado (dentro de la clase)');
-        console.log('');
-        console.log('📚 Jornadas soportadas:');
-        Object.keys(this.sistemaUnificado.jornadasLaborales).forEach(jornada => {
-            const config = this.sistemaUnificado.jornadasLaborales[jornada];
-            console.log(`  - ${jornada}: ${config.horasTrabajadas}h trabajadas, ${config.horasPagadas}h pagadas`);
-        });
-    }
-
-    // Método para calcular planilla usando el sistema unificado
-    async calcularPlanillaUnificada(periodo) {
-        if (!this.sistemaUnificado) {
-            throw new Error('Sistema unificado no inicializado');
-        }
-
-        const empleados = this.empleados;
-        const asistencias = this.asistencias;
-        
-        return this.sistemaUnificado.calcularPlanillaCompleta(empleados, asistencias, periodo);
-    }
-
-    // Método para obtener configuración de jornada
-    getJornadaConfig(jornada) {
-        if (this.sistemaUnificado) {
-            return this.sistemaUnificado.getJornadaConfig(jornada);
-        }
-        return null;
-    }
-
-    // Método para obtener información de categoría
-    getCategoriaInfo(categoria) {
-        if (this.sistemaUnificado) {
-            return this.sistemaUnificado.getCategoriaInfo(categoria);
-        }
-        return null;
     }
 
     async guardarDatos() {
@@ -734,6 +394,7 @@ class SistemaPlanillas {
 
             // Calcular total bruto y aguinaldo
             const totalBruto = Object.values(salariosPorMes).reduce((sum, salario) => sum + salario, 0);
+            // Aguinaldo en Costa Rica = promedio mensual (total / 12 meses trabajados)
             const aguinaldo = totalBruto / 12;
 
             return {
@@ -1191,27 +852,14 @@ class SistemaPlanillas {
     // CÁLCULO DE PLANILLAS
     // ============================================
 
-    calcularPlanilla(periodo, fechaInicio, fechaFin, empresaFiltro = '', aplicarImpuestoRenta = false, busquedaEmpleado = '') {
+    calcularPlanilla(periodo, fechaInicio, fechaFin, empresaFiltro = '', aplicarImpuestoRenta = false) {
         const planilla = [];
 
         let empleadosAFiltrar = this.empleados;
         
         // Aplicar filtro por empresa si se especifica
         if (empresaFiltro) {
-            empleadosAFiltrar = empleadosAFiltrar.filter(emp => emp.empresa === empresaFiltro);
-        }
-
-        // Aplicar filtro de búsqueda por nombre o cédula
-        if (busquedaEmpleado && busquedaEmpleado.trim()) {
-            const terminoBusqueda = busquedaEmpleado.toLowerCase().trim();
-            empleadosAFiltrar = empleadosAFiltrar.filter(emp => {
-                const nombre = (emp.nombre || '').toLowerCase();
-                const cedula = (emp.cedula || '').toLowerCase();
-                const puesto = (emp.puesto || '').toLowerCase();
-                return nombre.includes(terminoBusqueda) || 
-                       cedula.includes(terminoBusqueda) || 
-                       puesto.includes(terminoBusqueda);
-            });
+            empleadosAFiltrar = this.empleados.filter(emp => emp.empresa === empresaFiltro);
         }
 
         empleadosAFiltrar.forEach(empleado => {
@@ -1223,25 +871,6 @@ class SistemaPlanillas {
         });
 
         return planilla;
-    }
-
-    // Método para recalcular planilla con filtros actuales
-    recalcularPlanillaConFiltros() {
-        // Si ya hay una planilla generada, recalcularla con los filtros actuales
-        if (this.ultimaPlanilla && this.ultimaPlanilla.length > 0) {
-            const periodo = document.getElementById('periodoPlanilla').value;
-            const fechaInicio = document.getElementById('fechaInicioPlanilla').value;
-            const fechaFin = document.getElementById('fechaFinPlanilla').value;
-            const empresaFiltro = document.getElementById('filtroEmpresaPlanilla').value;
-            const tipoPlanilla = document.getElementById('tipoPlanilla').value;
-            const busquedaEmpleado = document.getElementById('buscarEmpleadoPlanilla').value;
-
-            if (fechaInicio && fechaFin) {
-                const aplicarImpuestoRenta = (tipoPlanilla === 'segunda');
-                const planilla = this.calcularPlanilla(periodo, fechaInicio, fechaFin, empresaFiltro, aplicarImpuestoRenta, busquedaEmpleado);
-                this.renderPlanilla(planilla);
-            }
-        }
     }
 
     calcularSalarioEmpleado(empleado, fechaInicio, fechaFin, aplicarImpuestoRenta = false) {
@@ -1287,7 +916,6 @@ class SistemaPlanillas {
                 }
                 
                 const extra = parseFloat(asist.horasExtra || 0);
-                const horasAdicionales = parseFloat(asist.horasAdicionales || 0);
 
                 // Calcular según jornada
                 const horasPorDia = this.getHorasJornada(empleado.jornada);
@@ -1296,46 +924,28 @@ class SistemaPlanillas {
                     // Jornada diurna: 8 horas por día
                     // Las horas trabajadas se pagan normalmente
                     // Las horas extra SOLO se toman del campo "Horas Extra"
-                    // Pero si no trabajó horas, no pagar nada
-                    horasNormales += horas > 0 ? horas : 0;
+                    horasNormales += horas;
                 } else if (empleado.jornada === 'nocturna') {
-                    // Jornada nocturna: 6 horas trabajadas = 6 horas pagadas
-                    // Se trabajan 6 horas y se pagan 6 horas (estándar)
-                    // Si trabaja menos de 6 horas: pagar las horas trabajadas
-                    // Si trabaja 6 horas: pagar 6 horas
-                    // Si trabaja más de 6 horas: pagar solo 6 horas (las adicionales se manejan aparte)
-                    if (horas === 0) {
-                        // No trabajó horas: no pagar nada
-                        horasNormales += 0;
-                    } else if (horas <= 6) {
-                        // Si trabajó 6 horas o menos, pagar las horas trabajadas
-                        horasNormales += horas;
+                    // Jornada nocturna: 6 horas trabajadas = 8 horas pagadas
+                    // Se trabajan 6 horas pero se pagan 8 horas (equivalencia diurna)
+                    // Las horas extra SOLO se toman del campo "Horas Extra"
+                    if (horas >= 6) {
+                        // Si trabajó 6 horas o más, pagar 8 horas completas
+                        horasNormales += 8;
                     } else {
-                        // Si trabajó más de 6 horas (ej: 8 horas), solo pagar 6 horas normales
-                        // Las horas adicionales (2 en este caso) deben manejarse separadamente
-                        horasNormales += 6;
+                        // Si trabajó menos de 6 horas, pagar proporcionalmente
+                        horasNormales += (horas / 6) * 8;
                     }
                 } else if (empleado.jornada === 'mixta') {
                     // Jornada mixta: 7 horas por día
                     // Las horas trabajadas se pagan normalmente
                     // Las horas extra SOLO se toman del campo "Horas Extra"
                     horasNormales += horas;
-                } else if (empleado.jornada === 'mixta_ampliada') {
-                    // Jornada mixta ampliada: 8 horas por día
-                    // Similar a jornada diurna pero con componente nocturno
-                    // Las horas trabajadas se pagan normalmente
-                    horasNormales += horas > 0 ? horas : 0;
-                } else if (empleado.jornada === 'parcial') {
-                    // Jornada parcial: 4 horas por día (variable según contrato)
-                    // Las horas trabajadas se pagan normalmente
-                    horasNormales += horas > 0 ? horas : 0;
-                } else if (empleado.jornada === 'medio_tiempo') {
-                    // Jornada de medio tiempo: 4 horas por día
-                    // Las horas trabajadas se pagan normalmente
-                    horasNormales += horas > 0 ? horas : 0;
                 } else if (empleado.jornada === 'diurna_acumulativa') {
                     // Jornada diurna acumulativa:
-                    // Se trabajan 10 horas físicas pero se PAGAN 8 horas (beneficio acumulativo)
+                    // Se trabajan 10 horas físicas pero se PAGAN 8 horas
+                    // Por cada hora menos trabajada, se resta 1 hora de pago
+                    // Ej: 10h trabajadas = 8h pagadas, 9h trabajadas = 7h pagadas, 8h = 6h pagadas
                     // Los días libres también se pagan 8 horas
                     
                     const horasOriginales = parseFloat(asist.horas || 0);
@@ -1354,23 +964,18 @@ class SistemaPlanillas {
                         
                         if (horasVisualesNormales === 0) {
                             // Según horario es día libre, pero está trabajando: pagar 1:1
-                            // Pero si no trabajó horas, no pagar nada
-                            horasPagadas = horas > 0 ? horas : 0;
+                            horasPagadas = horas;
                         } else if (horasVisualesNormales === 8) {
                             // Días de 8 horas visuales: relación 1:1
                             // 8h trabajadas = 8h pagadas, 7h = 7h, etc.
-                            // Pero si no trabajó horas, no pagar nada
-                            horasPagadas = horas > 0 ? horas : 0;
+                            horasPagadas = horas;
                         } else {
                             // Días con más de 8 horas visuales (típicamente 10h)
                             // Si trabaja las horas completas esperadas → pagar 8 horas
                             // Si trabaja menos → restar proporcionalmente
                             // 10h visuales → 8h pagadas (si trabaja las 10 completas)
                             // 9h visuales → 7h pagadas (1h menos)
-                            if (horas === 0) {
-                                // No trabajó horas: no pagar nada
-                                horasPagadas = 0;
-                            } else if (horas >= horasVisualesNormales) {
+                            if (horas >= horasVisualesNormales) {
                                 // Trabajó las horas completas: pagar jornada completa (8h)
                                 horasPagadas = horasPorDia;
                             } else {
@@ -1383,13 +988,12 @@ class SistemaPlanillas {
                         horasNormales += horasPagadas;
                     }
                     // NO calcular horas extra automáticamente
-                } else if (empleado.jornada === 'mixta_acumulativa' || empleado.jornada === 'mixta_ampliada') {
-                    // Jornada mixta acumulativa/ampliada:
+                } else if (empleado.jornada === 'mixta_acumulativa') {
+                    // Jornada mixta acumulativa:
                     // Se trabajan entre 8-9 horas físicas pero se PAGAN 8 horas
                     // Los días libres NO se pagan automáticamente
                     
                     const horasOriginales = parseFloat(asist.horas || 0);
-                    const horasAdicionales = parseFloat(asist.horasAdicionales || 0);
                     
                     // Si el día fue registrado con 0 horas (día libre), NO pagar automáticamente
                     if (horasOriginales === 0) {
@@ -1403,11 +1007,12 @@ class SistemaPlanillas {
                         const diaSemana = this.getDiaSemana(fecha);
                         const horasVisualesNormales = this.getHorasVisualesJornada(empleado.jornada, diaSemana, empleado.horario);
                         
-                        // Calcular horas pagadas según la jornada mixta acumulativa
+                        // Si trabajó 8 horas o más, pagar 8 horas completas
+                        // Si trabajó menos de 8 horas, pagar las horas trabajadas
                         let horasPagadas;
                         if (horas >= horasPorDia) {
-                            // Trabajó 8 horas o más: pagar máximo 8 horas (sin horas adicionales automáticas)
-                            horasPagadas = Math.min(horasPorDia, 8); // Máximo 8 horas pagadas
+                            // Trabajó 8 horas o más: siempre pagar 8 horas
+                            horasPagadas = horasPorDia; // 8 horas
                         } else {
                             // Trabajó menos de 8 horas: pagar las horas trabajadas
                             horasPagadas = horas;
@@ -1479,22 +1084,29 @@ class SistemaPlanillas {
                 // Sumar las horas trabajadas (no las de permiso)
                 horasNormales += horasTrabajadas;
             } else if (asist.tipo === 'incapacidad_ccss') {
-                // CCSS: no se suma al salario bruto, se maneja como ajuste al neto
-                // La empresa paga 50% los primeros 3 días, 100% después del día 3
-                // Esto se procesará después del cálculo del salario bruto
+                // CCSS: primeros 3 días la empresa paga 50%, después del día 3 paga 100%
+                const horasDia = this.getHorasJornada(empleado.jornada);
+                const diaIncapacidad = this.contarDiasIncapacidadCCSS(empleado.id, asist.fecha);
+                
+                if (diaIncapacidad <= 3) {
+                    // Primeros 3 días: empresa paga 50%
+                    horasNormales += horasDia * 0.5;
+                } else {
+                    // Después del día 3: empresa paga 100%
+                    horasNormales += horasDia;
+                }
             } else if (asist.tipo === 'vacaciones') {
                 // Vacaciones: se pagan las horas de la jornada completa
                 const horasDia = this.getHorasJornada(empleado.jornada);
                 horasNormales += horasDia;
             } else if (asist.tipo === 'libre') {
-                // Días libres en jornadas acumulativas SÍ se pagan SOLO para diurna_acumulativa
+                // Días libres en jornadas acumulativas SÍ se pagan
                 // porque las horas trabajadas en otros días cubren toda la semana
-                // Para mixta_acumulativa y mixta_ampliada NO se pagan los días libres automáticamente
-                if (empleado.jornada === 'diurna_acumulativa' || empleado.jornada === 'acumulativa') {
+                if (empleado.jornada === 'diurna_acumulativa' || empleado.jornada === 'mixta_acumulativa' || empleado.jornada === 'acumulativa') {
                     const horasDia = this.getHorasJornada(empleado.jornada);
                     horasNormales += horasDia;
                 }
-                // Para mixta_acumulativa, mixta_ampliada y otras jornadas, los días libres no se pagan (0%)
+                // Para otras jornadas, los días libres no se pagan (0%)
             }
             // INS no paga (0%)
         });
@@ -1502,16 +1114,8 @@ class SistemaPlanillas {
         // NOTA: En jornadas acumulativas solo se cuentan los días registrados en asistencias
         // No se agregan días automáticamente para evitar contar días fuera del período
 
-        // Calcular horas adicionales (se pagan como salario normal, no como horas extra)
-        let totalHorasAdicionales = 0;
-        asistencias.forEach(asist => {
-            if (asist.tipo === 'presente' || asist.tipo === 'tardanza') {
-                totalHorasAdicionales += parseFloat(asist.horasAdicionales || 0);
-            }
-        });
-
-        // Calcular salario base con las horas normales + horas adicionales
-        salarioBase = Math.round(((horasNormales + totalHorasAdicionales) * empleado.salarioHora) * 100000000) / 100000000;
+        // Calcular salario base con las horas normales (ya incluye el cálculo correcto de permisos)
+        salarioBase = Math.round((horasNormales * empleado.salarioHora) * 100000000) / 100000000;
         
         // Horas extra con recargo del 50% según ley costarricense
         montoHorasExtra = Math.round((horasExtra * empleado.salarioHora * 1.5) * 100000000) / 100000000;
@@ -1556,31 +1160,11 @@ class SistemaPlanillas {
             impuestoRenta = impuestoMensual / 2;
         }
 
-        // Calcular ajuste por incapacidad CCSS
-        let ajusteCCSS = 0;
-        const incapacidadesCCSS = asistencias.filter(a => a.tipo === 'incapacidad_ccss');
-        
-        if (incapacidadesCCSS.length > 0) {
-            incapacidadesCCSS.forEach(asist => {
-                const horasDia = this.getHorasJornada(empleado.jornada);
-                const diaIncapacidad = this.contarDiasIncapacidadCCSS(empleado.id, asist.fecha);
-                
-                if (diaIncapacidad <= 3) {
-                    // Primeros 3 días: empresa paga 50%, CCSS paga 50%
-                    ajusteCCSS += (horasDia * empleado.salarioHora) * 0.5;
-                } else {
-                    // Después del día 3: empresa paga 100%, CCSS no paga
-                    ajusteCCSS += (horasDia * empleado.salarioHora);
-                }
-            });
-        }
-
-        // Calcular salario neto (salario bruto - deducciones - rebajos + ajuste CCSS)
-        const salarioNeto = Math.round((salarioBruto - ccss - impuestoRenta - totalRebajos + ajusteCCSS) * 100000000) / 100000000;
+        // Calcular salario neto (salario bruto - deducciones - rebajos)
+        const salarioNeto = Math.round((salarioBruto - ccss - impuestoRenta - totalRebajos) * 100000000) / 100000000;
 
         return {
             horasNormales: horasNormales.toFixed(2),
-            horasAdicionales: totalHorasAdicionales.toFixed(2),
             horasExtra: horasExtra.toFixed(2),
             salarioBase: salarioBase.toFixed(2),
             montoHorasExtra: montoHorasExtra.toFixed(2),
@@ -1593,7 +1177,6 @@ class SistemaPlanillas {
             salarioBruto: salarioBruto.toFixed(2),
             ccss: ccss.toFixed(2),
             impuestoRenta: impuestoRenta.toFixed(2),
-            ajusteCCSS: ajusteCCSS.toFixed(2),
             salarioNeto: salarioNeto.toFixed(2)
         };
     }
@@ -1640,7 +1223,7 @@ class SistemaPlanillas {
         if (planilla.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="12" class="empty-state">
+                    <td colspan="11" class="empty-state">
                         <i class="fas fa-file-invoice-dollar"></i>
                         <p>No hay datos para mostrar</p>
                     </td>
@@ -1660,14 +1243,7 @@ class SistemaPlanillas {
                     </div>
                 </td>
                 <td>₡${this.formatearMoneda(item.salarioBase)}</td>
-                <td>
-                    ${parseFloat(item.horasAdicionales || 0).toFixed(2)}h 
-                    (₡${this.formatearMoneda(parseFloat(item.horasAdicionales || 0) * parseFloat(item.empleado.salarioHora))})
-                </td>
-                <td>
-                    ${parseFloat(item.horasExtra || 0).toFixed(2)}h 
-                    (₡${this.formatearMoneda(item.montoHorasExtra)})
-                </td>
+                <td>₡${this.formatearMoneda(item.montoHorasExtra)}</td>
                 <td>₡${this.formatearMoneda(item.montoFeriado || 0)}</td>
                 <td>₡${this.formatearMoneda(item.bonos)}</td>
                 <td><strong>₡${this.formatearMoneda(item.salarioBruto)}</strong></td>
@@ -1878,7 +1454,8 @@ class SistemaPlanillas {
         if (!empleado) return 0;
 
         const calculos = this.calcularSalarioEmpleado(empleado, fechaInicio, fechaFin);
-        const aguinaldo = parseFloat(calculos.salarioBruto) / 12;
+        // Aguinaldo en Costa Rica = 1 mes de salario (salario mensual completo)
+        const aguinaldo = parseFloat(calculos.salarioBruto);
         
         return aguinaldo.toFixed(2);
     }
@@ -1932,7 +1509,7 @@ class SistemaPlanillas {
                 salarioBruto: parseFloat(item.salarioBruto),
                 ccss: parseFloat(item.ccss),
                 salarioNeto: parseFloat(item.salarioNeto),
-                aguinaldo: parseFloat(item.salarioBruto) / 12,
+                aguinaldo: parseFloat(item.salarioBruto), // Aguinaldo = 1 mes de salario
                 vacaciones: this.calcularVacaciones(item.empleado.id)
             };
             this.historialPlanillas.push(registro);
@@ -2507,24 +2084,16 @@ class SistemaPlanillas {
         const nombreMes = fechaFinObj.toLocaleDateString('es-CR', { month: 'long', year: 'numeric' });
 
         // Calcular valores
+        const salarioDiario = parseFloat(empleado.salarioHora) * this.getHorasJornada(empleado.jornada);
         const diasLaborados = this.contarDiasLaborados(empleado.id, fechaInicio, fechaFin);
         
-        // Usar el salario base real calculado en la planilla (ya con deducciones de días no trabajados)
-        const salarioBasePlanilla = parseFloat(calculos.salarioBase || 0);
+        // Salario mensual de referencia: usar días laborales reales (22 días promedio)
+        // No usar 30 días porque solo cuenta días laborables
+        const diasLaboralesMensuales = 22; // 22 días laborales promedio en un mes
+        const salarioMensual = salarioDiario * diasLaboralesMensuales;
         
-        // Calcular días totales del período (días que debería haber trabajado)
-        const diasTotalesPeriodo = this.contarDiasTotalesPeriodo(fechaInicio, fechaFin);
-        
-        // Calcular salario diario teórico (como si trabajara todos los días del período)
-        const horasJornada = this.getHorasJornada(empleado.jornada);
-        const salarioDiarioTeorico = parseFloat(empleado.salarioHora) * horasJornada;
-        const salarioDiario = diasLaborados > 0 ? salarioBasePlanilla / diasLaborados : salarioDiarioTeorico;
-        
-        // Calcular el subtotal quincenal teórico (si trabajara todos los días del período)
-        const subtotalQuincenal = salarioDiarioTeorico * diasTotalesPeriodo;
-        
-        // Salario mensual: el subtotal quincenal × 2 (porque la planilla es quincenal)
-        const salarioMensual = subtotalQuincenal * 2;
+        // Subtotal quincenal: mitad del salario mensual (sin rebajos)
+        const subtotalQuincenal = salarioMensual / 2;
         
         const horasFeriado = this.calcularHorasFeriado(empleado.id, fechaInicio, fechaFin);
         const totalFeriado = horasFeriado * parseFloat(empleado.salarioHora) * 2;
@@ -2535,11 +2104,10 @@ class SistemaPlanillas {
         const horasExtras = parseFloat(calculos.horasExtra || 0);
         const totalExtras = parseFloat(calculos.montoHorasExtra || 0);
         
-        // El salario bruto es el salario base de la planilla + todos los ingresos adicionales
-        const salarioBruto = parseFloat(calculos.salarioBase) + totalFeriado + totalExtraFeriado + totalExtras;
+        const subtotalPagado = parseFloat(calculos.salarioBase) + totalFeriado + totalExtraFeriado + totalExtras;
+        const salarioBruto = parseFloat(calculos.salarioBruto);
         
-        // Recalcular deducciones basadas en el salario bruto correcto del comprobante
-        const ccss = Math.round(salarioBruto * this.config.ccss / 100 * 100) / 100;
+        const ccss = parseFloat(calculos.ccss);
         const impuestoRenta = parseFloat(calculos.impuestoRenta || 0);
         const otrasDedu = parseFloat(calculos.rebajos);
         
@@ -2548,11 +2116,7 @@ class SistemaPlanillas {
         
         const totalDeducciones = ccss + impuestoRenta + otrasDedu + deduccionesHoras.total;
         
-        const salarioNeto = salarioBruto - totalDeducciones;
-        
-        // El subtotal pagado es lo que realmente se le pagó (ya con deducciones de días no trabajados)
-        // Es decir: salario base (con deducciones) + feriados + horas extra
-        const subtotalPagado = salarioBasePlanilla + totalFeriado + totalExtraFeriado + totalExtras;
+        const salarioNeto = parseFloat(calculos.salarioNeto);
 
         // Obtener todos los detalles de asistencias del período
         const asistenciasConDetalle = this.asistencias.filter(a => 
@@ -3530,19 +3094,6 @@ class SistemaPlanillas {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
 
-    contarDiasTotalesPeriodo(fechaInicio, fechaFin) {
-        // Contar todos los días entre fechaInicio y fechaFin (incluyendo festivos)
-        const inicio = new Date(fechaInicio + 'T00:00:00');
-        const fin = new Date(fechaFin + 'T00:00:00');
-        let diasTotal = 0;
-        
-        for (let fecha = new Date(inicio); fecha <= fin; fecha.setDate(fecha.getDate() + 1)) {
-            diasTotal++;
-        }
-        
-        return diasTotal;
-    }
-
     contarDiasLaborados(empleadoId, fechaInicio, fechaFin) {
         // Obtener todas las asistencias del empleado en el período
         const asistencias = this.asistencias.filter(a => 
@@ -3551,18 +3102,38 @@ class SistemaPlanillas {
             a.fecha <= fechaFin
         );
         
-        // Contar días laborados (excluyendo ausencias e incapacidades INS)
+        // Contar días laborados según el tipo de asistencia
         let diasLaborados = 0;
         
         asistencias.forEach(asist => {
-            // Contar solo los tipos que representan días trabajados
-            if (asist.tipo === 'presente' || 
-                asist.tipo === 'tardanza' || 
-                asist.tipo === 'permiso' || 
-                asist.tipo === 'vacaciones') {
+            if (asist.tipo === 'presente') {
+                // Día trabajado normalmente
+                diasLaborados++;
+            } else if (asist.tipo === 'ausencia') {
+                // Solo contar como día laborado si tiene horas especificadas (ausencia parcial)
+                const horas = parseFloat(asist.horas || 0);
+                if (horas > 0) {
+                    diasLaborados++;
+                }
+                // Si no tiene horas (ausencia completa), no cuenta como día laborado
+            } else if (asist.tipo === 'permiso') {
+                // Solo contar como día laborado si tiene horas especificadas (permiso parcial)
+                const horas = parseFloat(asist.horas || 0);
+                if (horas > 0) {
+                    diasLaborados++;
+                }
+                // Si no tiene horas (permiso completo), no cuenta como día laborado
+            } else if (asist.tipo === 'tardanza') {
+                // Tardanza cuenta como día laborado
+                diasLaborados++;
+            } else if (asist.tipo === 'vacaciones') {
+                // Vacaciones cuenta como día laborado
+                diasLaborados++;
+            } else if (asist.tipo === 'incapacidad_ccss') {
+                // Incapacidad CCSS cuenta como día laborado
                 diasLaborados++;
             }
-            // NO contar: ausencia, incapacidad_ins, incapacidad_ccss
+            // incapacidad_ins y libre no cuentan como días laborados
         });
         
         return diasLaborados;
@@ -4396,22 +3967,6 @@ class SistemaPlanillas {
             this.aplicarFiltrosEmpleados();
         });
 
-        // Búsqueda de empleados en planillas
-        document.getElementById('buscarEmpleadoPlanilla')?.addEventListener('input', (e) => {
-            this.recalcularPlanillaConFiltros();
-        });
-
-        // Filtro por empresa en planillas
-        document.getElementById('filtroEmpresaPlanilla')?.addEventListener('change', () => {
-            this.recalcularPlanillaConFiltros();
-        });
-
-        // Botón limpiar búsqueda en planillas
-        document.getElementById('limpiarBusquedaPlanilla')?.addEventListener('click', () => {
-            document.getElementById('buscarEmpleadoPlanilla').value = '';
-            this.recalcularPlanillaConFiltros();
-        });
-
         // Botón limpiar filtros
         document.getElementById('btnLimpiarFiltros')?.addEventListener('click', () => {
             document.getElementById('searchEmpleado').value = '';
@@ -4574,7 +4129,6 @@ class SistemaPlanillas {
             const fechaFin = document.getElementById('fechaFinPlanilla').value;
             const empresaFiltro = document.getElementById('filtroEmpresaPlanilla').value;
             const tipoPlanilla = document.getElementById('tipoPlanilla').value;
-            const busquedaEmpleado = document.getElementById('buscarEmpleadoPlanilla')?.value || '';
 
             if (!fechaInicio || !fechaFin) {
                 notify.warning('Por favor seleccione las fechas de inicio y fin');
@@ -4583,7 +4137,7 @@ class SistemaPlanillas {
 
             // Aplicar impuesto de renta solo si es segunda planilla
             const aplicarImpuestoRenta = (tipoPlanilla === 'segunda');
-            const planilla = this.calcularPlanilla(periodo, fechaInicio, fechaFin, empresaFiltro, aplicarImpuestoRenta, busquedaEmpleado);
+            const planilla = this.calcularPlanilla(periodo, fechaInicio, fechaFin, empresaFiltro, aplicarImpuestoRenta);
             this.renderPlanilla(planilla);
         });
 

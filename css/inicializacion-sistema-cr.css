@@ -1,0 +1,202 @@
+/* ============================================
+   ESTILOS PARA INICIALIZACIÓN SISTEMA CR
+   ============================================ */
+
+/* Notificación de migración */
+.notificacion-migracion {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.notificacion-contenido {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.notificacion-icono {
+    font-size: 24px;
+    flex-shrink: 0;
+}
+
+.notificacion-texto h4 {
+    margin: 0 0 5px 0;
+    color: #155724;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.notificacion-texto p {
+    margin: 0;
+    color: #155724;
+    font-size: 14px;
+}
+
+.notificacion-cerrar {
+    background: none;
+    border: none;
+    font-size: 20px;
+    color: #155724;
+    cursor: pointer;
+    padding: 0;
+    margin-left: auto;
+    flex-shrink: 0;
+}
+
+.notificacion-cerrar:hover {
+    color: #0c3e1a;
+}
+
+/* Mensaje de bienvenida */
+.mensaje-bienvenida-cr {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.mensaje-contenido {
+    position: relative;
+}
+
+.mensaje-icono {
+    font-size: 48px;
+    text-align: center;
+    margin-bottom: 15px;
+}
+
+.mensaje-texto h3 {
+    margin: 0 0 10px 0;
+    color: #2c3e50;
+    font-size: 20px;
+    font-weight: 600;
+    text-align: center;
+}
+
+.mensaje-texto p {
+    margin: 0 0 15px 0;
+    color: #555;
+    font-size: 14px;
+    text-align: center;
+}
+
+.mensaje-texto ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.mensaje-texto li {
+    padding: 5px 0;
+    color: #27ae60;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.mensaje-cerrar {
+    position: absolute;
+    top: -10px;
+    right: -10px;
+    background: #e74c3c;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.mensaje-cerrar:hover {
+    background: #c0392b;
+}
+
+/* Error de inicialización */
+.error-inicializacion {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.error-contenido {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.error-icono {
+    font-size: 24px;
+    flex-shrink: 0;
+}
+
+.error-texto h4 {
+    margin: 0 0 5px 0;
+    color: #721c24;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.error-texto p {
+    margin: 0 0 5px 0;
+    color: #721c24;
+    font-size: 14px;
+}
+
+.error-texto small {
+    color: #721c24;
+    font-size: 12px;
+    font-style: italic;
+}
+
+/* Animaciones */
+@keyframes slideInRight {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes fadeInScale {
+    from {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0.8);
+    }
+    to {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+    }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .notificacion-migracion,
+    .error-inicializacion {
+        right: 10px;
+        left: 10px;
+        max-width: none;
+    }
+    
+    .mensaje-bienvenida-cr {
+        left: 10px;
+        right: 10px;
+        max-width: none;
+        transform: translateY(-50%);
+    }
+    
+    .mensaje-icono {
+        font-size: 36px;
+    }
+    
+    .mensaje-texto h3 {
+        font-size: 18px;
+    }
+}
+
+
+
+
+
+

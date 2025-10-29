@@ -26,18 +26,22 @@ function buildDays(periodType) {
 export async function renderPayrollView(root, { showToast }) {
   root.innerHTML = `
     <div class="panel-title">Planillas</div>
-    <div class="toolbar">
-      <label>Periodo</label>
-      <select id="period">
+    <div class="toolbar" style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center; padding: 16px; background: var(--bg-primary); border-radius: 8px; margin-bottom: 20px;">
+      <label style="font-weight: 600; color: var(--text-primary);">Periodo:</label>
+      <select id="period" style="padding: 8px 12px; border: 1px solid var(--gray-300); border-radius: 6px; font-size: 14px; background: white;">
         <option value="semanal">Semanal</option>
         <option value="quincenal">Quincenal</option>
         <option value="mensual">Mensual</option>
       </select>
-      <button id="recalc" class="btn">Calcular</button>
-      <button id="save-payroll" class="btn" style="background: var(--color-success);">Guardar Planilla</button>
-      <div class="spacer"></div>
-      <button id="export-xlsx" class="btn secondary">Exportar Excel</button>
-      <button id="export-pdf" class="btn secondary">Exportar PDF</button>
+      <button id="recalc" class="btn" style="padding: 8px 16px; background: var(--primary-color); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 500;">Calcular</button>
+      <button id="save-payroll" class="btn" style="padding: 8px 16px; background: var(--success-color); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 500;">Guardar Planilla</button>
+      <div class="spacer" style="flex: 1;"></div>
+      <div style="display: flex; align-items: center; position: relative;">
+        <i class="fas fa-search" style="position: absolute; left: 12px; color: #64748B; z-index: 1;"></i>
+        <input type="text" id="search-employee" placeholder="Buscar por nombre..." style="padding: 8px 12px 8px 38px; border: 1px solid #CBD5E1; border-radius: 6px; min-width: 280px; font-size: 14px; outline: none; transition: border-color 0.2s;" onfocus="this.style.borderColor='var(--primary-color)'" onblur="this.style.borderColor='#CBD5E1'" />
+      </div>
+      <button id="export-xlsx" class="btn secondary" style="padding: 8px 16px; background: var(--gray-200); color: var(--text-primary); border: none; border-radius: 6px; cursor: pointer; font-weight: 500;">Exportar Excel</button>
+      <button id="export-pdf" class="btn secondary" style="padding: 8px 16px; background: var(--gray-200); color: var(--text-primary); border: none; border-radius: 6px; cursor: pointer; font-weight: 500;">Exportar PDF</button>
     </div>
 
     <div class="card">
@@ -60,8 +64,10 @@ export async function renderPayrollView(root, { showToast }) {
 
   const tbody = root.querySelector('#payroll-table tbody');
   const periodSel = root.querySelector('#period');
+  const searchInput = root.querySelector('#search-employee');
 
   let employees = await storage.listEmployees();
+  let searchTerm = '';
   
   // Migrar empleados existentes para agregar campo de email si no existe
   const needsMigration = employees.some(emp => emp.email === undefined);
@@ -118,8 +124,15 @@ export async function renderPayrollView(root, { showToast }) {
     const period = periodSel.value;
     const days = buildDays(period);
 
+    // Filtrar empleados basado en el término de búsqueda
+    const filteredEmployees = searchTerm.trim() === '' 
+      ? employees 
+      : employees.filter(emp => 
+          emp.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          emp.id?.toLowerCase().includes(searchTerm.toLowerCase())
+        );
 
-    const rows = employees.map(emp => {
+    const rows = filteredEmployees.map(emp => {
       // Merge attendance into days (if any)
       const attendance = allAttendance.filter(a => a.employeeId === emp.id);
       const dayMap = Object.fromEntries(days.map(d => [d.date, { ...d }]));
@@ -165,6 +178,12 @@ export async function renderPayrollView(root, { showToast }) {
   root.querySelector('#recalc').addEventListener('click', () => { 
     lastCalculatedRows = recalc(); 
     showToast('Planilla recalculada'); 
+  });
+
+  // Agregar evento de búsqueda
+  searchInput.addEventListener('input', (e) => {
+    searchTerm = e.target.value;
+    recalc();
   });
 
   root.querySelector('#save-payroll').addEventListener('click', async () => {
