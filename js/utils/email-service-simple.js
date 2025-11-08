@@ -746,6 +746,195 @@ class EmailServiceSimple {
     }
 
     /**
+     * Envía felicitación de cumpleaños por email
+     * @param {Object} empleado - Datos del empleado
+     * @returns {Promise<Object>} Resultado del envío
+     */
+    async enviarCumpleanos(empleado) {
+        try {
+            // Verificar configuración
+            if (!this.verificarConfiguracion()) {
+                throw new Error('EmailJS no está configurado correctamente');
+            }
+
+            // Obtener nombre de la empresa (usar la del empleado o una por defecto)
+            const nombreEmpresa = empleado.empresa || 'San Martin de Porres';
+            
+            // Generar HTML del email de cumpleaños
+            const htmlCumpleanos = this.generarHTMLCumpleanos(empleado, nombreEmpresa);
+
+            // Preparar parámetros para EmailJS
+            const templateParams = {
+                to_email: empleado.correo,
+                to_name: empleado.nombre,
+                from_name: 'Equipo de Recursos Humanos',
+                subject: `🎉 ¡Feliz cumpleaños, ${empleado.nombre}!`,
+                message_html: htmlCumpleanos,
+                empleado_nombre: empleado.nombre,
+                empresa: nombreEmpresa
+            };
+
+            console.log('=== Enviando email de cumpleaños ===');
+            console.log('Parámetros:', {
+                to_email: templateParams.to_email,
+                to_name: templateParams.to_name,
+                empleado_nombre: templateParams.empleado_nombre,
+                empresa: templateParams.empresa
+            });
+
+            // Inicializar EmailJS
+            emailjs.init(window.EMAILJS_CONFIG.USER_ID);
+
+            // Usar template específico para cumpleaños
+            const templateIdCumpleanos = window.EMAILJS_CONFIG.TEMPLATE_ID_CUMPLEANOS || window.EMAILJS_CONFIG.TEMPLATE_ID;
+            
+            const response = await emailjs.send(
+                window.EMAILJS_CONFIG.SERVICE_ID,
+                templateIdCumpleanos,
+                templateParams
+            );
+
+            return {
+                success: response.status === 200,
+                messageId: response.text
+            };
+
+        } catch (error) {
+            console.error('Error enviando felicitación de cumpleaños:', error);
+            return {
+                success: false,
+                error: error.message
+            };
+        }
+    }
+
+    /**
+     * Genera el HTML del email de cumpleaños basado en cumple.html
+     * @param {Object} empleado - Datos del empleado
+     * @param {string} nombreEmpresa - Nombre de la empresa/veterinaria
+     * @returns {string} HTML del email
+     */
+    generarHTMLCumpleanos(empleado, nombreEmpresa) {
+        const safeHTML = (val) => {
+            if (val === null || val === undefined) return '';
+            return String(val).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        };
+
+        const nombreEmpleado = safeHTML(empleado.nombre);
+        const empresa = safeHTML(nombreEmpresa);
+
+        return `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>🎉 ¡Feliz cumpleaños!</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background: #e0f7fa;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      color: #333;
+    }
+
+    .email-wrapper {
+      max-width: 650px;
+      margin: 30px auto;
+      background: #ffffff;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      overflow: hidden;
+    }
+
+    .header {
+      background-color: #b3e5fc;
+      padding: 30px 20px;
+      text-align: center;
+      color: #01579b;
+    }
+
+    .header h1 {
+      margin: 0;
+      font-size: 28px;
+      line-height: 1.2;
+    }
+
+    .confetti {
+      font-size: 36px;
+      margin-bottom: 10px;
+    }
+
+    .content {
+      padding: 30px 25px;
+    }
+
+    .content h2 {
+      color: #0277bd;
+    }
+
+    .content p {
+      font-size: 16px;
+      line-height: 1.6;
+      margin-bottom: 20px;
+    }
+
+    .quote {
+      background: #e1f5fe;
+      padding: 15px 20px;
+      border-left: 5px solid #03a9f4;
+      font-style: italic;
+      color: #444;
+      margin: 30px 0;
+      border-radius: 6px;
+    }
+
+    .footer {
+      background-color: #f1f9ff;
+      text-align: center;
+      padding: 20px;
+      font-size: 14px;
+      color: #666;
+    }
+
+    .footer strong {
+      color: #0288d1;
+    }
+  </style>
+</head>
+<body>
+  <div class="email-wrapper">
+    <div class="header">
+      <div class="confetti">🎉🐾🎂</div>
+      <h1>¡Feliz cumpleaños, ${nombreEmpleado}!</h1>
+      <p>Hoy celebramos a alguien muy especial del equipo 💙</p>
+    </div>
+    <div class="content">
+      <h2>Gracias por cuidar cada vida con tanto amor 🐶🐱</h2>
+
+      <p>En este día tan especial, todo el equipo de <strong>${empresa}</strong> quiere hacerte llegar un enorme abrazo lleno de gratitud y buenos deseos.</p>
+
+      <p>Tu dedicación diaria no solo mejora la vida de nuestros pacientes peludos, sino también de todos los que trabajamos a tu lado. ¡Sos parte esencial de nuestra manada!</p>
+
+      <div class="quote">
+        "Quienes cuidan con el corazón, merecen celebraciones con el alma."<br>
+        ¡Hoy te celebramos a vos!
+      </div>
+
+      <p>Que tengas un cumpleaños lleno de alegría, cariño, salud y muchos momentos felices humanos y peluditos por igual.</p>
+
+      <p>¡Disfrutá tu día, y gracias por ser parte de esta gran familia veterinaria! 🐾🎉</p>
+    </div>
+    <div class="footer">
+      Con cariño,<br>
+      <strong>Equipo de Recursos Humanos</strong><br>
+      ${empresa}
+    </div>
+  </div>
+</body>
+</html>`;
+    }
+
+    /**
      * Función de prueba simple para diagnosticar errores de EmailJS
      */
     async enviarPruebaSimple() {

@@ -487,6 +487,13 @@ const EmpleadosModule = {
                                 </div>
 
                                 <div class="form-group">
+                                    <label class="form-label">Fecha de Nacimiento</label>
+                                    <input type="date" id="fechaNacimiento" class="form-control" 
+                                        value="${empleado && empleado.fechaNacimiento ? Formatters.formatearFechaInput(empleado.fechaNacimiento) : ''}">
+                                    <div class="form-help">Para envío automático de felicitaciones de cumpleaños</div>
+                                </div>
+
+                                <div class="form-group">
                                     <label class="form-label">Estado <span class="text-red-500">*</span></label>
                                     <select id="estado" class="form-control" required>
                                         <option value="activo" ${empleado?.estado === 'activo' ? 'selected' : ''}>Activo</option>
@@ -700,12 +707,23 @@ const EmpleadosModule = {
                 salarioMensual = salarioHorarioInput * jornada.horasPorMes;
             }
 
+            const fechaNacimientoInput = document.getElementById('fechaNacimiento').value;
+            // Crear fecha usando componentes locales para evitar problemas de zona horaria
+            let fechaNacimiento = null;
+            if (fechaNacimientoInput) {
+                const [ano, mes, dia] = fechaNacimientoInput.split('-').map(Number);
+                // Crear fecha en hora local (mes es 0-indexed en JavaScript)
+                const fechaLocal = new Date(ano, mes - 1, dia);
+                fechaNacimiento = fechaLocal.getTime();
+            }
+
             const datosEmpleado = {
                 nombre: document.getElementById('nombre').value.trim(),
                 cedula: document.getElementById('cedula').value.trim(),
                 correo: document.getElementById('correo').value.trim(),
                 telefono: document.getElementById('telefono').value.trim(),
                 fechaIngreso: new Date(document.getElementById('fechaIngreso').value).getTime(),
+                fechaNacimiento: fechaNacimiento,
                 salarioMensual: salarioMensual,
                 salarioHorario: salarioHorarioInput || null, // Guardar como referencia
                 jornada: jornadaCodigo,
@@ -823,6 +841,7 @@ const EmpleadosModule = {
                                 <div><span class="font-medium">Correo:</span> ${empleado.correo}</div>
                                 <div><span class="font-medium">Teléfono:</span> ${Formatters.formatearTelefono(empleado.telefono)}</div>
                                 <div><span class="font-medium">Ingreso:</span> ${Formatters.formatearFechaLarga(empleado.fechaIngreso)}</div>
+                                <div><span class="font-medium">Nacimiento:</span> ${empleado.fechaNacimiento ? Formatters.formatearFechaLarga(empleado.fechaNacimiento) : 'No registrada'}</div>
                                 <div><span class="font-medium">Estado:</span> ${Formatters.formatearEstadoBadge(empleado.estado)}</div>
                             </div>
                         </div>

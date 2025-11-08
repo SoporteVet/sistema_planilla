@@ -48,25 +48,20 @@ const AguinaldosModule = {
             config.push({ id, label, start, end, orden: orden++ });
         };
 
-        addConfig(
-            `${prevYear}-nov-q2`,
-            `Noviembre ${prevYear} (16-30)`,
-            new Date(prevYear, 10, 16),
-            new Date(prevYear, 10, 30)
-        );
-
+        // Período de aguinaldo: Diciembre del año anterior a Noviembre del año actual
         const mesesSecuencia = [
-            { year: prevYear, month: 11 },
-            { year: año, month: 0 },
-            { year: año, month: 1 },
-            { year: año, month: 2 },
-            { year: año, month: 3 },
-            { year: año, month: 4 },
-            { year: año, month: 5 },
-            { year: año, month: 6 },
-            { year: año, month: 7 },
-            { year: año, month: 8 },
-            { year: año, month: 9 }
+            { year: prevYear, month: 11 }, // Diciembre del año anterior
+            { year: año, month: 0 },       // Enero
+            { year: año, month: 1 },       // Febrero
+            { year: año, month: 2 },       // Marzo
+            { year: año, month: 3 },       // Abril
+            { year: año, month: 4 },       // Mayo
+            { year: año, month: 5 },       // Junio
+            { year: año, month: 6 },       // Julio
+            { year: año, month: 7 },       // Agosto
+            { year: año, month: 8 },       // Septiembre
+            { year: año, month: 9 },       // Octubre
+            { year: año, month: 10 }       // Noviembre del año actual
         ];
 
         mesesSecuencia.forEach(({ year, month }) => {
@@ -79,13 +74,6 @@ const AguinaldosModule = {
                 end
             );
         });
-
-        addConfig(
-            `${año}-nov-q1`,
-            `Noviembre ${año} (1-15)`,
-            new Date(año, 10, 1),
-            new Date(año, 10, 15)
-        );
 
         return config;
     },
@@ -165,7 +153,7 @@ const AguinaldosModule = {
                         <div class="text-xl font-bold text-blue-700">${Formatters.formatearMoneda(totalBruto)}</div>
                         <div class="text-sm text-gray-500">Aguinaldo proyectado</div>
                         <div class="text-lg font-semibold text-green-600">${Formatters.formatearMoneda(aguinaldo)}</div>
-                        <div class="text-xs text-gray-400">Periodos con monto: ${periodosConMonto}/13</div>
+                        <div class="text-xs text-gray-400">Periodos con monto: ${periodosConMonto}/12</div>
                     </div>
                 </div>
                 <div class="table-container">
@@ -240,7 +228,7 @@ const AguinaldosModule = {
                 <div class="flex justify-between items-center">
                     <div>
                         <h1 class="text-2xl font-bold text-gray-800">Aguinaldos</h1>
-                        <p class="text-sm text-gray-600 mt-1">Gestione los salarios brutos del período de aguinaldo (16 Nov ${this.añoActual - 1} al 15 Nov ${this.añoActual}).</p>
+                        <p class="text-sm text-gray-600 mt-1">Gestione los salarios brutos del período de aguinaldo (Dic ${this.añoActual - 1} a Nov ${this.añoActual}).</p>
                     </div>
                     <div class="flex gap-4">
                         <select id="selectEmpleado" class="form-control">

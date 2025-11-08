@@ -7,8 +7,12 @@ const EMAILJS_CONFIG = {
     // ID del servicio de email (Service ID)
     SERVICE_ID: 'service_aupbtwq',
     
-    // ID de la plantilla de email (Template ID)
+    // ID de la plantilla de email para comprobantes (Template ID)
     TEMPLATE_ID: 'template_t0p0r4w',
+    
+    // ID de la plantilla de email para cumpleaños (Template ID)
+    // IMPORTANTE: Crea una nueva plantilla en EmailJS y reemplaza este valor
+    TEMPLATE_ID_CUMPLEANOS: 'template_qag1084',
     
     // URL base para descarga de PDFs (puede ser tu servidor o un servicio de almacenamiento)
     PDF_DOWNLOAD_BASE_URL: window.location.origin

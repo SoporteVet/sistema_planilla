@@ -66,10 +66,19 @@ const Formatters = {
     formatearFecha(fecha) {
         if (!fecha) return '-';
         
-        const fechaObj = fecha instanceof Date ? fecha : new Date(fecha);
+        let fechaObj;
+        if (fecha instanceof Date) {
+            fechaObj = fecha;
+        } else if (typeof fecha === 'number') {
+            // Si es un timestamp, crear Date y usar métodos locales
+            fechaObj = new Date(fecha);
+        } else {
+            fechaObj = new Date(fecha);
+        }
         
         if (isNaN(fechaObj.getTime())) return '-';
         
+        // Usar métodos locales para evitar problemas de zona horaria
         const dia = String(fechaObj.getDate()).padStart(2, '0');
         const mes = String(fechaObj.getMonth() + 1).padStart(2, '0');
         const ano = fechaObj.getFullYear();
@@ -85,7 +94,15 @@ const Formatters = {
     formatearFechaLarga(fecha) {
         if (!fecha) return '-';
         
-        const fechaObj = fecha instanceof Date ? fecha : new Date(fecha);
+        let fechaObj;
+        if (fecha instanceof Date) {
+            fechaObj = fecha;
+        } else if (typeof fecha === 'number') {
+            // Si es un timestamp, crear Date y usar métodos locales
+            fechaObj = new Date(fecha);
+        } else {
+            fechaObj = new Date(fecha);
+        }
         
         if (isNaN(fechaObj.getTime())) return '-';
         
@@ -94,6 +111,7 @@ const Formatters = {
             'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'
         ];
         
+        // Usar métodos locales para evitar problemas de zona horaria
         const dia = fechaObj.getDate();
         const mes = meses[fechaObj.getMonth()];
         const ano = fechaObj.getFullYear();
@@ -109,10 +127,19 @@ const Formatters = {
     formatearFechaInput(fecha) {
         if (!fecha) return '';
         
-        const fechaObj = fecha instanceof Date ? fecha : new Date(fecha);
+        let fechaObj;
+        if (fecha instanceof Date) {
+            fechaObj = fecha;
+        } else if (typeof fecha === 'number') {
+            // Si es un timestamp, crear Date y usar métodos locales
+            fechaObj = new Date(fecha);
+        } else {
+            fechaObj = new Date(fecha);
+        }
         
         if (isNaN(fechaObj.getTime())) return '';
         
+        // Usar métodos locales para evitar problemas de zona horaria
         const ano = fechaObj.getFullYear();
         const mes = String(fechaObj.getMonth() + 1).padStart(2, '0');
         const dia = String(fechaObj.getDate()).padStart(2, '0');
