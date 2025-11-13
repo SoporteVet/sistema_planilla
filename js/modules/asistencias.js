@@ -513,6 +513,7 @@ const AsistenciasModule = {
             }
 
             // Guardar todas las nuevas asistencias
+            // Permitir fechas futuras para períodos quincenales completos
             let guardadas = 0;
             for (const asistencia of asistenciasAGuardar) {
                 try {
@@ -529,11 +530,13 @@ const AsistenciasModule = {
                             observaciones: asistencia.observaciones,
                             jornadaEmpleado: this.empleadoSeleccionado.jornada,
                             horasNormalesEsperadas: jornada.horasPorDia
-                        }
+                        },
+                        true // Permitir fechas futuras para períodos quincenales
                     );
                     guardadas++;
                 } catch (error) {
                     console.error(`Error guardando asistencia para ${asistencia.fechaKey}:`, error);
+                    Utils.showToast(`Error guardando asistencia para ${asistencia.fechaKey}: ${error.message}`, 'error');
                 }
             }
 

@@ -373,9 +373,10 @@ const FirebaseHelpers = {
      * @param {string} empleadoId - ID del empleado
      * @param {string} fecha - Fecha (YYYYMMDD)
      * @param {object} asistencia - Datos de asistencia
+     * @param {boolean} permitirFutura - Si permite fechas futuras (útil para períodos quincenales)
      * @returns {Promise}
      */
-    async registrarAsistencia(empleadoId, fecha, asistencia) {
+    async registrarAsistencia(empleadoId, fecha, asistencia, permitirFutura = false) {
         // Convertir fechaKey (YYYYMMDD) a objeto Date para validación
         let fechaParaValidar = fecha;
         if (typeof fecha === 'string' && /^\d{8}$/.test(fecha)) {
@@ -386,7 +387,7 @@ const FirebaseHelpers = {
             fechaParaValidar = new Date(ano, mes, dia);
         }
 
-        const validacion = Validators.validarAsistencia({ ...asistencia, empleadoId, fecha: fechaParaValidar });
+        const validacion = Validators.validarAsistencia({ ...asistencia, empleadoId, fecha: fechaParaValidar }, permitirFutura);
         if (!validacion.valido) {
             throw new Error('Datos de asistencia inválidos: ' + JSON.stringify(validacion.errores));
         }

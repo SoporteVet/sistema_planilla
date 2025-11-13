@@ -782,10 +782,35 @@ const PlanillasModule = {
             // Usar rebajos por horas de datosPlanilla si está disponible
             const rebajosPorHoras = datosPlanilla.rebajosPorHoras || { total: 0, horasFaltantes: 0, detalles: [] };
             
+            // Calcular días trabajados ajustados según horas realmente trabajadas
+            let diasTrabajadosAjustados = datosPlanilla.diasTrabajados || 0;
+            if (rebajosPorHoras.horasFaltantes > 0) {
+                // Si hay horas faltantes, calcular días trabajados basándose en horas realmente trabajadas
+                const jornada = CONFIG.getJornadaByCodigo(empleado.jornada);
+                const horasEsperadasQuincenales = jornada.horasPorQuincena;
+                const horasRealmenteTrabajadas = horasEsperadasQuincenales - rebajosPorHoras.horasFaltantes;
+                
+                // Para jornadas acumulativas, usar el promedio de horas por día
+                // Para jornadas normales, usar las horas por día fijas
+                let horasPorDiaPromedio = jornada.horasPorDia;
+                if (jornada.horasPorDiaMin !== undefined && jornada.horasPorDiaMax !== undefined) {
+                    // Jornada acumulativa: usar promedio entre min y max
+                    horasPorDiaPromedio = (jornada.horasPorDiaMin + jornada.horasPorDiaMax) / 2;
+                } else if (jornada.horasPorDiaMin !== undefined && jornada.horasPorDiaMin !== null) {
+                    // Si solo hay min, usar el promedio entre min y el valor por defecto
+                    horasPorDiaPromedio = (jornada.horasPorDiaMin + jornada.horasPorDia) / 2;
+                }
+                
+                // Calcular días trabajados: horas trabajadas / horas por día promedio
+                diasTrabajadosAjustados = horasRealmenteTrabajadas / horasPorDiaPromedio;
+                // Redondear a 2 decimales para mostrar
+                diasTrabajadosAjustados = Math.round(diasTrabajadosAjustados * 100) / 100;
+            }
+            
             const calculos = {
                 salarioBaseMensual: datosPlanilla.salarioBaseMensual || empleado.salarioMensual,
                 salarioDiario: datosPlanilla.salarioDiario || Calculations.calcularSalarioDiario(empleado.salarioMensual, empleado.jornada),
-                diasTrabajados: datosPlanilla.diasTrabajados || 0,
+                diasTrabajados: diasTrabajadosAjustados,
                 salarioBase: datosPlanilla.salarioBruto || 0,
                 subtotalQuincenal: subtotalQuincenal,
                 horasExtra: datosPlanilla.horasExtra || 0,
@@ -952,10 +977,35 @@ const PlanillasModule = {
             // Usar rebajos por horas de datosPlanilla si está disponible
             const rebajosPorHoras = datosPlanilla.rebajosPorHoras || { total: 0, horasFaltantes: 0, detalles: [] };
             
+            // Calcular días trabajados ajustados según horas realmente trabajadas
+            let diasTrabajadosAjustados = datosPlanilla.diasTrabajados || 0;
+            if (rebajosPorHoras.horasFaltantes > 0) {
+                // Si hay horas faltantes, calcular días trabajados basándose en horas realmente trabajadas
+                const jornada = CONFIG.getJornadaByCodigo(empleadoEncontrado.jornada);
+                const horasEsperadasQuincenales = jornada.horasPorQuincena;
+                const horasRealmenteTrabajadas = horasEsperadasQuincenales - rebajosPorHoras.horasFaltantes;
+                
+                // Para jornadas acumulativas, usar el promedio de horas por día
+                // Para jornadas normales, usar las horas por día fijas
+                let horasPorDiaPromedio = jornada.horasPorDia;
+                if (jornada.horasPorDiaMin !== undefined && jornada.horasPorDiaMax !== undefined) {
+                    // Jornada acumulativa: usar promedio entre min y max
+                    horasPorDiaPromedio = (jornada.horasPorDiaMin + jornada.horasPorDiaMax) / 2;
+                } else if (jornada.horasPorDiaMin !== undefined && jornada.horasPorDiaMin !== null) {
+                    // Si solo hay min, usar el promedio entre min y el valor por defecto
+                    horasPorDiaPromedio = (jornada.horasPorDiaMin + jornada.horasPorDia) / 2;
+                }
+                
+                // Calcular días trabajados: horas trabajadas / horas por día promedio
+                diasTrabajadosAjustados = horasRealmenteTrabajadas / horasPorDiaPromedio;
+                // Redondear a 2 decimales para mostrar
+                diasTrabajadosAjustados = Math.round(diasTrabajadosAjustados * 100) / 100;
+            }
+            
             const calculos = {
                 salarioBaseMensual: datosPlanilla.salarioBaseMensual || empleadoEncontrado.salarioMensual,
                 salarioDiario: datosPlanilla.salarioDiario || Calculations.calcularSalarioDiario(empleadoEncontrado.salarioMensual, empleadoEncontrado.jornada),
-                diasTrabajados: datosPlanilla.diasTrabajados || 0,
+                diasTrabajados: diasTrabajadosAjustados,
                 salarioBase: salarioBase > 0 ? salarioBase : subtotalQuincenal,
                 subtotalQuincenal: subtotalQuincenal,
                 horasExtra: datosPlanilla.horasExtra || 0,

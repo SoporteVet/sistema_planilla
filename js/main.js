@@ -166,9 +166,6 @@ const AppRouter = {
             case 'usuarios':
                 UsuariosModule.init();
                 break;
-            case 'cumpleanos':
-                CumpleanosModule.render();
-                break;
             default:
                 this.renderDashboard();
         }
@@ -313,7 +310,6 @@ document.addEventListener('DOMContentLoaded', () => {
     PlanillasModule.init();
     AguinaldosModule.init();
     FeriadosModule.init();
-    CumpleanosModule.init();
 
     console.log('Aplicación inicializada correctamente');
 });

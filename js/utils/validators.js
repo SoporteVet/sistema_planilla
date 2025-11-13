@@ -229,9 +229,10 @@ const Validators = {
     /**
      * Valida datos de asistencia
      * @param {object} asistencia - Datos de asistencia
+     * @param {boolean} permitirFutura - Si permite fechas futuras (útil para períodos quincenales)
      * @returns {object} { valido, errores }
      */
-    validarAsistencia(asistencia) {
+    validarAsistencia(asistencia, permitirFutura = false) {
         const errores = {};
         
         if (!asistencia.empleadoId) {
@@ -241,7 +242,7 @@ const Validators = {
         if (!asistencia.fecha) {
             errores.fecha = 'Fecha es obligatoria';
         } else {
-            const validacionFecha = this.validarFecha(asistencia.fecha, false);
+            const validacionFecha = this.validarFecha(asistencia.fecha, permitirFutura);
             if (!validacionFecha.valido) {
                 errores.fecha = validacionFecha.mensaje;
             }
