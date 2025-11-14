@@ -286,6 +286,16 @@ const AsistenciasModule = {
                         </div>
 
                         <div class="form-group">
+                            <label class="form-label">Días Trabajados (Manual)</label>
+                            <input type="number" id="diasTrabajadosQuincena" class="form-control" step="0.01" 
+                                min="0" max="15" 
+                                value="${asistenciasExistentes.find(a => a.diasTrabajadosManual !== undefined)?.diasTrabajadosManual || ''}">
+                            <div class="form-help">
+                                Ingrese manualmente los días trabajados que aparecerán en el comprobante de pago. Si se deja vacío, se calculará automáticamente.
+                            </div>
+                        </div>
+
+                        <div class="form-group">
                             <label class="form-label">Horas Extra</label>
                             <input type="number" id="horasExtraQuincena" class="form-control" step="0.25" min="0" 
                                 value="${horasExtraExistentes || 0}">
@@ -393,6 +403,7 @@ const AsistenciasModule = {
             const horasINS = parseFloat(document.getElementById('horasINSQuincena').value) || 0;
             const diasPermiso = parseFloat(document.getElementById('diasPermisoQuincena').value) || 0;
             const diasFeriados = parseFloat(document.getElementById('diasFeriadosQuincena').value) || 0;
+            const diasTrabajadosManual = document.getElementById('diasTrabajadosQuincena').value ? parseFloat(document.getElementById('diasTrabajadosQuincena').value) : null;
             const observaciones = document.getElementById('observacionesQuincena').value || '';
 
             if (horasTrabajadas < 0) {
@@ -515,22 +526,31 @@ const AsistenciasModule = {
             // Guardar todas las nuevas asistencias
             // Permitir fechas futuras para períodos quincenales completos
             let guardadas = 0;
-            for (const asistencia of asistenciasAGuardar) {
+            for (let i = 0; i < asistenciasAGuardar.length; i++) {
+                const asistencia = asistenciasAGuardar[i];
                 try {
+                    // Guardar días trabajados manual solo en la primera asistencia del período
+                    const datosAsistencia = {
+                        tipoDia: asistencia.tipoDia,
+                        horasTrabajadas: asistencia.horasTrabajadas,
+                        horasExtra: asistencia.horasExtra,
+                        horasAdicionales: asistencia.horasAdicionales || 0,
+                        diasCCSSEmpresa: asistencia.diasCCSSEmpresa,
+                        diasINSEmpresa: asistencia.diasINSEmpresa,
+                        observaciones: asistencia.observaciones,
+                        jornadaEmpleado: this.empleadoSeleccionado.jornada,
+                        horasNormalesEsperadas: jornada.horasPorDia
+                    };
+                    
+                    // Agregar días trabajados manual solo en la primera asistencia
+                    if (i === 0 && diasTrabajadosManual !== null && diasTrabajadosManual !== undefined) {
+                        datosAsistencia.diasTrabajadosManual = diasTrabajadosManual;
+                    }
+                    
                     await FirebaseHelpers.registrarAsistencia(
                         this.empleadoSeleccionado.id,
                         asistencia.fechaKey,
-                        {
-                            tipoDia: asistencia.tipoDia,
-                            horasTrabajadas: asistencia.horasTrabajadas,
-                            horasExtra: asistencia.horasExtra,
-                            horasAdicionales: asistencia.horasAdicionales || 0,
-                            diasCCSSEmpresa: asistencia.diasCCSSEmpresa,
-                            diasINSEmpresa: asistencia.diasINSEmpresa,
-                            observaciones: asistencia.observaciones,
-                            jornadaEmpleado: this.empleadoSeleccionado.jornada,
-                            horasNormalesEsperadas: jornada.horasPorDia
-                        },
+                        datosAsistencia,
                         true // Permitir fechas futuras para períodos quincenales
                     );
                     guardadas++;

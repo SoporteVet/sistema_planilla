@@ -371,6 +371,14 @@ const PlanillasModule = {
                     
                     console.log(`Asistencias encontradas para ${empleado.nombre}:`, asistencias.length);
 
+                // Verificar si hay un valor manual de días trabajados
+                let diasTrabajadosManual = null;
+                const asistenciaConDiasManual = asistencias.find(a => a.diasTrabajadosManual !== undefined && a.diasTrabajadosManual !== null);
+                if (asistenciaConDiasManual) {
+                    diasTrabajadosManual = asistenciaConDiasManual.diasTrabajadosManual;
+                    console.log(`Días trabajados manual encontrados para ${empleado.nombre}: ${diasTrabajadosManual}`);
+                }
+
                 // Calcular datos de asistencia
                 let diasTrabajados = 0;
                 let horasExtra = 0;
@@ -383,18 +391,26 @@ const PlanillasModule = {
                 let diasLibresTrabajados = 0;
                 let horasDiasLibres = 0;
 
+                // Procesar todas las asistencias para calcular días especiales, horas extra, etc.
                 asistencias.forEach(asist => {
+                    // Calcular días trabajados solo si no hay valor manual
+                    if (diasTrabajadosManual === null || diasTrabajadosManual === undefined) {
+                        switch (asist.tipoDia) {
+                            case CONFIG.TIPOS_DIA.NORMAL:
+                                diasTrabajados++;
+                                break;
+                            case CONFIG.TIPOS_DIA.DIA_LIBRE:
+                                // Los días libres también se cuentan para el cálculo (se pagan como día completo)
+                                diasTrabajados++;
+                                break;
+                            case CONFIG.TIPOS_DIA.INCOMPLETO:
+                                diasTrabajados++; // Se ajusta en el cálculo
+                                break;
+                        }
+                    }
+                    
+                    // Calcular días especiales (siempre se calculan)
                     switch (asist.tipoDia) {
-                        case CONFIG.TIPOS_DIA.NORMAL:
-                            diasTrabajados++;
-                            break;
-                        case CONFIG.TIPOS_DIA.DIA_LIBRE:
-                            // Los días libres también se cuentan para el cálculo (se pagan como día completo)
-                            diasTrabajados++;
-                            break;
-                        case CONFIG.TIPOS_DIA.INCOMPLETO:
-                            diasTrabajados++; // Se ajusta en el cálculo
-                            break;
                         case CONFIG.TIPOS_DIA.FERIADO_TRABAJADO:
                             diasFeriados++;
                             break;
@@ -427,6 +443,8 @@ const PlanillasModule = {
                             diasPermiso++;
                             break;
                     }
+                    
+                    // Calcular horas extra y adicionales (siempre se calculan)
                     horasExtra += asist.horasExtra || 0;
                     const horasAdicionalesDia = asist.horasAdicionales || 0;
                     horasAdicionales += horasAdicionalesDia;
@@ -434,6 +452,12 @@ const PlanillasModule = {
                         console.log(`Horas adicionales encontradas para ${empleado.nombre} en fecha ${asist.fecha}: ${horasAdicionalesDia}`);
                     }
                 });
+                
+                // Si hay días trabajados manual, usarlo en lugar del cálculo automático
+                if (diasTrabajadosManual !== null && diasTrabajadosManual !== undefined) {
+                    diasTrabajados = diasTrabajadosManual;
+                    console.log(`Usando días trabajados manual para ${empleado.nombre}: ${diasTrabajados}`);
+                }
                 
                 console.log(`Total horas adicionales para ${empleado.nombre}: ${horasAdicionales}`);
 
@@ -782,35 +806,10 @@ const PlanillasModule = {
             // Usar rebajos por horas de datosPlanilla si está disponible
             const rebajosPorHoras = datosPlanilla.rebajosPorHoras || { total: 0, horasFaltantes: 0, detalles: [] };
             
-            // Calcular días trabajados ajustados según horas realmente trabajadas
-            let diasTrabajadosAjustados = datosPlanilla.diasTrabajados || 0;
-            if (rebajosPorHoras.horasFaltantes > 0) {
-                // Si hay horas faltantes, calcular días trabajados basándose en horas realmente trabajadas
-                const jornada = CONFIG.getJornadaByCodigo(empleado.jornada);
-                const horasEsperadasQuincenales = jornada.horasPorQuincena;
-                const horasRealmenteTrabajadas = horasEsperadasQuincenales - rebajosPorHoras.horasFaltantes;
-                
-                // Para jornadas acumulativas, usar el promedio de horas por día
-                // Para jornadas normales, usar las horas por día fijas
-                let horasPorDiaPromedio = jornada.horasPorDia;
-                if (jornada.horasPorDiaMin !== undefined && jornada.horasPorDiaMax !== undefined) {
-                    // Jornada acumulativa: usar promedio entre min y max
-                    horasPorDiaPromedio = (jornada.horasPorDiaMin + jornada.horasPorDiaMax) / 2;
-                } else if (jornada.horasPorDiaMin !== undefined && jornada.horasPorDiaMin !== null) {
-                    // Si solo hay min, usar el promedio entre min y el valor por defecto
-                    horasPorDiaPromedio = (jornada.horasPorDiaMin + jornada.horasPorDia) / 2;
-                }
-                
-                // Calcular días trabajados: horas trabajadas / horas por día promedio
-                diasTrabajadosAjustados = horasRealmenteTrabajadas / horasPorDiaPromedio;
-                // Redondear a 2 decimales para mostrar
-                diasTrabajadosAjustados = Math.round(diasTrabajadosAjustados * 100) / 100;
-            }
-            
             const calculos = {
                 salarioBaseMensual: datosPlanilla.salarioBaseMensual || empleado.salarioMensual,
                 salarioDiario: datosPlanilla.salarioDiario || Calculations.calcularSalarioDiario(empleado.salarioMensual, empleado.jornada),
-                diasTrabajados: diasTrabajadosAjustados,
+                diasTrabajados: datosPlanilla.diasTrabajados || 0,
                 salarioBase: datosPlanilla.salarioBruto || 0,
                 subtotalQuincenal: subtotalQuincenal,
                 horasExtra: datosPlanilla.horasExtra || 0,
@@ -977,35 +976,10 @@ const PlanillasModule = {
             // Usar rebajos por horas de datosPlanilla si está disponible
             const rebajosPorHoras = datosPlanilla.rebajosPorHoras || { total: 0, horasFaltantes: 0, detalles: [] };
             
-            // Calcular días trabajados ajustados según horas realmente trabajadas
-            let diasTrabajadosAjustados = datosPlanilla.diasTrabajados || 0;
-            if (rebajosPorHoras.horasFaltantes > 0) {
-                // Si hay horas faltantes, calcular días trabajados basándose en horas realmente trabajadas
-                const jornada = CONFIG.getJornadaByCodigo(empleadoEncontrado.jornada);
-                const horasEsperadasQuincenales = jornada.horasPorQuincena;
-                const horasRealmenteTrabajadas = horasEsperadasQuincenales - rebajosPorHoras.horasFaltantes;
-                
-                // Para jornadas acumulativas, usar el promedio de horas por día
-                // Para jornadas normales, usar las horas por día fijas
-                let horasPorDiaPromedio = jornada.horasPorDia;
-                if (jornada.horasPorDiaMin !== undefined && jornada.horasPorDiaMax !== undefined) {
-                    // Jornada acumulativa: usar promedio entre min y max
-                    horasPorDiaPromedio = (jornada.horasPorDiaMin + jornada.horasPorDiaMax) / 2;
-                } else if (jornada.horasPorDiaMin !== undefined && jornada.horasPorDiaMin !== null) {
-                    // Si solo hay min, usar el promedio entre min y el valor por defecto
-                    horasPorDiaPromedio = (jornada.horasPorDiaMin + jornada.horasPorDia) / 2;
-                }
-                
-                // Calcular días trabajados: horas trabajadas / horas por día promedio
-                diasTrabajadosAjustados = horasRealmenteTrabajadas / horasPorDiaPromedio;
-                // Redondear a 2 decimales para mostrar
-                diasTrabajadosAjustados = Math.round(diasTrabajadosAjustados * 100) / 100;
-            }
-            
             const calculos = {
                 salarioBaseMensual: datosPlanilla.salarioBaseMensual || empleadoEncontrado.salarioMensual,
                 salarioDiario: datosPlanilla.salarioDiario || Calculations.calcularSalarioDiario(empleadoEncontrado.salarioMensual, empleadoEncontrado.jornada),
-                diasTrabajados: diasTrabajadosAjustados,
+                diasTrabajados: datosPlanilla.diasTrabajados || 0,
                 salarioBase: salarioBase > 0 ? salarioBase : subtotalQuincenal,
                 subtotalQuincenal: subtotalQuincenal,
                 horasExtra: datosPlanilla.horasExtra || 0,
