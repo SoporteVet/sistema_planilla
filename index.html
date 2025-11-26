@@ -113,8 +113,8 @@
 
         <!-- Sidebar -->
         <aside id="sidebar"
-            class="fixed left-0 top-0 h-full w-64 bg-white shadow-lg z-40 transform transition-transform duration-300 -translate-x-full lg:translate-x-0">
-            <div class="p-6 border-b border-gray-200 flex items-center justify-between">
+            class="fixed left-0 top-0 h-full w-64 bg-white shadow-lg z-40 transform transition-transform duration-300 -translate-x-full lg:translate-x-0 flex flex-col">
+            <div class="p-6 border-b border-gray-200 flex items-center justify-between flex-shrink-0">
                 <div>
                     <h2 class="text-xl font-bold text-gray-800">Planify</h2>
                     <p class="text-sm text-gray-600">SMP</p>
@@ -128,7 +128,7 @@
                 </button>
             </div>
 
-            <nav class="p-4">
+            <nav class="p-4 overflow-y-auto flex-1">
                 <ul class="space-y-2">
                     <li>
                         <a href="#" data-view="dashboard"

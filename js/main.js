@@ -129,6 +129,43 @@ const AppRouter = {
     async navigate(view) {
         this.currentView = view;
 
+        // Mapeo de vistas a permisos requeridos
+        const viewPermissions = {
+            'dashboard': '*', // Todos pueden ver dashboard excepto operador_asistencia
+            'empleados': 'empleados',
+            'asistencias': 'asistencias',
+            'bonos': 'bonos',
+            'planillas': 'planillas',
+            'servicios-profesionales': 'servicios_profesionales',
+            'control-asistencia': 'control_asistencia',
+            'aguinaldos': 'aguinaldos',
+            'feriados': 'feriados',
+            'reportes': 'reportes',
+            'cumpleanos': 'cumpleanos',
+            'usuarios': 'usuarios'
+        };
+
+        // Operador de asistencia SOLO puede acceder a control-asistencia
+        if (FirebaseHelpers.currentUserRole === 'operador_asistencia') {
+            if (view !== 'control-asistencia') {
+                this.navigate('control-asistencia');
+                return;
+            }
+        } else {
+            // Para otros usuarios, validar permisos normalmente
+            const requiredPermission = viewPermissions[view];
+            const hasPermission = requiredPermission === '*' ||
+                FirebaseHelpers.tienePermiso(requiredPermission);
+
+            // Si no tiene permiso, redirigir
+            if (!hasPermission) {
+                console.warn(`Usuario sin permisos para: ${view}`);
+                Utils.showToast('No tiene permisos para acceder a este módulo', 'error');
+                this.navigate('dashboard');
+                return;
+            }
+        }
+
         // Actualizar enlaces activos del sidebar
         document.querySelectorAll('.nav-link').forEach(link => {
             link.classList.remove('active');

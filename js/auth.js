@@ -63,10 +63,26 @@ const Auth = {
             // Actualizar UI con datos de usuario
             this.updateUserUI(user, userProfile || { rol: CONFIG.ROLES.EMPLEADO });
 
-            // Cargar dashboard
-            if (window.AppRouter) {
-                window.AppRouter.navigate('dashboard');
-            }
+            // Cargar módulo apropiado según el rol (con delay para evitar conflictos)
+            setTimeout(() => {
+                if (window.AppRouter) {
+                    console.log('Navegando con rol:', FirebaseHelpers.currentUserRole);
+
+                    // Si es operador de asistencia, ir directo a control de asistencia
+                    if (FirebaseHelpers.currentUserRole === 'operador_asistencia') {
+                        // Limpiar cualquier hash en la URL que pueda interferir
+                        if (window.location.hash) {
+                            console.log('Limpiando hash:', window.location.hash);
+                            window.location.hash = '';
+                        }
+                        console.log('Redirigiendo a control-asistencia');
+                        window.AppRouter.navigate('control-asistencia');
+                    } else {
+                        console.log('Redirigiendo a dashboard');
+                        window.AppRouter.navigate('dashboard');
+                    }
+                }
+            }, 300); // Aumentado a 300ms para asegurar que todos los módulos se hayan inicializado
 
         } catch (error) {
             console.error('Error handling user login:', error);
@@ -260,21 +276,22 @@ const Auth = {
             const view = link.dataset.view;
             const requiredPermission = viewPermissions[view];
 
-            if (requiredPermission === '*' || permisos.includes(requiredPermission)) {
-                link.parentElement.style.display = '';
+            // Operador de asistencia SOLO ve control-asistencia
+            if (rol === 'operador_asistencia') {
+                if (view === 'control-asistencia') {
+                    link.parentElement.style.display = '';
+                } else {
+                    link.parentElement.style.display = 'none';
+                }
             } else {
-                link.parentElement.style.display = 'none';
+                // Para otros roles, validar normalmente
+                if (requiredPermission === '*' || permisos.includes(requiredPermission)) {
+                    link.parentElement.style.display = '';
+                } else {
+                    link.parentElement.style.display = 'none';
+                }
             }
         });
-
-        // Si es operador de asistencia, redirigir directamente al control
-        if (rol === 'operador_asistencia') {
-            setTimeout(() => {
-                if (window.AppRouter) {
-                    window.AppRouter.navigate('control-asistencia');
-                }
-            }, 100);
-        }
     },
 
     /**
