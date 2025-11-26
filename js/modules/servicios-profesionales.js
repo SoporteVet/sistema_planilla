@@ -122,20 +122,26 @@ const ServiciosProfesionalesModule = {
                 <div class="flex justify-between items-center">
                     <div>
                         <h1 class="text-2xl font-bold text-gray-800">Servicios Profesionales (SP)</h1>
-                        <p class="text-sm text-gray-600 mt-1">Registro de horas y pagos para empleados SP</p>
-                        <p class="text-xs text-blue-600 mt-1">
-                            <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                            </svg>
-                            Los registros se cargan automáticamente desde Control de Asistencia. También puedes registrar horas manualmente.
-                        </p>
+                        <p class="text-sm text-gray-600 mt-1">Bitácora de actividades y horas facturables registradas por el profesional.</p>
                     </div>
                     <button onclick="ServiciosProfesionalesModule.mostrarModalRegistro()" class="btn btn-primary">
                         <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
                         </svg>
-                        Registrar Horas
+                        Registrar Actividad
                     </button>
+                </div>
+
+                <!-- Disclaimer Legal -->
+                <div class="bg-blue-50 border-l-4 border-blue-400 p-4 rounded">
+                    <div class="flex items-start">
+                        <svg class="w-5 h-5 text-blue-400 mt-0.5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <p class="text-sm text-blue-800">
+                            <strong>Nota importante:</strong> Este módulo registra únicamente las actividades realizadas y la presencia física en las instalaciones, cuando aplica. No constituye control de jornada laboral. Los ingresos y salidas al edificio pueden generar registros de actividad para SP. Puedes editarlos o agregar actividades manualmente.
+                        </p>
+                    </div>
                 </div>
 
                 ${this.empleadosSP.length === 0 ? `
@@ -150,9 +156,9 @@ const ServiciosProfesionalesModule = {
                 <div class="card">
                     <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                         <div>
-                            <label class="form-label">Empleado</label>
+                            <label class="form-label">Profesional</label>
                             <select id="filtroEmpleado" class="form-control">
-                                <option value="">Todos los empleados</option>
+                                <option value="">Todos los profesionales</option>
                                 ${this.empleadosSP.map(e => `
                                     <option value="${e.id}" ${this.filtros.empleadoId === e.id ? 'selected' : ''}>${e.nombre} - ${Formatters.formatearCedula(e.cedula)}</option>
                                 `).join('')}
@@ -177,7 +183,7 @@ const ServiciosProfesionalesModule = {
                 <!-- Tabla de registros -->
                 <div class="card">
                     <div class="flex justify-between items-center mb-4">
-                        <h3 class="text-lg font-semibold text-gray-800">Registros de Horas</h3>
+                        <h3 class="text-lg font-semibold text-gray-800">Bitácora de Actividades</h3>
                     </div>
                     
                     <div class="table-container">
@@ -185,12 +191,12 @@ const ServiciosProfesionalesModule = {
                             <thead>
                                 <tr>
                                     <th>Fecha</th>
-                                    <th>Empleado</th>
-                                    <th>Hora Entrada</th>
-                                    <th>Hora Salida</th>
-                                    <th>Horas Trabajadas</th>
-                                    <th>Salario por Hora</th>
-                                    <th>Total a Pagar</th>
+                                    <th>Profesional</th>
+                                    <th>Inicio</th>
+                                    <th>Fin</th>
+                                    <th>Duración</th>
+                                    <th>Tarifa SP</th>
+                                    <th>Monto Estimado</th>
                                     <th>Acciones</th>
                                 </tr>
                             </thead>
@@ -223,7 +229,7 @@ const ServiciosProfesionalesModule = {
             return `
                 <tr>
                     <td colspan="8" class="text-center text-gray-500 py-8">
-                        No hay registros de horas
+                        No hay actividades registradas
                     </td>
                 </tr>
             `;
@@ -311,18 +317,18 @@ const ServiciosProfesionalesModule = {
 
         return `
             <div class="card">
-                <h3 class="text-lg font-semibold text-gray-800 mb-4">Resumen de Pagos</h3>
+                <h3 class="text-lg font-semibold text-gray-800 mb-4">Resumen por Profesional</h3>
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     ${empleadosConRegistros.map(resumen => `
                         <div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
                             <h4 class="font-semibold text-gray-800 mb-2">${resumen.empleado.nombre}</h4>
                             <div class="space-y-1 text-sm">
                                 <div class="flex justify-between">
-                                    <span class="text-gray-600">Total Horas:</span>
+                                    <span class="text-gray-600">Tiempo Registrado:</span>
                                     <span class="font-medium">${resumen.totalHoras.toFixed(2)} hrs</span>
                                 </div>
                                 <div class="flex justify-between">
-                                    <span class="text-gray-600">Total a Pagar:</span>
+                                    <span class="text-gray-600">Monto Estimado:</span>
                                     <span class="font-semibold text-green-600">${Formatters.formatearMoneda(resumen.totalPagar)}</span>
                                 </div>
                                 <div class="flex justify-between">
@@ -434,9 +440,9 @@ const ServiciosProfesionalesModule = {
 
                     <form id="formRegistroSP" class="p-6 space-y-6">
                         <div class="form-group">
-                            <label class="form-label">Empleado <span class="text-red-500">*</span></label>
+                            <label class="form-label">Profesional <span class="text-red-500">*</span></label>
                             <select id="empleadoId" class="form-control" required>
-                                <option value="">Seleccione un empleado</option>
+                                <option value="">Seleccione un profesional</option>
                                 ${this.empleadosSP.map(e => `
                                     <option value="${e.id}" ${registro?.empleadoId === e.id ? 'selected' : ''}>
                                         ${e.nombre} - ${Formatters.formatearCedula(e.cedula)}
@@ -454,13 +460,13 @@ const ServiciosProfesionalesModule = {
 
                         <div class="grid grid-cols-2 gap-4">
                             <div class="form-group">
-                                <label class="form-label">Hora de Entrada <span class="text-red-500">*</span></label>
+                                <label class="form-label">Inicio de Actividad <span class="text-red-500">*</span></label>
                                 <input type="time" id="horaEntrada" class="form-control" 
                                     value="${registro?.horaEntrada || ''}" required>
                             </div>
 
                             <div class="form-group">
-                                <label class="form-label">Hora de Salida <span class="text-red-500">*</span></label>
+                                <label class="form-label">Fin de Actividad <span class="text-red-500">*</span></label>
                                 <input type="time" id="horaSalida" class="form-control" 
                                     value="${registro?.horaSalida || ''}" required>
                             </div>
@@ -470,15 +476,15 @@ const ServiciosProfesionalesModule = {
                             <h4 class="font-semibold text-blue-800 mb-2">Vista Previa del Cálculo</h4>
                             <div class="space-y-1 text-sm">
                                 <div class="flex justify-between">
-                                    <span class="text-gray-600">Horas Trabajadas:</span>
+                                    <span class="text-gray-600">Duración:</span>
                                     <span class="font-medium" id="previewHoras">0.00 hrs</span>
                                 </div>
                                 <div class="flex justify-between">
-                                    <span class="text-gray-600">Salario por Hora:</span>
+                                    <span class="text-gray-600">Tarifa SP:</span>
                                     <span class="font-medium" id="previewSalarioHora">₡0.00</span>
                                 </div>
                                 <div class="flex justify-between">
-                                    <span class="text-gray-600">Total a Pagar:</span>
+                                    <span class="text-gray-600">Monto Estimado:</span>
                                     <span class="font-semibold text-green-600" id="previewTotal">₡0.00</span>
                                 </div>
                             </div>

@@ -46,7 +46,7 @@ const ControlAsistenciaModule = {
      * Renderiza la vista principal
      */
     async render() {
-        Utils.updateBreadcrumb(['Control de Asistencia']);
+        Utils.updateBreadcrumb(['Control de Acceso']);
 
         await this.cargarEmpleadosSP();
 
@@ -55,10 +55,24 @@ const ControlAsistenciaModule = {
                 <!-- Header -->
                 <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <div>
-                        <h1 class="text-2xl lg:text-3xl font-bold text-gray-800">Control de Asistencia</h1>
+                        <h1 class="text-2xl lg:text-3xl font-bold text-gray-800">Control de Acceso</h1>
+                        <p class="text-sm text-gray-600 mt-1">Ingreso / Salida del Edificio</p>
                     </div>
                     <div class="text-sm lg:text-base text-gray-600">
                         <span class="font-medium">Fecha:</span> ${Formatters.formatearFecha(new Date())}
+                    </div>
+                </div>
+
+                <!-- Disclaimer Legal -->
+                <div class="bg-blue-50 border-l-4 border-blue-400 p-4 rounded">
+                    <div class="flex items-start">
+                        <svg class="w-5 h-5 text-blue-400 mt-0.5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <p class="text-sm text-blue-800">
+                            <strong>Nota importante:</strong> Este registro no constituye control de jornada ni supervisión laboral. 
+                            Únicamente se administra el ingreso a las instalaciones por motivos de seguridad, control interno y trazabilidad.
+                        </p>
                     </div>
                 </div>
 
