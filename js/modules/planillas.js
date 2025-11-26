@@ -223,7 +223,7 @@ const PlanillasModule = {
         // Función para calcular fechas según tipo de período
         const calcularFechas = () => {
             const tipo = tipoPeriodo.value;
-            
+
             if (tipo === 'quincenal') {
                 if (!mesAno.value || !quincena.value) {
                     fechaInicio.value = '';
@@ -256,7 +256,7 @@ const PlanillasModule = {
                 const [ano, mes] = mesAno.value.split('-').map(Number);
                 const mesIndex = mes - 1;
                 const ultimoDia = new Date(ano, mesIndex + 1, 0).getDate();
-                
+
                 fechaInicio.value = `${ano}-${String(mes).padStart(2, '0')}-01`;
                 fechaFin.value = `${ano}-${String(mes).padStart(2, '0')}-${String(ultimoDia).padStart(2, '0')}`;
             }
@@ -265,12 +265,12 @@ const PlanillasModule = {
         // Configurar mes/año por defecto al mes actual
         const ahora = new Date();
         mesAno.value = `${ahora.getFullYear()}-${String(ahora.getMonth() + 1).padStart(2, '0')}`;
-        
+
         // Si es quincenal, seleccionar primera quincena por defecto
         if (tipoPeriodo.value === 'quincenal') {
             quincena.value = 'primera';
         }
-        
+
         calcularFechas();
 
         // Event listeners
@@ -302,8 +302,12 @@ const PlanillasModule = {
                 await this.cargarDatos();
             }
 
-            // Obtener empleados activos
-            const empleadosActivos = this.empleados.filter(e => e.estado === 'activo');
+            // Obtener empleados activos que NO sean de tipo SP (Servicios Profesionales)
+            // Los empleados SP se manejan en el módulo de Servicios Profesionales con pago por horas
+            const empleadosActivos = this.empleados.filter(e =>
+                e.estado === 'activo' &&
+                e.tipoEmpleado !== 'SP'
+            );
 
             if (empleadosActivos.length === 0) {
                 Utils.showToast('No hay empleados activos', 'warning');
@@ -327,30 +331,30 @@ const PlanillasModule = {
 
             // Obtener bonos y rebajos aprobados
             const bonosRebajos = await FirebaseHelpers.once(CONFIG.DB_PATHS.BONOS_REBAJOS);
-            const bonosRebajosArray = bonosRebajos ? Object.keys(bonosRebajos).map(k => ({id: k, ...bonosRebajos[k]})) : [];
-            
+            const bonosRebajosArray = bonosRebajos ? Object.keys(bonosRebajos).map(k => ({ id: k, ...bonosRebajos[k] })) : [];
+
             // Convertir fechas de la planilla a timestamps para comparación
             const fechaInicioTimestamp = new Date(fechaInicio).getTime();
             const fechaFinTimestamp = new Date(fechaFin).getTime();
-            
+
             // Filtrar bonos/rebajos aprobados cuya fecha de aplicación esté dentro del rango de la planilla
             const bonosRebajosAprobados = bonosRebajosArray.filter(br => {
                 if (br.estado !== 'aprobado') return false;
-                
+
                 // Si tiene fechaAplicacion, verificar que esté en el rango
                 if (br.fechaAplicacion) {
-                    const fechaAplicacionTimestamp = typeof br.fechaAplicacion === 'number' 
-                        ? br.fechaAplicacion 
+                    const fechaAplicacionTimestamp = typeof br.fechaAplicacion === 'number'
+                        ? br.fechaAplicacion
                         : new Date(br.fechaAplicacion).getTime();
-                    return fechaAplicacionTimestamp >= fechaInicioTimestamp && 
-                           fechaAplicacionTimestamp <= fechaFinTimestamp;
+                    return fechaAplicacionTimestamp >= fechaInicioTimestamp &&
+                        fechaAplicacionTimestamp <= fechaFinTimestamp;
                 }
-                
+
                 // Si no tiene fechaAplicacion pero tiene periodoAplicacion (compatibilidad con datos antiguos)
                 if (br.periodoAplicacion) {
                     return br.periodoAplicacion === tipoPeriodo;
                 }
-                
+
                 return false;
             });
 
@@ -360,199 +364,199 @@ const PlanillasModule = {
             for (const empleado of empleadosActivos) {
                 try {
                     console.log(`Procesando empleado: ${empleado.nombre} (${empleado.id})`);
-                    
+
                     // Obtener asistencias del período
-                        const asistencias = await FirebaseHelpers.getAsistenciasPeriodo(
-                            empleado.id,
-                            fechaInicioKey,
-                            fechaFinKey,
-                            empleado.cedula // Pasar la cédula para búsqueda alternativa
-                        );
-                    
+                    const asistencias = await FirebaseHelpers.getAsistenciasPeriodo(
+                        empleado.id,
+                        fechaInicioKey,
+                        fechaFinKey,
+                        empleado.cedula // Pasar la cédula para búsqueda alternativa
+                    );
+
                     console.log(`Asistencias encontradas para ${empleado.nombre}:`, asistencias.length);
 
-                // Verificar si hay un valor manual de días trabajados
-                let diasTrabajadosManual = null;
-                const asistenciaConDiasManual = asistencias.find(a => a.diasTrabajadosManual !== undefined && a.diasTrabajadosManual !== null);
-                if (asistenciaConDiasManual) {
-                    diasTrabajadosManual = asistenciaConDiasManual.diasTrabajadosManual;
-                    console.log(`Días trabajados manual encontrados para ${empleado.nombre}: ${diasTrabajadosManual}`);
-                }
+                    // Verificar si hay un valor manual de días trabajados
+                    let diasTrabajadosManual = null;
+                    const asistenciaConDiasManual = asistencias.find(a => a.diasTrabajadosManual !== undefined && a.diasTrabajadosManual !== null);
+                    if (asistenciaConDiasManual) {
+                        diasTrabajadosManual = asistenciaConDiasManual.diasTrabajadosManual;
+                        console.log(`Días trabajados manual encontrados para ${empleado.nombre}: ${diasTrabajadosManual}`);
+                    }
 
-                // Calcular datos de asistencia
-                let diasTrabajados = 0;
-                let horasExtra = 0;
-                let horasAdicionales = 0;
-                let diasFeriados = 0;
-                let diasCCSSEmpresa = 0;
-                let diasINSEmpresa = 0;
-                let diasPermiso = 0;
+                    // Calcular datos de asistencia
+                    let diasTrabajados = 0;
+                    let horasExtra = 0;
+                    let horasAdicionales = 0;
+                    let diasFeriados = 0;
+                    let diasCCSSEmpresa = 0;
+                    let diasINSEmpresa = 0;
+                    let diasPermiso = 0;
 
-                let diasLibresTrabajados = 0;
-                let horasDiasLibres = 0;
+                    let diasLibresTrabajados = 0;
+                    let horasDiasLibres = 0;
 
-                // Procesar todas las asistencias para calcular días especiales, horas extra, etc.
-                asistencias.forEach(asist => {
-                    // Calcular días trabajados solo si no hay valor manual
-                    if (diasTrabajadosManual === null || diasTrabajadosManual === undefined) {
+                    // Procesar todas las asistencias para calcular días especiales, horas extra, etc.
+                    asistencias.forEach(asist => {
+                        // Calcular días trabajados solo si no hay valor manual
+                        if (diasTrabajadosManual === null || diasTrabajadosManual === undefined) {
+                            switch (asist.tipoDia) {
+                                case CONFIG.TIPOS_DIA.NORMAL:
+                                    diasTrabajados++;
+                                    break;
+                                case CONFIG.TIPOS_DIA.DIA_LIBRE:
+                                    // Los días libres también se cuentan para el cálculo (se pagan como día completo)
+                                    diasTrabajados++;
+                                    break;
+                                case CONFIG.TIPOS_DIA.INCOMPLETO:
+                                    diasTrabajados++; // Se ajusta en el cálculo
+                                    break;
+                            }
+                        }
+
+                        // Calcular días especiales (siempre se calculan)
                         switch (asist.tipoDia) {
-                            case CONFIG.TIPOS_DIA.NORMAL:
-                                diasTrabajados++;
+                            case CONFIG.TIPOS_DIA.FERIADO_TRABAJADO:
+                                diasFeriados++;
                                 break;
-                            case CONFIG.TIPOS_DIA.DIA_LIBRE:
-                                // Los días libres también se cuentan para el cálculo (se pagan como día completo)
-                                diasTrabajados++;
+                            case CONFIG.TIPOS_DIA.DIA_LIBRE_TRABAJADO:
+                                diasLibresTrabajados++;
+                                horasDiasLibres += asist.horasTrabajadas || 0;
                                 break;
-                            case CONFIG.TIPOS_DIA.INCOMPLETO:
-                                diasTrabajados++; // Se ajusta en el cálculo
+                            case CONFIG.TIPOS_DIA.INCAPACIDAD_CCSS:
+                                // Si hay una asistencia de tipo INCAPACIDAD_CCSS, contar como 1 día
+                                // a menos que diasCCSSEmpresa esté explícitamente definido
+                                // IMPORTANTE: Solo contar si diasCCSSEmpresa > 0 o si no está definido (entonces usar 1)
+                                let diasCCSS = 0;
+                                if (asist.diasCCSSEmpresa !== undefined && asist.diasCCSSEmpresa !== null) {
+                                    diasCCSS = asist.diasCCSSEmpresa > 0 ? asist.diasCCSSEmpresa : 0;
+                                } else {
+                                    diasCCSS = 1; // Si no está definido, asumir 1 día
+                                }
+
+                                if (diasCCSS > 0) {
+                                    console.log(`Incapacidad CCSS encontrada para ${empleado.nombre} en fecha ${asist.fecha}: diasCCSSEmpresa=${asist.diasCCSSEmpresa}, usando ${diasCCSS}`);
+                                    diasCCSSEmpresa += diasCCSS;
+                                } else {
+                                    console.warn(`Incapacidad CCSS encontrada para ${empleado.nombre} en fecha ${asist.fecha} pero diasCCSSEmpresa es 0, no se contará`);
+                                }
+                                break;
+                            case CONFIG.TIPOS_DIA.INCAPACIDAD_INS:
+                                diasINSEmpresa += asist.diasINSEmpresa || 0;
+                                break;
+                            case CONFIG.TIPOS_DIA.PERMISO_SIN_GOCE:
+                                diasPermiso++;
                                 break;
                         }
-                    }
-                    
-                    // Calcular días especiales (siempre se calculan)
-                    switch (asist.tipoDia) {
-                        case CONFIG.TIPOS_DIA.FERIADO_TRABAJADO:
-                            diasFeriados++;
-                            break;
-                        case CONFIG.TIPOS_DIA.DIA_LIBRE_TRABAJADO:
-                            diasLibresTrabajados++;
-                            horasDiasLibres += asist.horasTrabajadas || 0;
-                            break;
-                        case CONFIG.TIPOS_DIA.INCAPACIDAD_CCSS:
-                            // Si hay una asistencia de tipo INCAPACIDAD_CCSS, contar como 1 día
-                            // a menos que diasCCSSEmpresa esté explícitamente definido
-                            // IMPORTANTE: Solo contar si diasCCSSEmpresa > 0 o si no está definido (entonces usar 1)
-                            let diasCCSS = 0;
-                            if (asist.diasCCSSEmpresa !== undefined && asist.diasCCSSEmpresa !== null) {
-                                diasCCSS = asist.diasCCSSEmpresa > 0 ? asist.diasCCSSEmpresa : 0;
-                            } else {
-                                diasCCSS = 1; // Si no está definido, asumir 1 día
-                            }
-                            
-                            if (diasCCSS > 0) {
-                                console.log(`Incapacidad CCSS encontrada para ${empleado.nombre} en fecha ${asist.fecha}: diasCCSSEmpresa=${asist.diasCCSSEmpresa}, usando ${diasCCSS}`);
-                                diasCCSSEmpresa += diasCCSS;
-                            } else {
-                                console.warn(`Incapacidad CCSS encontrada para ${empleado.nombre} en fecha ${asist.fecha} pero diasCCSSEmpresa es 0, no se contará`);
-                            }
-                            break;
-                        case CONFIG.TIPOS_DIA.INCAPACIDAD_INS:
-                            diasINSEmpresa += asist.diasINSEmpresa || 0;
-                            break;
-                        case CONFIG.TIPOS_DIA.PERMISO_SIN_GOCE:
-                            diasPermiso++;
-                            break;
-                    }
-                    
-                    // Calcular horas extra y adicionales (siempre se calculan)
-                    horasExtra += asist.horasExtra || 0;
-                    const horasAdicionalesDia = asist.horasAdicionales || 0;
-                    horasAdicionales += horasAdicionalesDia;
-                    if (horasAdicionalesDia > 0) {
-                        console.log(`Horas adicionales encontradas para ${empleado.nombre} en fecha ${asist.fecha}: ${horasAdicionalesDia}`);
-                    }
-                });
-                
-                // Si hay días trabajados manual, usarlo en lugar del cálculo automático
-                if (diasTrabajadosManual !== null && diasTrabajadosManual !== undefined) {
-                    diasTrabajados = diasTrabajadosManual;
-                    console.log(`Usando días trabajados manual para ${empleado.nombre}: ${diasTrabajados}`);
-                }
-                
-                console.log(`Total horas adicionales para ${empleado.nombre}: ${horasAdicionales}`);
 
-                // Calcular bonos y rebajos del empleado
-                const bonosEmpleado = bonosRebajosAprobados
-                    .filter(br => br.empleadoId === empleado.id && br.tipo === 'bono')
-                    .reduce((sum, br) => sum + br.monto, 0);
+                        // Calcular horas extra y adicionales (siempre se calculan)
+                        horasExtra += asist.horasExtra || 0;
+                        const horasAdicionalesDia = asist.horasAdicionales || 0;
+                        horasAdicionales += horasAdicionalesDia;
+                        if (horasAdicionalesDia > 0) {
+                            console.log(`Horas adicionales encontradas para ${empleado.nombre} en fecha ${asist.fecha}: ${horasAdicionalesDia}`);
+                        }
+                    });
 
-                const rebajosEmpleado = bonosRebajosAprobados
-                    .filter(br => br.empleadoId === empleado.id && br.tipo === 'rebajo')
-                    .reduce((sum, br) => sum + br.monto, 0);
+                    // Si hay días trabajados manual, usarlo en lugar del cálculo automático
+                    if (diasTrabajadosManual !== null && diasTrabajadosManual !== undefined) {
+                        diasTrabajados = diasTrabajadosManual;
+                        console.log(`Usando días trabajados manual para ${empleado.nombre}: ${diasTrabajados}`);
+                    }
 
-                // Calcular salarios usando el módulo Calculations
-                const datosCalculos = {
-                    salarioMensual: empleado.salarioMensual,
-                    salarioHorario: empleado.salarioHorario || null, // Salario horario directo si está disponible
-                    codigoJornada: empleado.jornada,
-                    diasTrabajados,
-                    horasExtra,
-                    diasFeriados,
-                    diasLibresTrabajados,
-                    horasDiasLibres,
-                    diasCCSSEmpresa,
-                    diasINSEmpresa,
-                    diasPermiso,
-                    bonos: bonosEmpleado,
-                    rebajos: rebajosEmpleado,
-                    asistencias,
-                    cantidadHijos: empleado.hijos || 0,
-                    tieneConyuge: empleado.estadoCivil === 'casado',
-                    impuestoRentaManual: null, // Se puede editar después
-                    tipoPeriodo: tipoPeriodo // Pasar el tipo de período para aplicar impuesto de renta solo en mensuales
-                };
+                    console.log(`Total horas adicionales para ${empleado.nombre}: ${horasAdicionales}`);
+
+                    // Calcular bonos y rebajos del empleado
+                    const bonosEmpleado = bonosRebajosAprobados
+                        .filter(br => br.empleadoId === empleado.id && br.tipo === 'bono')
+                        .reduce((sum, br) => sum + br.monto, 0);
+
+                    const rebajosEmpleado = bonosRebajosAprobados
+                        .filter(br => br.empleadoId === empleado.id && br.tipo === 'rebajo')
+                        .reduce((sum, br) => sum + br.monto, 0);
+
+                    // Calcular salarios usando el módulo Calculations
+                    const datosCalculos = {
+                        salarioMensual: empleado.salarioMensual,
+                        salarioHorario: empleado.salarioHorario || null, // Salario horario directo si está disponible
+                        codigoJornada: empleado.jornada,
+                        diasTrabajados,
+                        horasExtra,
+                        diasFeriados,
+                        diasLibresTrabajados,
+                        horasDiasLibres,
+                        diasCCSSEmpresa,
+                        diasINSEmpresa,
+                        diasPermiso,
+                        bonos: bonosEmpleado,
+                        rebajos: rebajosEmpleado,
+                        asistencias,
+                        cantidadHijos: empleado.hijos || 0,
+                        tieneConyuge: empleado.estadoCivil === 'casado',
+                        impuestoRentaManual: null, // Se puede editar después
+                        tipoPeriodo: tipoPeriodo // Pasar el tipo de período para aplicar impuesto de renta solo en mensuales
+                    };
 
                     console.log(`Calculando salario para ${empleado.nombre}...`);
                     const resultadoCalculo = Calculations.calcularSalarioNeto(datosCalculos);
                     console.log(`Resultado del cálculo para ${empleado.nombre}:`, resultadoCalculo);
-                    
+
                     const jornada = CONFIG.getJornadaByCodigo(empleado.jornada);
                     const salarioDiario = Calculations.calcularSalarioDiario(empleado.salarioMensual, empleado.jornada);
 
                     // Guardar datos del empleado en la planilla
                     console.log(`Guardando datos de ${empleado.nombre} en la planilla...`);
                     empleadosPlanilla[empleado.id] = {
-                    nombreEmpleado: empleado.nombre,
-                    cedula: empleado.cedula,
-                    cargo: empleado.cargo,
-                    departamento: empleado.departamento,
-                    jornada: empleado.jornada,
-                    horasNormalesMes: jornada.horasPorMes,
-                    horasNormalesQuincena: jornada.horasPorQuincena,
-                    horasDiaJornada: jornada.horasPorDia,
-                    salarioBaseMensual: empleado.salarioMensual,
-                    salarioDiario,
-                    diasTrabajados,
-                    horasExtra,
-                    pagoHorasExtra: Calculations.calcularHorasExtra(empleado.salarioMensual, empleado.jornada, horasExtra),
-                    horasAdicionales,
-                    pagoHorasAdicionales: Calculations.calcularHorasAdicionales(empleado.salarioMensual, empleado.jornada, horasAdicionales),
-                    diasFeriadosTrabajados: diasFeriados,
-                    pagoFeriados: Calculations.calcularFeriadosTrabajados(
-                        empleado.salarioMensual, 
-                        empleado.jornada, 
-                        diasFeriados,
-                        asistencias.filter(a => a.tipoDia === CONFIG.TIPOS_DIA.FERIADO_TRABAJADO)
-                    ),
-                    diasLibresTrabajados,
-                    horasDiasLibres,
-                    pagoDiasLibres: Calculations.calcularDiaLibreTrabajado(
-                        empleado.salarioMensual,
-                        empleado.jornada,
-                        horasDiasLibres
-                    ),
-                    diasCCSSEmpresa,
-                    pagoCCSSEmpresa: Calculations.calcularIncapacidadCCSS(empleado.salarioMensual, empleado.jornada, diasCCSSEmpresa),
-                    diasINSEmpresa,
-                    pagoINSEmpresa: Calculations.calcularIncapacidadINS(empleado.salarioMensual, empleado.jornada, diasINSEmpresa),
-                    diasPermisoSinGoce: diasPermiso,
-                    descuentoPermisos: Calculations.calcularDescuentoPermiso(empleado.salarioMensual, empleado.jornada, diasPermiso),
-                    bonos: bonosEmpleado,
-                    rebajos: rebajosEmpleado,
-                    sumaAjustes: bonosEmpleado - rebajosEmpleado,
-                    salarioBruto: resultadoCalculo.salarioBruto,
-                    subtotalQuincenal: resultadoCalculo.subtotalQuincenal || (salarioDiario * diasTrabajados), // Usar el calculado o calcular si no está
-                    rebajosPorHoras: resultadoCalculo.rebajosPorHoras || { total: 0, horasFaltantes: 0, detalles: [] },
-                    descuentoCCSS: resultadoCalculo.descuentoCCSS,
-                    impuestoRenta: resultadoCalculo.impuestoRenta,
-                    creditosRenta: resultadoCalculo.creditosRenta,
-                    otrosDescuentos: resultadoCalculo.otrosDescuentos,
-                    salarioNeto: resultadoCalculo.salarioNeto,
-                    metodoPago: 'transferencia',
-                    banco: empleado.banco || '',
-                    estado: 'generada',
-                    observaciones: ''
-                };
+                        nombreEmpleado: empleado.nombre,
+                        cedula: empleado.cedula,
+                        cargo: empleado.cargo,
+                        departamento: empleado.departamento,
+                        jornada: empleado.jornada,
+                        horasNormalesMes: jornada.horasPorMes,
+                        horasNormalesQuincena: jornada.horasPorQuincena,
+                        horasDiaJornada: jornada.horasPorDia,
+                        salarioBaseMensual: empleado.salarioMensual,
+                        salarioDiario,
+                        diasTrabajados,
+                        horasExtra,
+                        pagoHorasExtra: Calculations.calcularHorasExtra(empleado.salarioMensual, empleado.jornada, horasExtra),
+                        horasAdicionales,
+                        pagoHorasAdicionales: Calculations.calcularHorasAdicionales(empleado.salarioMensual, empleado.jornada, horasAdicionales),
+                        diasFeriadosTrabajados: diasFeriados,
+                        pagoFeriados: Calculations.calcularFeriadosTrabajados(
+                            empleado.salarioMensual,
+                            empleado.jornada,
+                            diasFeriados,
+                            asistencias.filter(a => a.tipoDia === CONFIG.TIPOS_DIA.FERIADO_TRABAJADO)
+                        ),
+                        diasLibresTrabajados,
+                        horasDiasLibres,
+                        pagoDiasLibres: Calculations.calcularDiaLibreTrabajado(
+                            empleado.salarioMensual,
+                            empleado.jornada,
+                            horasDiasLibres
+                        ),
+                        diasCCSSEmpresa,
+                        pagoCCSSEmpresa: Calculations.calcularIncapacidadCCSS(empleado.salarioMensual, empleado.jornada, diasCCSSEmpresa),
+                        diasINSEmpresa,
+                        pagoINSEmpresa: Calculations.calcularIncapacidadINS(empleado.salarioMensual, empleado.jornada, diasINSEmpresa),
+                        diasPermisoSinGoce: diasPermiso,
+                        descuentoPermisos: Calculations.calcularDescuentoPermiso(empleado.salarioMensual, empleado.jornada, diasPermiso),
+                        bonos: bonosEmpleado,
+                        rebajos: rebajosEmpleado,
+                        sumaAjustes: bonosEmpleado - rebajosEmpleado,
+                        salarioBruto: resultadoCalculo.salarioBruto,
+                        subtotalQuincenal: resultadoCalculo.subtotalQuincenal || (salarioDiario * diasTrabajados), // Usar el calculado o calcular si no está
+                        rebajosPorHoras: resultadoCalculo.rebajosPorHoras || { total: 0, horasFaltantes: 0, detalles: [] },
+                        descuentoCCSS: resultadoCalculo.descuentoCCSS,
+                        impuestoRenta: resultadoCalculo.impuestoRenta,
+                        creditosRenta: resultadoCalculo.creditosRenta,
+                        otrosDescuentos: resultadoCalculo.otrosDescuentos,
+                        salarioNeto: resultadoCalculo.salarioNeto,
+                        metodoPago: 'transferencia',
+                        banco: empleado.banco || '',
+                        estado: 'generada',
+                        observaciones: ''
+                    };
                 } catch (error) {
                     console.error(`Error procesando empleado ${empleado.nombre} (${empleado.id}):`, error);
                     console.error('Detalles del error:', error.stack);
@@ -666,8 +670,8 @@ const PlanillasModule = {
                                 </thead>
                                 <tbody>
                                     ${empleadosArray.map((emp, idx) => {
-                                        const empleadoCompleto = this.empleados.find(e => e.id === emp.id || e.cedula === emp.cedula);
-                                        return `
+            const empleadoCompleto = this.empleados.find(e => e.id === emp.id || e.cedula === emp.cedula);
+            return `
                                         <tr>
                                             <td>
                                                 <div class="font-medium">${emp.nombreEmpleado}</div>
@@ -703,7 +707,7 @@ const PlanillasModule = {
                                             <td class="font-bold text-blue-600" id="salarioNeto_${emp.id || idx}">${Formatters.formatearMoneda(emp.salarioNeto)}</td>
                                         </tr>
                                     `;
-                                    }).join('')}
+        }).join('')}
                                 </tbody>
                             </table>
                         </div>
@@ -775,7 +779,7 @@ const PlanillasModule = {
                     empleado = this.empleados.find(e => e.cedula === datosPlanilla.cedula);
                 }
             }
-            
+
             if (!empleado) {
                 Utils.showToast('Empleado no encontrado', 'error');
                 return;
@@ -786,10 +790,10 @@ const PlanillasModule = {
                 id: key,
                 ...planilla.empleados[key]
             }));
-            const datosPlanilla = empleadosArray.find(emp => emp.id === empleadoId || emp.cedula === empleado.cedula) || 
-                                empleadosArray[parseInt(empleadoId)] ||
-                                Object.values(planilla.empleados || {})[0];
-            
+            const datosPlanilla = empleadosArray.find(emp => emp.id === empleadoId || emp.cedula === empleado.cedula) ||
+                empleadosArray[parseInt(empleadoId)] ||
+                Object.values(planilla.empleados || {})[0];
+
             if (!datosPlanilla) {
                 Utils.showToast('No se encontraron datos del empleado en esta planilla', 'error');
                 return;
@@ -804,12 +808,12 @@ const PlanillasModule = {
             const fechaFinStr = fechaFin.toISOString().split('T')[0];
 
             // Calcular subtotal quincenal si no está en datosPlanilla
-            const subtotalQuincenal = datosPlanilla.subtotalQuincenal || 
-                                     ((datosPlanilla.salarioDiario || 0) * (datosPlanilla.diasTrabajados || 0));
-            
+            const subtotalQuincenal = datosPlanilla.subtotalQuincenal ||
+                ((datosPlanilla.salarioDiario || 0) * (datosPlanilla.diasTrabajados || 0));
+
             // Usar rebajos por horas de datosPlanilla si está disponible
             const rebajosPorHoras = datosPlanilla.rebajosPorHoras || { total: 0, horasFaltantes: 0, detalles: [] };
-            
+
             const calculos = {
                 salarioBaseMensual: datosPlanilla.salarioBaseMensual || empleado.salarioMensual,
                 salarioDiario: datosPlanilla.salarioDiario || Calculations.calcularSalarioDiario(empleado.salarioMensual, empleado.jornada),
@@ -840,7 +844,7 @@ const PlanillasModule = {
                 const diaInicio = fechaInicio.getDate();
                 const nombreMes = fechaInicio.toLocaleDateString('es-CR', { month: 'long' });
                 const primeraLetraMayuscula = nombreMes.charAt(0).toUpperCase() + nombreMes.slice(1);
-                
+
                 if (diaInicio >= 1 && diaInicio <= 15) {
                     periodoFormateado = `IQ ${primeraLetraMayuscula}`;
                 } else {
@@ -903,7 +907,7 @@ const PlanillasModule = {
             // Buscar empleado completo
             const empleado = this.empleados.find(e => e.id === empleadoId);
             let empleadoEncontrado = empleado;
-            
+
             if (!empleadoEncontrado) {
                 const empleadosArray = Object.keys(planilla.empleados || {}).map(key => ({
                     id: key,
@@ -914,7 +918,7 @@ const PlanillasModule = {
                     empleadoEncontrado = this.empleados.find(e => e.cedula === datosPlanilla.cedula);
                 }
             }
-            
+
             if (!empleadoEncontrado) {
                 Utils.showToast('Empleado no encontrado', 'error');
                 return;
@@ -930,10 +934,10 @@ const PlanillasModule = {
                 id: key,
                 ...planilla.empleados[key]
             }));
-            const datosPlanilla = empleadosArray.find(emp => emp.id === empleadoId || emp.cedula === empleadoEncontrado.cedula) || 
-                                empleadosArray[parseInt(empleadoId)] ||
-                                Object.values(planilla.empleados || {})[0];
-            
+            const datosPlanilla = empleadosArray.find(emp => emp.id === empleadoId || emp.cedula === empleadoEncontrado.cedula) ||
+                empleadosArray[parseInt(empleadoId)] ||
+                Object.values(planilla.empleados || {})[0];
+
             if (!datosPlanilla) {
                 Utils.showToast('No se encontraron datos del empleado en esta planilla', 'error');
                 return;
@@ -950,7 +954,7 @@ const PlanillasModule = {
 
             // Crear instancia del servicio
             const emailService = new EmailServiceSimple();
-            
+
             // Verificar configuración
             if (!emailService.verificarConfiguracion()) {
                 Utils.showToast('EmailJS no está configurado correctamente', 'error');
@@ -967,19 +971,19 @@ const PlanillasModule = {
             // Debug: Log para ver qué datos vienen de la planilla
             console.log('Datos del empleado en planilla:', datosPlanilla);
             console.log('Datos del empleado encontrado:', empleadoEncontrado);
-            
+
             // Calcular salario base (salario bruto - extras - feriados)
-            const salarioBase = (datosPlanilla.salarioBruto || 0) - 
-                               (datosPlanilla.pagoHorasExtra || 0) - 
-                               (datosPlanilla.pagoFeriados || 0);
-            
+            const salarioBase = (datosPlanilla.salarioBruto || 0) -
+                (datosPlanilla.pagoHorasExtra || 0) -
+                (datosPlanilla.pagoFeriados || 0);
+
             // Usar subtotal quincenal de datosPlanilla si está disponible, sino calcularlo
-            const subtotalQuincenal = datosPlanilla.subtotalQuincenal || 
-                                     ((datosPlanilla.salarioDiario || 0) * (datosPlanilla.diasTrabajados || 0));
-            
+            const subtotalQuincenal = datosPlanilla.subtotalQuincenal ||
+                ((datosPlanilla.salarioDiario || 0) * (datosPlanilla.diasTrabajados || 0));
+
             // Usar rebajos por horas de datosPlanilla si está disponible
             const rebajosPorHoras = datosPlanilla.rebajosPorHoras || { total: 0, horasFaltantes: 0, detalles: [] };
-            
+
             const calculos = {
                 salarioBaseMensual: datosPlanilla.salarioBaseMensual || empleadoEncontrado.salarioMensual,
                 salarioDiario: datosPlanilla.salarioDiario || Calculations.calcularSalarioDiario(empleadoEncontrado.salarioMensual, empleadoEncontrado.jornada),
@@ -1008,7 +1012,7 @@ const PlanillasModule = {
                 const diaInicio = fechaInicio.getDate();
                 const nombreMes = fechaInicio.toLocaleDateString('es-CR', { month: 'long' });
                 const primeraLetraMayuscula = nombreMes.charAt(0).toUpperCase() + nombreMes.slice(1);
-                
+
                 if (diaInicio >= 1 && diaInicio <= 15) {
                     periodoFormateado = `IQ ${primeraLetraMayuscula}`;
                 } else {
@@ -1086,7 +1090,7 @@ const PlanillasModule = {
 
             // Crear instancia del servicio
             const emailService = new EmailServiceSimple();
-            
+
             // Verificar configuración
             if (!emailService.verificarConfiguracion()) {
                 Utils.showToast('EmailJS no está configurado correctamente', 'error');
@@ -1112,8 +1116,8 @@ const PlanillasModule = {
 
             // Confirmar acción
             const mensaje = `¿Desea enviar comprobantes por correo a ${empleadosConCorreo.length} empleado(s)?\n\n` +
-                          `Esta acción enviará un correo a cada empleado con su comprobante de pago.`;
-            
+                `Esta acción enviará un correo a cada empleado con su comprobante de pago.`;
+
             if (!confirm(mensaje)) {
                 return;
             }
@@ -1128,29 +1132,29 @@ const PlanillasModule = {
             for (let i = 0; i < empleadosConCorreo.length; i++) {
                 const emp = empleadosConCorreo[i];
                 const empleadoCompleto = this.empleados.find(e => e.id === emp.id || e.cedula === emp.cedula);
-                
+
                 try {
                     Utils.showLoading(`Enviando correos (${i + 1}/${empleadosConCorreo.length}): ${empleadoCompleto.nombre}...`);
 
                     // Reutilizar la lógica de enviarComprobante pero sin mostrar toasts individuales
                     const datosPlanilla = emp;
-                    
+
                     // Preparar datos
                     const fechaInicio = new Date(planilla.periodoInicio);
                     const fechaFin = new Date(planilla.periodoFin);
                     const fechaInicioStr = fechaInicio.toISOString().split('T')[0];
                     const fechaFinStr = fechaFin.toISOString().split('T')[0];
-                    
+
                     // Calcular salario base
-                    const salarioBase = (datosPlanilla.salarioBruto || 0) - 
-                                       (datosPlanilla.pagoHorasExtra || 0) - 
-                                       (datosPlanilla.pagoFeriados || 0);
-                    
-                    const subtotalQuincenal = datosPlanilla.subtotalQuincenal || 
-                                             ((datosPlanilla.salarioDiario || 0) * (datosPlanilla.diasTrabajados || 0));
-                    
+                    const salarioBase = (datosPlanilla.salarioBruto || 0) -
+                        (datosPlanilla.pagoHorasExtra || 0) -
+                        (datosPlanilla.pagoFeriados || 0);
+
+                    const subtotalQuincenal = datosPlanilla.subtotalQuincenal ||
+                        ((datosPlanilla.salarioDiario || 0) * (datosPlanilla.diasTrabajados || 0));
+
                     const rebajosPorHoras = datosPlanilla.rebajosPorHoras || { total: 0, horasFaltantes: 0, detalles: [] };
-                    
+
                     const calculos = {
                         salarioBaseMensual: datosPlanilla.salarioBaseMensual || empleadoCompleto.salarioMensual,
                         salarioDiario: datosPlanilla.salarioDiario || Calculations.calcularSalarioDiario(empleadoCompleto.salarioMensual, empleadoCompleto.jornada),
@@ -1181,7 +1185,7 @@ const PlanillasModule = {
                         const diaInicio = fechaInicio.getDate();
                         const nombreMes = fechaInicio.toLocaleDateString('es-CR', { month: 'long' });
                         const primeraLetraMayuscula = nombreMes.charAt(0).toUpperCase() + nombreMes.slice(1);
-                        
+
                         if (diaInicio >= 1 && diaInicio <= 15) {
                             periodoFormateado = `IQ ${primeraLetraMayuscula}`;
                         } else {
@@ -1248,9 +1252,9 @@ const PlanillasModule = {
 
             // Mostrar resumen
             let mensajeResumen = `Envío masivo completado:\n\n` +
-                               `✓ Exitosos: ${exitosos}\n` +
-                               `✗ Fallidos: ${fallidos}`;
-            
+                `✓ Exitosos: ${exitosos}\n` +
+                `✗ Fallidos: ${fallidos}`;
+
             if (errores.length > 0) {
                 mensajeResumen += `\n\nErrores:\n${errores.slice(0, 5).join('\n')}`;
                 if (errores.length > 5) {
@@ -1261,7 +1265,7 @@ const PlanillasModule = {
             if (exitosos > 0) {
                 Utils.showToast(`Se enviaron ${exitosos} comprobante(s) exitosamente`, 'success');
             }
-            
+
             if (fallidos > 0) {
                 Utils.showToast(`Hubo ${fallidos} error(es) al enviar comprobantes. Revise la consola para más detalles.`, 'warning');
                 console.log('Errores de envío masivo:', errores);
@@ -1390,7 +1394,7 @@ const PlanillasModule = {
             if (!planilla) return;
 
             const empleadosArray = Object.values(planilla.empleados || {});
-            
+
             const totales = {
                 cantidadEmpleados: empleadosArray.length,
                 totalSalariosBrutos: empleadosArray.reduce((sum, emp) => sum + (emp.salarioBruto || 0), 0),

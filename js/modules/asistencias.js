@@ -10,7 +10,7 @@ const AsistenciasModule = {
     mesActual: new Date(),
     mesSeleccionado: null, // Guardar el mes seleccionado por el usuario
     quincenaSeleccionada: null, // Guardar la quincena seleccionada
-    
+
     /**
      * Inicializa el módulo
      */
@@ -24,7 +24,12 @@ const AsistenciasModule = {
     async cargarEmpleados() {
         try {
             const empleados = await FirebaseHelpers.getEmpleados();
-            this.empleados = empleados.filter(e => e.estado === 'activo');
+            // Filtrar solo empleados activos de planilla regular (NO SP)
+            // Los empleados SP tienen su propio módulo de Control de Asistencia
+            this.empleados = empleados.filter(e =>
+                e.estado === 'activo' &&
+                e.tipoEmpleado !== 'SP'
+            );
         } catch (error) {
             console.error('Error cargando empleados:', error);
             this.empleados = [];
@@ -119,11 +124,11 @@ const AsistenciasModule = {
      */
     renderResumenQuincenal() {
         if (!this.empleadoSeleccionado) return '';
-        
+
         const jornada = CONFIG.getJornadaByCodigo(this.empleadoSeleccionado.jornada);
         const mesAno = document.getElementById('selectMes')?.value || '';
         const quincena = document.getElementById('selectQuincena')?.value || '';
-        
+
         if (!mesAno || !quincena) {
             return `
                 <div class="card">
@@ -138,7 +143,7 @@ const AsistenciasModule = {
         const [ano, mes] = mesAno.split('-').map(Number);
         const fechaInicio = quincena === 'primera' ? new Date(ano, mes - 1, 1) : new Date(ano, mes - 1, 16);
         const fechaFin = quincena === 'primera' ? new Date(ano, mes - 1, 15) : new Date(ano, mes - 1, 30);
-        
+
         return `
             <div class="card">
                 <div class="mb-4">
@@ -212,20 +217,20 @@ const AsistenciasModule = {
         const [ano, mes] = mesAno.split('-').map(Number);
         const fechaInicio = quincena === 'primera' ? new Date(ano, mes - 1, 1) : new Date(ano, mes - 1, 16);
         const fechaFin = quincena === 'primera' ? new Date(ano, mes - 1, 15) : new Date(ano, mes - 1, 30);
-        
+
         const jornada = CONFIG.getJornadaByCodigo(this.empleadoSeleccionado.jornada);
-        
+
         // Cargar datos existentes si los hay
         const fechaInicioKey = Formatters.formatearFechaFirebase(fechaInicio);
         const fechaFinKey = Formatters.formatearFechaFirebase(fechaFin);
-        
+
         // Obtener asistencias existentes del período
         const asistenciasExistentes = await FirebaseHelpers.getAsistenciasPeriodo(
             this.empleadoSeleccionado.id,
             fechaInicioKey,
             fechaFinKey
         );
-        
+
         // Calcular totales de asistencias existentes
         let horasTrabajadasExistentes = 0;
         let horasExtraExistentes = 0;
@@ -234,7 +239,7 @@ const AsistenciasModule = {
         let diasINSExistentes = 0;
         let diasPermisoExistentes = 0;
         let diasFeriadosExistentes = 0;
-        
+
         asistenciasExistentes.forEach(a => {
             horasTrabajadasExistentes += a.horasTrabajadas || 0;
             horasExtraExistentes += a.horasExtra || 0;
@@ -257,7 +262,7 @@ const AsistenciasModule = {
         // Si hay un valor manual existente, usarlo; si no, usar 15 días por defecto (total de días en una quincena)
         const diasTrabajadosManualExistente = asistenciasExistentes.find(a => a.diasTrabajadosManual !== undefined && a.diasTrabajadosManual !== null)?.diasTrabajadosManual;
         let diasTrabajadosCalculados = '';
-        
+
         if (diasTrabajadosManualExistente !== undefined && diasTrabajadosManualExistente !== null) {
             // Si ya existe un valor manual, usarlo
             diasTrabajadosCalculados = diasTrabajadosManualExistente;
@@ -389,7 +394,7 @@ const AsistenciasModule = {
         `;
 
         document.getElementById('modalContainer').innerHTML = modal;
-        
+
         document.getElementById('formHorasQuincenales').addEventListener('submit', async (e) => {
             e.preventDefault();
             await this.guardarHorasQuincenales(fechaInicio, fechaFin, jornada);
@@ -445,27 +450,27 @@ const AsistenciasModule = {
 
             // Distribuir horas extra solo en días normales
             const horasExtraPorDia = (diasNormales > 0 && horasExtra > 0) ? horasExtra / diasNormales : 0;
-            
+
             // Distribuir horas adicionales solo en días normales
             const horasAdicionalesPorDia = (diasNormales > 0 && horasAdicionales > 0) ? horasAdicionales / diasNormales : 0;
 
             // Distribuir horas de incapacidad CCSS entre los días de incapacidad
             // Si no se especifican horas, usar el promedio basado en jornada
             const horasCCSSPorDia = (diasCCSS > 0 && horasCCSS > 0) ? horasCCSS / diasCCSS : (jornada.horasPorDia || 7);
-            
+
             // Distribuir horas de incapacidad INS entre los días de incapacidad
             const horasINSPorDia = (diasINS > 0 && horasINS > 0) ? horasINS / diasINS : (jornada.horasPorDia || 7);
 
             // Crear asistencias para cada día de la quincena
             const fechaActual = new Date(fechaInicio);
             const asistenciasAGuardar = [];
-            
+
             // Contadores para días especiales
             let contadorCCSS = 0;
             let contadorINS = 0;
             let contadorPermiso = 0;
             let contadorFeriados = 0;
-            
+
             while (fechaActual <= fechaFin) {
                 const fechaKey = Formatters.formatearFechaFirebase(fechaActual);
                 let tipoDia = CONFIG.TIPOS_DIA.NORMAL;
@@ -554,12 +559,12 @@ const AsistenciasModule = {
                         jornadaEmpleado: this.empleadoSeleccionado.jornada,
                         horasNormalesEsperadas: jornada.horasPorDia
                     };
-                    
+
                     // Agregar días trabajados manual solo en la primera asistencia
                     if (i === 0 && diasTrabajadosManual !== null && diasTrabajadosManual !== undefined) {
                         datosAsistencia.diasTrabajadosManual = diasTrabajadosManual;
                     }
-                    
+
                     await FirebaseHelpers.registrarAsistencia(
                         this.empleadoSeleccionado.id,
                         asistencia.fechaKey,

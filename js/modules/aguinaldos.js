@@ -192,14 +192,20 @@ const AguinaldosModule = {
         const container = document.getElementById('mainContent');
         if (!container) return;
 
-        const empleadosActivos = this.empleados.filter(e => e.estado !== CONFIG.ESTADOS_EMPLEADO.INACTIVO);
-        const empleadosFiltrados = this.empleadoSeleccionado 
+        // Filtrar empleados activos que NO sean de tipo SP (Servicios Profesionales)
+        // Los empleados SP se pagan por horas y no participan en aguinaldos
+        const empleadosActivos = this.empleados.filter(e =>
+            e.estado !== CONFIG.ESTADOS_EMPLEADO.INACTIVO &&
+            e.tipoEmpleado !== 'SP'
+        );
+        const empleadosFiltrados = this.empleadoSeleccionado
             ? empleadosActivos.filter(e => e.id === this.empleadoSeleccionado)
             : empleadosActivos;
-        
+
         const tarjetas = empleadosFiltrados.map(empleado => this.obtenerRenderEmpleado(empleado));
 
         this.aguinaldosResumen = {};
+        // Solo incluir empleados de planilla regular (no SP) en el resumen
         empleadosActivos.forEach(empleado => {
             const item = this.obtenerRenderEmpleado(empleado);
             this.aguinaldosResumen[item.empleadoId] = item.resumen;
@@ -211,7 +217,7 @@ const AguinaldosModule = {
                 const item = this.obtenerRenderEmpleado(emp);
                 return sum + item.resumen.totalBruto;
             }, 0);
-        
+
         const totalAguinaldo = empleadosFiltrados.length > 0
             ? tarjetas.reduce((sum, item) => sum + item.resumen.montoAguinaldo, 0)
             : empleadosActivos.reduce((sum, emp) => {
@@ -233,14 +239,14 @@ const AguinaldosModule = {
                     <div class="flex gap-4">
                         <select id="selectEmpleado" class="form-control">
                             <option value="">Todos los empleados</option>
-                            ${empleadosActivos.map(e => 
-                                `<option value="${e.id}" ${this.empleadoSeleccionado === e.id ? 'selected' : ''}>${e.nombre}</option>`
-                            ).join('')}
+                            ${empleadosActivos.map(e =>
+            `<option value="${e.id}" ${this.empleadoSeleccionado === e.id ? 'selected' : ''}>${e.nombre}</option>`
+        ).join('')}
                         </select>
                         <select id="selectAño" class="form-control">
-                            ${[this.añoActual, this.añoActual - 1, this.añoActual - 2].map(año => 
-                                `<option value="${año}" ${año === this.añoActual ? 'selected' : ''}>${año}</option>`
-                            ).join('')}
+                            ${[this.añoActual, this.añoActual - 1, this.añoActual - 2].map(año =>
+            `<option value="${año}" ${año === this.añoActual ? 'selected' : ''}>${año}</option>`
+        ).join('')}
                         </select>
                     </div>
                 </div>
