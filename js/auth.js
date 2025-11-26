@@ -88,7 +88,7 @@ const Auth = {
      */
     setupLoginForm() {
         const loginForm = document.getElementById('loginForm');
-        
+
         if (loginForm) {
             loginForm.addEventListener('submit', async (e) => {
                 e.preventDefault();
@@ -120,9 +120,9 @@ const Auth = {
 
         } catch (error) {
             console.error('Login error:', error);
-            
+
             let errorMessage = 'Error al iniciar sesión';
-            
+
             switch (error.code) {
                 case 'auth/user-not-found':
                     errorMessage = 'Usuario no encontrado';
@@ -155,7 +155,7 @@ const Auth = {
      */
     setupLogoutButton() {
         const logoutBtn = document.getElementById('logoutBtn');
-        
+
         if (logoutBtn) {
             logoutBtn.addEventListener('click', async () => {
                 await this.handleLogout();
@@ -227,6 +227,54 @@ const Auth = {
         if (roleElement) {
             roleElement.textContent = Formatters.formatearRol(profile.rol);
         }
+
+        // Ocultar/mostrar enlaces de navegación basado en permisos
+        this.updateNavigationVisibility(profile.rol);
+    },
+
+    /**
+     * Actualiza visibilidad de navegación basado en el rol
+     * @param {string} rol - Rol del usuario
+     */
+    updateNavigationVisibility(rol) {
+        const permisos = CONFIG.PERMISOS[rol] || [];
+
+        // Mapeo de vistas a permisos
+        const viewPermissions = {
+            'dashboard': '*', // Todos pueden ver dashboard
+            'empleados': 'empleados',
+            'asistencias': 'asistencias',
+            'bonos': 'bonos',
+            'planillas': 'planillas',
+            'servicios-profesionales': 'servicios_profesionales',
+            'control-asistencia': 'control_asistencia',
+            'aguinaldos': 'aguinaldos',
+            'feriados': 'feriados',
+            'reportes': 'reportes',
+            'cumpleanos': 'cumpleanos',
+            'usuarios': 'usuarios'
+        };
+
+        // Filtrar enlaces de navegación
+        document.querySelectorAll('.nav-link').forEach(link => {
+            const view = link.dataset.view;
+            const requiredPermission = viewPermissions[view];
+
+            if (requiredPermission === '*' || permisos.includes(requiredPermission)) {
+                link.parentElement.style.display = '';
+            } else {
+                link.parentElement.style.display = 'none';
+            }
+        });
+
+        // Si es operador de asistencia, redirigir directamente al control
+        if (rol === 'operador_asistencia') {
+            setTimeout(() => {
+                if (window.AppRouter) {
+                    window.AppRouter.navigate('control-asistencia');
+                }
+            }, 100);
+        }
     },
 
     /**
@@ -251,7 +299,7 @@ const Auth = {
         try {
             // Crear usuario en Firebase Auth
             const userCredential = await CONFIG.auth.createUserWithEmailAndPassword(email, password);
-            
+
             // Crear perfil de usuario
             await FirebaseHelpers.setUserProfile(userCredential.user.uid, {
                 ...userData,

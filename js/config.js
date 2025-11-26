@@ -13,9 +13,9 @@ const firebaseConfig = {
     messagingSenderId: "491116295999",
     appId: "1:491116295999:web:704f7c8620fcb43b00858a",
     measurementId: "G-QBB39HNE7R"
-  };
-  
-  
+};
+
+
 
 // Initialize Firebase
 firebase.initializeApp(firebaseConfig);
@@ -35,7 +35,9 @@ const DB_PATHS = {
     FERIADOS: 'feriados',
     JORNADAS: 'jornadas',
     USUARIOS: 'usuarios',
-    AUDITORIA: 'auditoria'
+    AUDITORIA: 'auditoria',
+    SERVICIOS_PROFESIONALES: 'servicios_profesionales',
+    CONTROL_ASISTENCIA: 'control_asistencia'
 };
 
 // Jornadas Laborales Costarricenses
@@ -255,16 +257,18 @@ const ROLES = {
     GERENTE_RRHH: 'gerente_rrhh',
     SUPERVISOR: 'supervisor',
     CONTADOR: 'contador',
-    EMPLEADO: 'empleado'
+    EMPLEADO: 'empleado',
+    OPERADOR_ASISTENCIA: 'operador_asistencia'
 };
 
 // Permisos por Rol
 const PERMISOS = {
-    admin: ['empleados', 'asistencias', 'bonos', 'planillas', 'aguinaldos', 'feriados', 'reportes', 'usuarios', 'jornadas'],
-    gerente_rrhh: ['empleados', 'asistencias', 'bonos', 'planillas', 'reportes'],
+    admin: ['empleados', 'asistencias', 'bonos', 'planillas', 'aguinaldos', 'feriados', 'reportes', 'usuarios', 'jornadas', 'control_asistencia', 'servicios_profesionales', 'cumpleanos'],
+    gerente_rrhh: ['empleados', 'asistencias', 'bonos', 'planillas', 'reportes', 'servicios_profesionales'],
     supervisor: ['asistencias'],
     contador: ['planillas', 'reportes'],
-    empleado: ['consulta_propia']
+    empleado: ['consulta_propia'],
+    operador_asistencia: ['control_asistencia']
 };
 
 // Bancos Costarricenses

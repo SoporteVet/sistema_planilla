@@ -261,19 +261,19 @@ const FirebaseHelpers = {
         const path = `${CONFIG.DB_PATHS.ASISTENCIAS}/${empleadoId}`;
         let data = await this.once(path);
         const asistencias = [];
-        
+
         console.log(`Buscando asistencias para empleado ${empleadoId}:`);
         console.log(`  Ruta en Firebase: ${path}`);
         console.log(`  Rango: ${fechaInicio} - ${fechaFin}`);
         if (empleadoCedula) {
             console.log(`  Cédula del empleado: ${empleadoCedula}`);
         }
-        
+
         if (data) {
             const fechasDisponibles = Object.keys(data);
             console.log(`  Fechas disponibles en Firebase:`, fechasDisponibles);
             console.log(`  Total fechas en Firebase: ${fechasDisponibles.length}`);
-            
+
             Object.keys(data).forEach(fecha => {
                 if (fecha >= fechaInicio && fecha <= fechaFin) {
                     console.log(`  ✓ Asistencia encontrada: ${fecha} - tipo: ${data[fecha].tipoDia}`);
@@ -284,7 +284,7 @@ const FirebaseHelpers = {
             });
         } else {
             console.log(`  No hay datos de asistencias para este empleado en la ruta: ${path}`);
-            
+
             // Si se proporciona la cédula, intentar buscar por cédula
             if (empleadoCedula) {
                 console.log(`  Intentando buscar asistencias por cédula: ${empleadoCedula}`);
@@ -293,14 +293,14 @@ const FirebaseHelpers = {
                     // Primero obtener los IDs de empleados que tienen asistencias
                     const empleadoIdsConAsistencias = Object.keys(allAsistencias);
                     console.log(`  IDs de empleados con asistencias: ${empleadoIdsConAsistencias.length} total`);
-                    
+
                     // Obtener todos los empleados para comparar cédulas
                     const allEmpleados = await this.once(CONFIG.DB_PATHS.EMPLEADOS);
                     const empleadosConAsistencias = [];
-                    
+
                     // Crear un mapa de cédula -> ID para empleados que tienen asistencias
                     const cedulaToIdConAsistencias = {};
-                    
+
                     if (allEmpleados) {
                         // Iterar sobre los empleados que tienen asistencias
                         empleadoIdsConAsistencias.forEach(empIdConAsistencias => {
@@ -319,7 +319,7 @@ const FirebaseHelpers = {
                             }
                         });
                     }
-                    
+
                     console.log(`  Empleados con asistencias encontrados: ${empleadosConAsistencias.length}`);
                     if (empleadosConAsistencias.length > 0) {
                         console.log(`  Primeros 5 empleados con asistencias:`, empleadosConAsistencias.slice(0, 5).map(e => ({
@@ -329,17 +329,17 @@ const FirebaseHelpers = {
                             cedulaLimpia: e.cedulaLimpia
                         })));
                     }
-                    
+
                     const cedulaLimpia = empleadoCedula.replace(/[-\s]/g, '');
                     console.log(`  Buscando cédula limpia: "${cedulaLimpia}"`);
                     console.log(`  Cédulas disponibles en mapa:`, Object.keys(cedulaToIdConAsistencias).slice(0, 10));
-                    
+
                     const empleadoIdConAsistencias = cedulaToIdConAsistencias[cedulaLimpia];
-                    
+
                     if (empleadoIdConAsistencias && allAsistencias[empleadoIdConAsistencias]) {
                         console.log(`  ✓ Encontrado empleado con misma cédula: ID ${empleadoIdConAsistencias}`);
                         data = allAsistencias[empleadoIdConAsistencias];
-                        
+
                         Object.keys(data).forEach(fecha => {
                             if (fecha >= fechaInicio && fecha <= fechaFin) {
                                 console.log(`  ✓ Asistencia encontrada por cédula: ${fecha} - tipo: ${data[fecha].tipoDia}`);
@@ -363,7 +363,7 @@ const FirebaseHelpers = {
                 }
             }
         }
-        
+
         console.log(`  Total asistencias encontradas: ${asistencias.length}`);
         return asistencias;
     },
@@ -463,7 +463,7 @@ const FirebaseHelpers = {
     async getBonosRebajosPorEmpleado(empleadoId) {
         const data = await this.once(CONFIG.DB_PATHS.BONOS_REBAJOS);
         const items = [];
-        
+
         if (data) {
             Object.keys(data).forEach(key => {
                 if (data[key].empleadoId === empleadoId) {
@@ -471,7 +471,7 @@ const FirebaseHelpers = {
                 }
             });
         }
-        
+
         return items;
     },
 
@@ -642,7 +642,7 @@ const FirebaseHelpers = {
     async inicializarFeriados2025() {
         const feriados = await this.getFeriados();
         const feriadosPorAño = {};
-        
+
         feriados.forEach(f => {
             const año = new Date(f.fecha).getFullYear();
             if (!feriadosPorAño[año]) {
@@ -650,7 +650,7 @@ const FirebaseHelpers = {
             }
             feriadosPorAño[año].push(f);
         });
-        
+
         // Inicializar 2025 si no existe
         if (!feriadosPorAño[2025] || feriadosPorAño[2025].length === 0) {
             for (const feriado of CONFIG.FERIADOS_2025) {
@@ -664,7 +664,7 @@ const FirebaseHelpers = {
                 });
             }
         }
-        
+
         // Inicializar 2026 si no existe
         if (!feriadosPorAño[2026] || feriadosPorAño[2026].length === 0) {
             for (const feriado of CONFIG.FERIADOS_2026) {
@@ -759,9 +759,175 @@ const FirebaseHelpers = {
      */
     tienePermiso(modulo) {
         if (!this.currentUserRole) return false;
-        
+
         const permisos = CONFIG.PERMISOS[this.currentUserRole];
         return permisos && permisos.includes(modulo);
+    },
+
+    // ==================== CONTROL DE ASISTENCIA ====================
+
+    /**
+     * Registra entrada o salida de un empleado
+     * @param {string} empleadoId - ID del empleado
+     * @param {string} tipo - 'entrada' o 'salida'
+     * @returns {Promise<object>} Registro creado
+     */
+    async registrarControlAsistencia(empleadoId, tipo) {
+        const ahora = new Date();
+        const fecha = Formatters.formatearFechaKey(ahora); // YYYYMMDD
+        const hora = Formatters.formatearHora(ahora); // HH:mm
+        const timestamp = ahora.getTime();
+
+        // Obtener registros del día
+        const registrosDelDia = await this.obtenerRegistrosAsistenciaDia(empleadoId, fecha);
+
+        // Validaciones
+        if (tipo === 'entrada') {
+            // Verificar si ya hay una entrada sin salida
+            // Buscar la última entrada y verificar si tiene salida después
+            const entradas = registrosDelDia.filter(r => r.tipo === 'entrada');
+            const salidas = registrosDelDia.filter(r => r.tipo === 'salida');
+
+            if (entradas.length > salidas.length) {
+                throw new Error('Ya existe una entrada sin salida registrada');
+            }
+        } else if (tipo === 'salida') {
+            // Verificar si hay una entrada sin salida
+            const entradas = registrosDelDia.filter(r => r.tipo === 'entrada');
+            const salidas = registrosDelDia.filter(r => r.tipo === 'salida');
+
+            if (entradas.length === 0 || entradas.length <= salidas.length) {
+                throw new Error('No hay una entrada registrada para marcar salida');
+            }
+        }
+
+        const nuevoRegistro = {
+            empleadoId,
+            fecha,
+            tipo,
+            hora,
+            timestamp,
+            registradoPor: this.currentUser?.uid || 'system',
+            fechaRegistro: firebase.database.ServerValue.TIMESTAMP
+        };
+
+        // Guardar en Firebase
+        const registroId = await this.push(
+            `${CONFIG.DB_PATHS.CONTROL_ASISTENCIA}/${empleadoId}/${fecha}`,
+            nuevoRegistro
+        );
+
+        return { id: registroId, ...nuevoRegistro };
+    },
+
+    /**
+     * Obtiene registros de asistencia de un empleado para una fecha específica
+     * @param {string} empleadoId - ID del empleado
+     * @param {string} fecha - Fecha en formato YYYYMMDD
+     * @returns {Promise<Array>} Registros del día
+     */
+    async obtenerRegistrosAsistenciaDia(empleadoId, fecha) {
+        const data = await this.once(`${CONFIG.DB_PATHS.CONTROL_ASISTENCIA}/${empleadoId}/${fecha}`);
+        const registros = [];
+
+        if (data) {
+            Object.keys(data).forEach(key => {
+                registros.push({ id: key, ...data[key] });
+            });
+        }
+
+        // Ordenar por timestamp
+        registros.sort((a, b) => a.timestamp - b.timestamp);
+
+        return registros;
+    },
+
+    /**
+     * Obtiene todos los registros de asistencia de un empleado en un rango de fechas
+     * @param {string} empleadoId - ID del empleado
+     * @param {string} fechaInicio - Fecha inicio YYYYMMDD
+     * @param {string} fechaFin - Fecha fin YYYYMMDD
+     * @returns {Promise<Array>} Registros del período
+     */
+    async obtenerRegistrosAsistenciaPeriodo(empleadoId, fechaInicio, fechaFin) {
+        const data = await this.once(`${CONFIG.DB_PATHS.CONTROL_ASISTENCIA}/${empleadoId}`);
+        const registros = [];
+
+        if (data) {
+            Object.keys(data).forEach(fecha => {
+                if (fecha >= fechaInicio && fecha <= fechaFin) {
+                    const registrosDia = data[fecha];
+                    Object.keys(registrosDia).forEach(id => {
+                        registros.push({
+                            id,
+                            fecha,
+                            ...registrosDia[id]
+                        });
+                    });
+                }
+            });
+        }
+
+        // Ordenar por fecha y timestamp
+        registros.sort((a, b) => {
+            if (a.fecha !== b.fecha) {
+                return a.fecha.localeCompare(b.fecha);
+            }
+            return a.timestamp - b.timestamp;
+        });
+
+        return registros;
+    },
+
+    /**
+     * Calcula horas trabajadas desde los registros de asistencia
+     * @param {Array} registros - Registros de entrada/salida
+     * @returns {Array} Registros con horas calculadas
+     */
+    calcularHorasDesdeRegistros(registros) {
+        const registrosPorDia = {};
+
+        // Agrupar por fecha
+        registros.forEach(r => {
+            if (!registrosPorDia[r.fecha]) {
+                registrosPorDia[r.fecha] = [];
+            }
+            registrosPorDia[r.fecha].push(r);
+        });
+
+        const resultado = [];
+
+        // Calcular horas para cada día
+        Object.keys(registrosPorDia).forEach(fecha => {
+            const registrosDia = registrosPorDia[fecha].sort((a, b) => a.timestamp - b.timestamp);
+
+            let entrada = null;
+            let totalHoras = 0;
+
+            registrosDia.forEach(registro => {
+                if (registro.tipo === 'entrada') {
+                    entrada = registro;
+                } else if (registro.tipo === 'salida' && entrada) {
+                    // Calcular horas entre entrada y salida
+                    const diffMs = registro.timestamp - entrada.timestamp;
+                    const horas = diffMs / (1000 * 60 * 60);
+                    totalHoras += horas;
+
+                    resultado.push({
+                        fecha,
+                        horaEntrada: entrada.hora,
+                        horaSalida: registro.hora,
+                        horasTrabajadas: parseFloat(horas.toFixed(2)),
+                        entrada: entrada,
+                        salida: registro
+                    });
+
+                    entrada = null;
+                }
+            });
+        });
+
+        return resultado;
     }
 };
 

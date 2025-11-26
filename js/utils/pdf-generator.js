@@ -10,60 +10,326 @@ const PDFGenerator = {
      */
     generarPlanillaPDF(planilla) {
         const { jsPDF } = window.jspdf;
-        const doc = new jsPDF();
+        const doc = new jsPDF('p', 'mm', 'a4');
+        
+        // Color primario (azul)
+        const primaryColor = [30, 64, 175];
+        const secondaryColor = [59, 130, 246];
+        const lightGray = [243, 244, 246];
+        const darkGray = [107, 114, 128];
 
-        // Título
-        doc.setFontSize(18);
-        doc.setFont(undefined, 'bold');
-        doc.text('Planilla de Nómina', 105, 15, { align: 'center' });
-
-        // Información del período
+        // ========== ENCABEZADO ==========
+        // Preparar información de fecha y quincena
+        const periodoInicio = Formatters.formatearFecha(planilla.periodoInicio);
+        const periodoFin = Formatters.formatearFecha(planilla.periodoFin);
+        const tipoPeriodo = (planilla.tipoPeriodo === 'quinzenal' ? 'quincenal' : planilla.tipoPeriodo).toUpperCase();
+        
+        // Determinar número de quincena y mes
+        const fechaInicio = new Date(planilla.periodoInicio);
+        const diaInicio = fechaInicio.getDate();
+        const nombreMes = fechaInicio.toLocaleDateString('es-CR', { month: 'long' });
+        const mesCapitalizado = nombreMes.charAt(0).toUpperCase() + nombreMes.slice(1);
+        const año = fechaInicio.getFullYear();
+        
+        let numeroQuincena = '';
+        if (planilla.tipoPeriodo === 'quincenal' || planilla.tipoPeriodo === 'quinzenal') {
+            if (diaInicio >= 1 && diaInicio <= 15) {
+                numeroQuincena = 'Primera Quincena';
+            } else {
+                numeroQuincena = 'Segunda Quincena';
+            }
+        } else {
+            numeroQuincena = 'Mensual';
+        }
+        
+        // Fondo del encabezado
+        doc.setFillColor(...primaryColor);
+        doc.rect(0, 0, 210, 35, 'F');
+        
+        // Título principal con quincena (formato título: primera letra mayúscula)
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(20);
+        doc.setFont('helvetica', 'bold');
+        const tituloCompleto = `Planilla ${numeroQuincena} - ${mesCapitalizado} ${año}`;
+        doc.text(tituloCompleto, 105, 18, { align: 'center' });
+        
+        // Subtítulo - San Martin de Porres
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'normal');
+        doc.text('San Martin de Porres', 105, 28, { align: 'center' });
+        
+        // ========== INFORMACIÓN DEL PERÍODO ==========
+        let currentY = 50;
+        doc.setTextColor(...darkGray);
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        
+        // Caja de información del período (altura ajustada para que quepa todo)
+        const alturaCaja = 25;
+        doc.setDrawColor(...primaryColor);
+        doc.setLineWidth(0.5);
+        doc.rect(20, currentY - 5, 170, alturaCaja, 'S');
+        
+        // Fondo gris claro
+        doc.setFillColor(...lightGray);
+        doc.rect(20, currentY - 5, 170, alturaCaja, 'F');
+        doc.rect(20, currentY - 5, 170, alturaCaja, 'S');
+        
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(...primaryColor);
         doc.setFontSize(11);
-        doc.setFont(undefined, 'normal');
-        doc.text(`Período: ${Formatters.formatearFecha(planilla.periodoInicio)} - ${Formatters.formatearFecha(planilla.periodoFin)}`, 20, 25);
-        doc.text(`Tipo: ${(planilla.tipoPeriodo === 'quinzenal' ? 'quincenal' : planilla.tipoPeriodo).toUpperCase()}`, 20, 31);
-        doc.text(`Fecha de generación: ${Formatters.formatearFecha(new Date())}`, 20, 37);
+        doc.text('INFORMACIÓN DEL PERÍODO', 25, currentY);
+        
+        currentY += 6;
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(0, 0, 0);
+        doc.setFontSize(10);
+        
+        const fechaGeneracion = Formatters.formatearFecha(new Date());
+        
+        doc.text(`Período: ${periodoInicio} - ${periodoFin}`, 25, currentY);
+        currentY += 6;
+        doc.text(`Fecha de generación: ${fechaGeneracion}`, 25, currentY);
+        currentY += 6;
+        doc.text(`Tipo: ${tipoPeriodo}`, 25, currentY);
 
-        // Tabla de empleados
+        // Función auxiliar para formatear moneda en PDF (sin símbolos extraños)
+        const formatearMonedaPDF = (monto) => {
+            if (monto === null || monto === undefined || isNaN(monto) || monto === 0) {
+                return '0.00';
+            }
+            const numero = parseFloat(monto);
+            
+            // Formatear manualmente para evitar problemas con símbolos
+            const partes = numero.toFixed(2).split('.');
+            let parteEntera = partes[0];
+            const parteDecimal = partes[1];
+            
+            // Agregar separadores de miles (espacios cada 3 dígitos desde la derecha)
+            let parteEnteraFormateada = '';
+            let contador = 0;
+            for (let i = parteEntera.length - 1; i >= 0; i--) {
+                if (contador > 0 && contador % 3 === 0) {
+                    parteEnteraFormateada = ' ' + parteEnteraFormateada;
+                }
+                parteEnteraFormateada = parteEntera[i] + parteEnteraFormateada;
+                contador++;
+            }
+            
+            return parteEnteraFormateada + '.' + parteDecimal;
+        };
+
+        // ========== TABLA DE EMPLEADOS ==========
+        currentY += 8;
         const empleadosArray = [];
         if (planilla.empleados) {
             Object.keys(planilla.empleados).forEach(key => {
                 const emp = planilla.empleados[key];
+                // Formatear cédula si existe
+                const cedulaFormateada = emp.cedula ? Formatters.formatearCedula(emp.cedula) : (emp.cédula ? Formatters.formatearCedula(emp.cédula) : '-');
                 empleadosArray.push([
                     emp.nombreEmpleado || '-',
-                    emp.cédula || '-',
-                    Formatters.formatearMoneda(emp.salarioBruto || 0),
-                    Formatters.formatearMoneda(emp.descuentoCCSS || 0),
-                    Formatters.formatearMoneda(emp.impuestoRenta || 0),
-                    Formatters.formatearMoneda(emp.salarioNeto || 0)
+                    cedulaFormateada,
+                    formatearMonedaPDF(emp.salarioBruto || 0),
+                    formatearMonedaPDF(emp.descuentoCCSS || 0),
+                    formatearMonedaPDF(emp.impuestoRenta || 0),
+                    formatearMonedaPDF(emp.salarioNeto || 0)
                 ]);
             });
         }
 
         doc.autoTable({
-            startY: 45,
-            head: [['Empleado', 'Cédula', 'Salario Bruto', 'CCSS', 'Renta', 'Salario Neto']],
+            startY: currentY,
+            head: [['Empleado', 'Cédula', 'Salario Bruto (CRC)', 'CCSS (CRC)', 'Renta (CRC)', 'Salario Neto (CRC)']],
             body: empleadosArray,
-            theme: 'grid',
-            styles: { fontSize: 8, cellPadding: 2 },
-            headStyles: { fillColor: [30, 64, 175], textColor: 255 }
+            theme: 'striped',
+            styles: { 
+                fontSize: 7.5, 
+                cellPadding: 2,
+                textColor: [0, 0, 0],
+                lineColor: [200, 200, 200],
+                lineWidth: 0.1,
+                overflow: 'linebreak',
+                cellWidth: 'wrap'
+            },
+            headStyles: { 
+                fillColor: primaryColor, 
+                textColor: [255, 255, 255],
+                fontStyle: 'bold',
+                fontSize: 7.5,
+                halign: 'center'
+            },
+            alternateRowStyles: {
+                fillColor: [249, 250, 251]
+            },
+            columnStyles: {
+                0: { cellWidth: 40, halign: 'left', fontSize: 7 },
+                1: { cellWidth: 24, halign: 'center', fontSize: 7 },
+                2: { cellWidth: 32, halign: 'right', fontSize: 7 },
+                3: { cellWidth: 26, halign: 'right', fontSize: 7 },
+                4: { cellWidth: 24, halign: 'right', fontSize: 7 },
+                5: { cellWidth: 32, halign: 'right', fontStyle: 'bold', fontSize: 7 }
+            },
+            margin: { left: 10, right: 10 },
+            tableWidth: 190
         });
 
-        // Totales
-        const finalY = doc.lastAutoTable.finalY + 10;
+        // ========== SECCIÓN DE TOTALES ==========
+        const finalY = doc.lastAutoTable.finalY + 15;
+        
+        // Caja de totales con fondo
+        doc.setFillColor(...lightGray);
+        doc.setDrawColor(...primaryColor);
+        doc.setLineWidth(0.5);
+        doc.rect(20, finalY - 5, 170, 50, 'F');
+        doc.rect(20, finalY - 5, 170, 50, 'S');
+        
+        // Título de totales
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(14);
+        doc.setTextColor(...primaryColor);
+        doc.text('RESUMEN DE TOTALES', 25, finalY + 3);
+        
+        // Línea separadora
+        doc.setDrawColor(...primaryColor);
+        doc.setLineWidth(0.3);
+        doc.line(25, finalY + 6, 185, finalY + 6);
+        
+        let totalY = finalY + 12;
         doc.setFontSize(10);
-        doc.setFont(undefined, 'bold');
-        doc.text('TOTALES:', 20, finalY);
-        doc.setFont(undefined, 'normal');
-        doc.text(`Total Salarios Brutos: ${Formatters.formatearMoneda(planilla.totales?.totalSalariosBrutos || 0)}`, 20, finalY + 6);
-        doc.text(`Total Descuentos CCSS: ${Formatters.formatearMoneda(planilla.totales?.totalDescuentosCCSS || 0)}`, 20, finalY + 12);
-        doc.text(`Total Impuestos Renta: ${Formatters.formatearMoneda(planilla.totales?.totalImpuestosRenta || 0)}`, 20, finalY + 18);
-        doc.text(`Total Salarios Netos: ${Formatters.formatearMoneda(planilla.totales?.totalSalariosNetos || 0)}`, 20, finalY + 24);
-        doc.text(`Cantidad de Empleados: ${planilla.totales?.cantidadEmpleados || 0}`, 20, finalY + 30);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(0, 0, 0);
+        
+        // Total Salarios Brutos
+        doc.setFont('helvetica', 'bold');
+        doc.text('Total Salarios Brutos (CRC):', 25, totalY);
+        doc.setFont('helvetica', 'normal');
+        doc.text(formatearMonedaPDF(planilla.totales?.totalSalariosBrutos || 0), 150, totalY, { align: 'right' });
+        
+        totalY += 7;
+        doc.setFont('helvetica', 'bold');
+        doc.text('Total Descuentos CCSS (CRC):', 25, totalY);
+        doc.setFont('helvetica', 'normal');
+        doc.text(formatearMonedaPDF(planilla.totales?.totalDescuentosCCSS || 0), 150, totalY, { align: 'right' });
+        
+        totalY += 7;
+        doc.setFont('helvetica', 'bold');
+        doc.text('Total Impuestos Renta (CRC):', 25, totalY);
+        doc.setFont('helvetica', 'normal');
+        doc.text(formatearMonedaPDF(planilla.totales?.totalImpuestosRenta || 0), 150, totalY, { align: 'right' });
+        
+        totalY += 7;
+        // Línea separadora antes del total neto
+        doc.setDrawColor(200, 200, 200);
+        doc.line(25, totalY + 2, 185, totalY + 2);
+        totalY += 6;
+        
+        // Total Salarios Netos (destacado)
+        doc.setFillColor(...secondaryColor);
+        doc.setDrawColor(...primaryColor);
+        doc.setLineWidth(0.5);
+        doc.roundedRect(25, totalY - 5, 160, 8, 2, 2, 'FD');
+        
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(12);
+        doc.setTextColor(255, 255, 255);
+        doc.text('TOTAL SALARIOS NETOS (CRC):', 30, totalY);
+        doc.text(formatearMonedaPDF(planilla.totales?.totalSalariosNetos || 0), 180, totalY, { align: 'right' });
+        
+        totalY += 10;
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(0, 0, 0);
+        doc.text(`Cantidad de Empleados: ${planilla.totales?.cantidadEmpleados || 0}`, 25, totalY);
+
+        // ========== PIE DE PÁGINA ==========
+        const pageHeight = doc.internal.pageSize.height;
+        doc.setFontSize(8);
+        doc.setTextColor(...darkGray);
+        doc.setFont('helvetica', 'italic');
+        doc.text('Documento generado automáticamente por el Sistema de Planillas', 105, pageHeight - 10, { align: 'center' });
+        
+        // Número de página
+        const pageCount = doc.internal.getNumberOfPages();
+        for (let i = 1; i <= pageCount; i++) {
+            doc.setPage(i);
+            doc.setFontSize(8);
+            doc.setTextColor(...darkGray);
+            doc.text(`Página ${i} de ${pageCount}`, 105, pageHeight - 5, { align: 'center' });
+        }
 
         // Guardar PDF
         const filename = `Planilla_${Formatters.formatearFechaFirebase(planilla.periodoInicio)}_${planilla.tipoPeriodo}.pdf`;
         doc.save(filename);
+    },
+
+    /**
+     * Convierte un número a texto en español (colones)
+     * @param {number} numero - Número a convertir
+     * @returns {string} Número en texto
+     */
+    numeroATexto(numero) {
+        const unidades = ['', 'uno', 'dos', 'tres', 'cuatro', 'cinco', 'seis', 'siete', 'ocho', 'nueve'];
+        const decenas = ['', '', 'veinte', 'treinta', 'cuarenta', 'cincuenta', 'sesenta', 'setenta', 'ochenta', 'noventa'];
+        const especiales = ['diez', 'once', 'doce', 'trece', 'catorce', 'quince', 'dieciséis', 'diecisiete', 'dieciocho', 'diecinueve'];
+        const centenas = ['', 'ciento', 'doscientos', 'trescientos', 'cuatrocientos', 'quinientos', 'seiscientos', 'setecientos', 'ochocientos', 'novecientos'];
+        
+        if (numero === 0) return 'cero';
+        if (numero < 0) return 'menos ' + this.numeroATexto(-numero);
+        
+        let texto = '';
+        const millones = Math.floor(numero / 1000000);
+        const miles = Math.floor((numero % 1000000) / 1000);
+        const resto = numero % 1000;
+        
+        if (millones > 0) {
+            texto += this.convertirGrupo(millones, unidades, decenas, especiales, centenas) + ' millón' + (millones > 1 ? 'es' : '') + ' ';
+        }
+        
+        if (miles > 0) {
+            if (miles === 1) {
+                texto += 'mil ';
+            } else {
+                texto += this.convertirGrupo(miles, unidades, decenas, especiales, centenas) + ' mil ';
+            }
+        }
+        
+        if (resto > 0 || texto === '') {
+            texto += this.convertirGrupo(resto, unidades, decenas, especiales, centenas);
+        }
+        
+        return texto.trim();
+    },
+    
+    /**
+     * Convierte un grupo de 3 dígitos a texto
+     */
+    convertirGrupo(numero, unidades, decenas, especiales, centenas) {
+        if (numero === 0) return '';
+        if (numero === 100) return 'cien';
+        
+        let texto = '';
+        const c = Math.floor(numero / 100);
+        const d = Math.floor((numero % 100) / 10);
+        const u = numero % 10;
+        
+        if (c > 0) {
+            texto += centenas[c] + ' ';
+        }
+        
+        if (d === 1) {
+            texto += especiales[u] + ' ';
+        } else if (d > 1) {
+            texto += decenas[d];
+            if (u > 0) {
+                texto += ' y ' + unidades[u];
+            }
+            texto += ' ';
+        } else if (u > 0) {
+            texto += unidades[u] + ' ';
+        }
+        
+        return texto.trim();
     },
 
     /**
@@ -74,42 +340,199 @@ const PDFGenerator = {
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF();
 
+        // Función para formatear moneda como en el documento (¢460 000,00)
+        const formatearMonedaConstancia = (monto) => {
+            if (monto === null || monto === undefined || isNaN(monto) || monto === 0) {
+                return '¢0,00';
+            }
+            const numero = parseFloat(monto);
+            const partes = numero.toFixed(2).split('.');
+            let parteEntera = partes[0];
+            const parteDecimal = partes[1];
+            
+            // Agregar espacios cada 3 dígitos desde la derecha
+            let parteEnteraFormateada = '';
+            let contador = 0;
+            for (let i = parteEntera.length - 1; i >= 0; i--) {
+                if (contador > 0 && contador % 3 === 0) {
+                    parteEnteraFormateada = ' ' + parteEnteraFormateada;
+                }
+                parteEnteraFormateada = parteEntera[i] + parteEnteraFormateada;
+                contador++;
+            }
+            
+            return '¢' + parteEnteraFormateada + ',' + parteDecimal;
+        };
+
+        // Función para convertir número a texto en español
+        const numeroATexto = (numero) => {
+            const unidades = ['', 'uno', 'dos', 'tres', 'cuatro', 'cinco', 'seis', 'siete', 'ocho', 'nueve'];
+            const decenas = ['', '', 'veinte', 'treinta', 'cuarenta', 'cincuenta', 'sesenta', 'setenta', 'ochenta', 'noventa'];
+            const especiales = ['diez', 'once', 'doce', 'trece', 'catorce', 'quince', 'dieciséis', 'diecisiete', 'dieciocho', 'diecinueve'];
+            const centenas = ['', 'ciento', 'doscientos', 'trescientos', 'cuatrocientos', 'quinientos', 'seiscientos', 'setecientos', 'ochocientos', 'novecientos'];
+            
+            if (numero === 0) return 'cero';
+            if (numero < 0) return 'menos ' + numeroATexto(-numero);
+            
+            let texto = '';
+            const millones = Math.floor(numero / 1000000);
+            const miles = Math.floor((numero % 1000000) / 1000);
+            const resto = numero % 1000;
+            
+            if (millones > 0) {
+                texto += convertirGrupo(millones, unidades, decenas, especiales, centenas) + ' millón' + (millones > 1 ? 'es' : '') + ' ';
+            }
+            
+            if (miles > 0) {
+                if (miles === 1) {
+                    texto += 'mil ';
+                } else {
+                    texto += convertirGrupo(miles, unidades, decenas, especiales, centenas) + ' mil ';
+                }
+            }
+            
+            if (resto > 0 || texto === '') {
+                texto += convertirGrupo(resto, unidades, decenas, especiales, centenas);
+            }
+            
+            return texto.trim();
+        };
+        
+        const convertirGrupo = (numero, unidades, decenas, especiales, centenas) => {
+            if (numero === 0) return '';
+            if (numero === 100) return 'cien';
+            
+            let texto = '';
+            const c = Math.floor(numero / 100);
+            const d = Math.floor((numero % 100) / 10);
+            const u = numero % 10;
+            
+            if (c > 0) {
+                texto += centenas[c] + ' ';
+            }
+            
+            if (d === 1) {
+                texto += especiales[u] + ' ';
+            } else if (d > 1) {
+                texto += decenas[d];
+                if (u > 0) {
+                    texto += ' y ' + unidades[u];
+                }
+                texto += ' ';
+            } else if (u > 0) {
+                texto += unidades[u] + ' ';
+            }
+            
+            return texto.trim();
+        };
+
         // Encabezado
         doc.setFontSize(16);
         doc.setFont(undefined, 'bold');
         doc.text('CONSTANCIA SALARIAL', 105, 20, { align: 'center' });
+        
+        doc.setFontSize(12);
+        doc.setFont(undefined, 'bold');
+        doc.text('A QUIEN INTERESE', 105, 28, { align: 'center' });
 
-        // Fecha actual
-        doc.setFontSize(10);
-        doc.setFont(undefined, 'normal');
-        doc.text(`Fecha de emisión: ${Formatters.formatearFechaLarga(new Date())}`, 105, 30, { align: 'center' });
-
-        // Cuerpo de la constancia
+        // Cuerpo de la constancia - formato exacto solicitado
         doc.setFontSize(11);
-        const textoInicio = 50;
-        
-        doc.text('Por medio de la presente, se hace constar que:', 20, textoInicio);
-        
-        doc.setFont(undefined, 'bold');
-        doc.text(`Nombre: ${empleado.nombre}`, 20, textoInicio + 10);
-        doc.text(`Cédula: ${Formatters.formatearCedula(empleado.cedula)}`, 20, textoInicio + 18);
-        
         doc.setFont(undefined, 'normal');
-        doc.text(`Labora en esta empresa desde el ${Formatters.formatearFechaLarga(empleado.fechaIngreso)}`, 20, textoInicio + 28);
-        doc.text(`en el cargo de ${empleado.cargo}, del departamento de ${empleado.departamento}.`, 20, textoInicio + 36);
+        let textoInicio = 45;
         
-        doc.setFont(undefined, 'bold');
-        doc.text(`Salario Mensual: ${Formatters.formatearMoneda(empleado.salarioMensual)}`, 20, textoInicio + 46);
+        // Formatear fecha de ingreso
+        const fechaIngreso = empleado.fechaIngreso ? new Date(empleado.fechaIngreso) : new Date();
+        const meses = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+        const diaIngreso = fechaIngreso.getDate();
+        const mesIngreso = meses[fechaIngreso.getMonth()];
+        const anioIngreso = fechaIngreso.getFullYear();
+        const fechaIngresoFormateada = `${diaIngreso} de ${mesIngreso} de ${anioIngreso}`;
         
-        doc.setFont(undefined, 'normal');
-        doc.text(`Jornada Laboral: ${Formatters.formatearJornada(empleado.jornada)}`, 20, textoInicio + 54);
-        doc.text(`Estado: ${empleado.estado.toUpperCase()}`, 20, textoInicio + 62);
-
-        doc.text('Constancia que se extiende a solicitud del interesado para los fines que estime convenientes.', 20, textoInicio + 80);
-
+        // Obtener fecha actual formateada
+        const fechaActual = new Date();
+        const diaActual = fechaActual.getDate();
+        const mesActual = meses[fechaActual.getMonth()];
+        const anioActual = fechaActual.getFullYear();
+        const fechaActualFormateada = `${diaActual} de ${mesActual} de ${anioActual}`;
+        
+        // Preparar datos
+        const nombreCompleto = (empleado.nombre || '').trim();
+        const nombreSinTitulo = nombreCompleto.replace(/^(Sr\.|Sra\.|Sr\.|Sra\.)\s*/i, '').trim();
+        const nombreMayusculas = nombreSinTitulo.toUpperCase();
+        const cedulaFormateada = Formatters.formatearCedula(empleado.cedula);
+        const puesto = empleado.cargo || 'N/A';
+        
+        // Calcular salarios
+        const salarioBruto = Math.round(empleado.salarioMensual || 0);
+        const descuentoCCSS = Math.round(salarioBruto * 0.1067);
+        let salarioDespuesCCSS = salarioBruto - descuentoCCSS;
+        
+        let impuestoRenta = 0;
+        if (salarioDespuesCCSS > 922000) {
+            const exceso = salarioDespuesCCSS - 922000;
+            if (exceso <= 430000) {
+                impuestoRenta = Math.round(exceso * 0.10);
+            } else if (exceso <= 1451000) {
+                impuestoRenta = Math.round(430000 * 0.10 + (exceso - 430000) * 0.15);
+            } else if (exceso <= 3823000) {
+                impuestoRenta = Math.round(430000 * 0.10 + 1021000 * 0.15 + (exceso - 1451000) * 0.20);
+            } else {
+                impuestoRenta = Math.round(430000 * 0.10 + 1021000 * 0.15 + 2372000 * 0.20 + (exceso - 3823000) * 0.25);
+            }
+            const creditosHijos = Math.min(empleado.hijos || 0, 4) * 1720;
+            const creditoConyuge = (empleado.estadoCivil === 'casado') ? 2600 : 0;
+            const totalCreditos = creditosHijos + creditoConyuge;
+            impuestoRenta = Math.max(0, impuestoRenta - totalCreditos);
+        }
+        
+        const salarioNeto = Math.round(salarioDespuesCCSS - impuestoRenta);
+        
+        // Convertir salarios a texto
+        const salarioBrutoTexto = numeroATexto(salarioBruto) + ' colones';
+        const salarioNetoTexto = numeroATexto(salarioNeto) + ' colones';
+        
+        // Texto principal - formato exacto solicitado
+        const textoPrincipal = `Por medio de este documento hacemos constar que el (la) Sr. (Sra.) ${nombreMayusculas}, documento de identidad número ${cedulaFormateada}, trabaja para nuestra empresa desempeñándose en la posición de ${puesto} desde el ${fechaIngresoFormateada} y hasta la actualidad.`;
+        
+        // Dividir texto largo en líneas
+        const lineas = doc.splitTextToSize(textoPrincipal, 170);
+        lineas.forEach((linea, index) => {
+            doc.text(linea, 20, textoInicio + (index * 7));
+        });
+        textoInicio += lineas.length * 7 + 5;
+        
+        // Texto de salarios
+        const textoSalarios = `Percibiendo en el último mes un salario mensual bruto de ${formatearMonedaConstancia(salarioBruto)} (${salarioBrutoTexto}) y un salario mensual neto de ${formatearMonedaConstancia(salarioNeto)} (${salarioNetoTexto}).`;
+        const lineasSalarios = doc.splitTextToSize(textoSalarios, 170);
+        lineasSalarios.forEach((linea, index) => {
+            doc.text(linea, 20, textoInicio + (index * 7));
+        });
+        textoInicio += lineasSalarios.length * 7 + 5;
+        
+        // Fecha de emisión
+        doc.text(`La presente se extiende a solicitud de la persona interesada el día ${fechaActualFormateada}.`, 20, textoInicio);
+        textoInicio += 10;
+        
+        // Información de contacto
+        const textoContacto = `Si usted tiene alguna pregunta o inquietud, o si desea validar esta información; por favor contacte a nuestro departamento de Recursos Humanos enviando un correo electrónico a rrhh@vetsanmartin.com, incluyendo la carta que desea validar.`;
+        const lineasContacto = doc.splitTextToSize(textoContacto, 170);
+        lineasContacto.forEach((linea, index) => {
+            doc.text(linea, 20, textoInicio + (index * 7));
+        });
+        textoInicio += lineasContacto.length * 7 + 10;
+        
         // Firma
-        doc.line(20, textoInicio + 120, 90, textoInicio + 120);
-        doc.text('Firma Autorizada', 55, textoInicio + 126, { align: 'center' });
+        doc.text('Atentamente,', 20, textoInicio);
+        textoInicio += 5;
+        
+        // Línea de firma
+        doc.line(20, textoInicio + 10, 90, textoInicio + 10);
+        
+        // Nombre y cargo
+        doc.setFont(undefined, 'bold');
+        doc.text('Dr. Randall Azofeifa', 55, textoInicio + 20, { align: 'center' });
+        doc.setFont(undefined, 'normal');
+        doc.text('Gerente General', 55, textoInicio + 26, { align: 'center' });
 
         // Guardar PDF
         const filename = `Constancia_${empleado.cedula.replace(/[-\s]/g, '')}.pdf`;

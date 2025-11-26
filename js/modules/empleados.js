@@ -144,6 +144,7 @@ const EmpleadosModule = {
                                     <th onclick="EmpleadosModule.ordenar('salarioMensual')" class="cursor-pointer">
                                         Salario ${this.sortBy === 'salarioMensual' ? (this.sortDirection === 'asc' ? '↑' : '↓') : ''}
                                     </th>
+                                    <th>Tipo</th>
                                     <th>Estado</th>
                                     <th>Acciones</th>
                                 </tr>
@@ -175,7 +176,7 @@ const EmpleadosModule = {
         if (empleadosPagina.length === 0) {
             return `
                 <tr>
-                    <td colspan="8" class="text-center text-gray-500 py-8">
+                    <td colspan="9" class="text-center text-gray-500 py-8">
                         No se encontraron empleados
                     </td>
                 </tr>
@@ -190,6 +191,7 @@ const EmpleadosModule = {
                 <td>${emp.departamento}</td>
                 <td><span class="text-xs">${Formatters.formatearJornada(emp.jornada)}</span></td>
                 <td class="font-semibold">${Formatters.formatearMoneda(emp.salarioMensual)}</td>
+                <td><span class="px-2 py-1 rounded text-xs font-medium ${emp.tipoEmpleado === 'SP' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}">${emp.tipoEmpleado === 'SP' ? 'SP' : 'Planilla'}</span></td>
                 <td>${Formatters.formatearEstadoBadge(emp.estado)}</td>
                 <td>
                     <div class="flex space-x-2">
@@ -462,16 +464,22 @@ const EmpleadosModule = {
                                 </div>
 
                                 <div class="form-group">
-                                    <label class="form-label">Cédula <span class="text-red-500">*</span></label>
+                                    <label class="form-label">Cédula <span class="text-red-500" id="label-cedula-required">*</span></label>
                                     <input type="text" id="cedula" class="form-control" 
                                         value="${empleado?.cedula || ''}" required>
                                     <div class="form-error hidden" id="error-cedula"></div>
+                                    <div class="form-help text-xs text-gray-500 hidden" id="helpCedulaSP">
+                                        Opcional para empleados de Servicios Profesionales.
+                                    </div>
                                 </div>
 
                                 <div class="form-group">
-                                    <label class="form-label">Correo Electrónico <span class="text-red-500">*</span></label>
+                                    <label class="form-label">Correo Electrónico <span class="text-red-500" id="label-correo-required">*</span></label>
                                     <input type="email" id="correo" class="form-control" value="${empleado?.correo || ''}" required>
                                     <div class="form-error hidden" id="error-correo"></div>
+                                    <div class="form-help text-xs text-gray-500 hidden" id="helpCorreoSP">
+                                        Opcional para empleados de Servicios Profesionales.
+                                    </div>
                                 </div>
 
                                 <div class="form-group">
@@ -480,26 +488,41 @@ const EmpleadosModule = {
                                         value="${empleado?.telefono || ''}">
                                 </div>
 
-                                <div class="form-group">
-                                    <label class="form-label">Fecha de Ingreso <span class="text-red-500">*</span></label>
+                                <div class="form-group" id="groupFechaIngreso">
+                                    <label class="form-label" for="fechaIngreso">Fecha de Ingreso <span class="text-red-500">*</span></label>
                                     <input type="date" id="fechaIngreso" class="form-control" 
                                         value="${empleado ? Formatters.formatearFechaInput(empleado.fechaIngreso) : ''}" required>
+                                    <div class="form-help text-xs text-gray-500 hidden" id="helpFechaIngresoSP">
+                                        Opcional para empleados de Servicios Profesionales.
+                                    </div>
                                 </div>
 
-                                <div class="form-group">
-                                    <label class="form-label">Fecha de Nacimiento</label>
+                                <div class="form-group" id="groupFechaNacimiento">
+                                    <label class="form-label" for="fechaNacimiento">Fecha de Nacimiento</label>
                                     <input type="date" id="fechaNacimiento" class="form-control" 
                                         value="${empleado && empleado.fechaNacimiento ? Formatters.formatearFechaInput(empleado.fechaNacimiento) : ''}">
                                     <div class="form-help">Para envío automático de felicitaciones de cumpleaños</div>
                                 </div>
 
                                 <div class="form-group">
-                                    <label class="form-label">Estado <span class="text-red-500">*</span></label>
+                                    <label class="form-label">Estado <span class="text-red-500" id="label-estado-required">*</span></label>
                                     <select id="estado" class="form-control" required>
                                         <option value="activo" ${empleado?.estado === 'activo' ? 'selected' : ''}>Activo</option>
                                         <option value="inactivo" ${empleado?.estado === 'inactivo' ? 'selected' : ''}>Inactivo</option>
                                         <option value="suspendido" ${empleado?.estado === 'suspendido' ? 'selected' : ''}>Suspendido</option>
                                     </select>
+                                    <div class="form-help text-xs text-gray-500 hidden" id="helpEstadoSP">
+                                        Opcional para empleados de Servicios Profesionales.
+                                    </div>
+                                </div>
+
+                                <div class="form-group">
+                                    <label class="form-label" for="tipoEmpleado">Tipo de Empleado <span class="text-red-500">*</span></label>
+                                    <select id="tipoEmpleado" class="form-control" required>
+                                        <option value="planilla" ${empleado?.tipoEmpleado === 'planilla' || !empleado?.tipoEmpleado ? 'selected' : ''}>En Planilla</option>
+                                        <option value="SP" ${empleado?.tipoEmpleado === 'SP' ? 'selected' : ''}>Servicios Profesionales (SP)</option>
+                                    </select>
+                                    <div class="form-help">Los empleados SP se pagan por horas trabajadas</div>
                                 </div>
                             </div>
                         </div>
@@ -508,24 +531,30 @@ const EmpleadosModule = {
                         <div>
                             <h3 class="text-lg font-semibold text-gray-800 mb-4">Información Laboral</h3>
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div class="form-group">
-                                    <label class="form-label">Salario Mensual (₡) <span class="text-red-500">*</span></label>
+                                <div class="form-group" id="groupSalarioMensual">
+                                    <label class="form-label">Salario Mensual (₡) <span class="text-red-500" id="label-salarioMensual-required">*</span></label>
                                     <input type="number" id="salarioMensual" class="form-control" step="0.01" 
                                         value="${empleado?.salarioMensual || ''}" required>
                                     <div class="form-error hidden" id="error-salarioMensual"></div>
                                     <div class="form-help">El salario mensual ya contempla los días libres de la jornada</div>
+                                    <div class="form-help text-xs text-gray-500 hidden" id="helpSalarioMensualSP">
+                                        Opcional para empleados de Servicios Profesionales.
+                                    </div>
                                 </div>
 
                                 <div class="form-group">
-                                    <label class="form-label">Salario por Hora (₡) <span class="text-gray-400">(Opcional)</span></label>
+                                    <label class="form-label">Salario por Hora (₡) <span class="text-gray-400" id="label-salarioHorario-optional">(Opcional)</span><span class="text-red-500 hidden" id="label-salarioHorario-required">*</span></label>
                                     <input type="number" id="salarioHorario" class="form-control" step="0.0000001" 
                                         value="${empleado?.salarioHorario || ''}" placeholder="Se calculará automáticamente">
                                     <div class="form-error hidden" id="error-salarioHorario"></div>
-                                    <div class="form-help">Si ingresa este valor, se calculará el salario mensual automáticamente. Use hasta 7 decimales para mayor precisión.</div>
+                                    <div class="form-help" id="helpSalarioHorarioNormal">Si ingresa este valor, se calculará el salario mensual automáticamente. Use hasta 7 decimales para mayor precisión.</div>
+                                    <div class="form-help text-xs text-purple-700 hidden" id="helpSalarioHoraSP">
+                                        Obligatorio para empleados de Servicios Profesionales.
+                                    </div>
                                 </div>
 
-                                <div class="form-group">
-                                    <label class="form-label">Jornada Laboral <span class="text-red-500">*</span></label>
+                                <div class="form-group" id="groupJornada">
+                                    <label class="form-label" for="jornada">Jornada Laboral <span class="text-red-500">*</span></label>
                                     <select id="jornada" class="form-control" required>
                                         ${Object.values(CONFIG.JORNADAS).map(j => 
                                             `<option value="${j.codigo}" ${empleado?.jornada === j.codigo ? 'selected' : ''}>
@@ -533,7 +562,9 @@ const EmpleadosModule = {
                                             </option>`
                                         ).join('')}
                                     </select>
-                                    <div class="form-help">Al cambiar la jornada, se recalcularán los salarios</div>
+                                    <div class="form-help" id="helpJornada">
+                                        Al cambiar la jornada, se recalcularán los salarios
+                                    </div>
                                 </div>
 
                                 <div class="form-group">
@@ -549,13 +580,16 @@ const EmpleadosModule = {
                                 </div>
 
                                 <div class="form-group">
-                                    <label class="form-label">Empresa <span class="text-red-500">*</span></label>
+                                    <label class="form-label">Empresa <span class="text-red-500" id="label-empresa-required">*</span></label>
                                     <select id="empresa" class="form-control" required>
                                         ${CONFIG.EMPRESAS.map(e => 
                                             `<option value="${e}" ${empleado?.empresa === e ? 'selected' : ''}>${e}</option>`
                                         ).join('')}
                                     </select>
                                     <div class="form-help">La empresa determina el logo y nombre en el comprobante de pago</div>
+                                    <div class="form-help text-xs text-gray-500 hidden" id="helpEmpresaSP">
+                                        Opcional para empleados de Servicios Profesionales.
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -627,6 +661,102 @@ const EmpleadosModule = {
             await this.guardarEmpleado(empleadoId);
         });
 
+        const tipoEmpleadoSelect = document.getElementById('tipoEmpleado');
+        const fechaIngresoInput = document.getElementById('fechaIngreso');
+        const jornadaSelect = document.getElementById('jornada');
+        const salarioHorarioInput = document.getElementById('salarioHorario');
+        const fechaIngresoHelp = document.getElementById('helpFechaIngresoSP');
+        const jornadaGroup = document.getElementById('groupJornada');
+        const salarioHoraHelp = document.getElementById('helpSalarioHoraSP');
+        const cedulaInput = document.getElementById('cedula');
+        const correoInput = document.getElementById('correo');
+        const estadoSelect = document.getElementById('estado');
+        const salarioMensualInput = document.getElementById('salarioMensual');
+        const empresaSelect = document.getElementById('empresa');
+
+        const toggleCamposSP = () => {
+            const esSP = tipoEmpleadoSelect.value === 'SP';
+
+            if (esSP) {
+                // Remover required de campos no obligatorios para SP
+                fechaIngresoInput?.removeAttribute('required');
+                fechaIngresoHelp?.classList.remove('hidden');
+                
+                jornadaSelect?.removeAttribute('required');
+                jornadaSelect?.setAttribute('data-disabled-for-sp', 'true');
+                jornadaSelect?.setAttribute('disabled', 'disabled');
+                jornadaGroup?.classList.add('opacity-60');
+                
+                cedulaInput?.removeAttribute('required');
+                document.getElementById('label-cedula-required')?.classList.add('hidden');
+                document.getElementById('helpCedulaSP')?.classList.remove('hidden');
+                
+                correoInput?.removeAttribute('required');
+                document.getElementById('label-correo-required')?.classList.add('hidden');
+                document.getElementById('helpCorreoSP')?.classList.remove('hidden');
+                
+                estadoSelect?.removeAttribute('required');
+                document.getElementById('label-estado-required')?.classList.add('hidden');
+                document.getElementById('helpEstadoSP')?.classList.remove('hidden');
+                
+                salarioMensualInput?.removeAttribute('required');
+                document.getElementById('label-salarioMensual-required')?.classList.add('hidden');
+                document.getElementById('helpSalarioMensualSP')?.classList.remove('hidden');
+                document.getElementById('groupSalarioMensual')?.classList.add('opacity-60');
+                
+                empresaSelect?.removeAttribute('required');
+                document.getElementById('label-empresa-required')?.classList.add('hidden');
+                document.getElementById('helpEmpresaSP')?.classList.remove('hidden');
+                
+                // Hacer obligatorio salario por hora para SP
+                salarioHorarioInput?.setAttribute('required', 'required');
+                document.getElementById('label-salarioHorario-optional')?.classList.add('hidden');
+                document.getElementById('label-salarioHorario-required')?.classList.remove('hidden');
+                document.getElementById('helpSalarioHorarioNormal')?.classList.add('hidden');
+                salarioHoraHelp?.classList.remove('hidden');
+            } else {
+                // Restaurar required para empleados normales
+                fechaIngresoInput?.setAttribute('required', 'required');
+                fechaIngresoHelp?.classList.add('hidden');
+                
+                jornadaSelect?.removeAttribute('data-disabled-for-sp');
+                jornadaSelect?.removeAttribute('disabled');
+                jornadaSelect?.setAttribute('required', 'required');
+                jornadaGroup?.classList.remove('opacity-60');
+                
+                cedulaInput?.setAttribute('required', 'required');
+                document.getElementById('label-cedula-required')?.classList.remove('hidden');
+                document.getElementById('helpCedulaSP')?.classList.add('hidden');
+                
+                correoInput?.setAttribute('required', 'required');
+                document.getElementById('label-correo-required')?.classList.remove('hidden');
+                document.getElementById('helpCorreoSP')?.classList.add('hidden');
+                
+                estadoSelect?.setAttribute('required', 'required');
+                document.getElementById('label-estado-required')?.classList.remove('hidden');
+                document.getElementById('helpEstadoSP')?.classList.add('hidden');
+                
+                salarioMensualInput?.setAttribute('required', 'required');
+                document.getElementById('label-salarioMensual-required')?.classList.remove('hidden');
+                document.getElementById('helpSalarioMensualSP')?.classList.add('hidden');
+                document.getElementById('groupSalarioMensual')?.classList.remove('opacity-60');
+                
+                empresaSelect?.setAttribute('required', 'required');
+                document.getElementById('label-empresa-required')?.classList.remove('hidden');
+                document.getElementById('helpEmpresaSP')?.classList.add('hidden');
+                
+                // Salario por hora es opcional para empleados normales
+                salarioHorarioInput?.removeAttribute('required');
+                document.getElementById('label-salarioHorario-optional')?.classList.remove('hidden');
+                document.getElementById('label-salarioHorario-required')?.classList.add('hidden');
+                document.getElementById('helpSalarioHorarioNormal')?.classList.remove('hidden');
+                salarioHoraHelp?.classList.add('hidden');
+            }
+        };
+
+        tipoEmpleadoSelect?.addEventListener('change', toggleCamposSP);
+        toggleCamposSP();
+
         // Validación en tiempo real de cédula
         document.getElementById('cedula').addEventListener('blur', (e) => {
             const cedula = e.target.value;
@@ -696,42 +826,61 @@ const EmpleadosModule = {
      */
     async guardarEmpleado(empleadoId) {
         try {
-            const salarioHorarioInput = parseFloat(document.getElementById('salarioHorario')?.value) || null;
-            const salarioMensualInput = parseFloat(document.getElementById('salarioMensual').value);
-            const jornadaCodigo = document.getElementById('jornada').value;
+            const tipoEmpleado = document.getElementById('tipoEmpleado').value;
+            const salarioHorarioInputValor = document.getElementById('salarioHorario')?.value;
+            const salarioHorarioInput = salarioHorarioInputValor ? parseFloat(salarioHorarioInputValor) : null;
+            const salarioMensualInput = parseFloat(document.getElementById('salarioMensual').value) || 0;
+            const jornadaSelect = document.getElementById('jornada');
+            let jornadaCodigo = jornadaSelect ? jornadaSelect.value : null;
+            if (tipoEmpleado === 'SP') {
+                jornadaCodigo = null;
+            }
 
-            // Si se ingresó salario horario, calcular mensual (tiene prioridad)
+            // Si se ingresó salario horario y existe jornada, calcular mensual (tiene prioridad)
             let salarioMensual = salarioMensualInput;
-            if (salarioHorarioInput && salarioHorarioInput > 0) {
+            if (salarioHorarioInput && salarioHorarioInput > 0 && jornadaCodigo) {
                 const jornada = CONFIG.getJornadaByCodigo(jornadaCodigo);
                 salarioMensual = salarioHorarioInput * jornada.horasPorMes;
             }
 
+            const fechaIngresoInput = document.getElementById('fechaIngreso').value;
+            let fechaIngreso = null;
+            if (fechaIngresoInput) {
+                const [anoIngreso, mesIngreso, diaIngreso] = fechaIngresoInput.split('-').map(Number);
+                const fechaIngresoLocal = new Date(anoIngreso, mesIngreso - 1, diaIngreso);
+                fechaIngreso = fechaIngresoLocal.getTime();
+            }
+
             const fechaNacimientoInput = document.getElementById('fechaNacimiento').value;
-            // Crear fecha usando componentes locales para evitar problemas de zona horaria
             let fechaNacimiento = null;
             if (fechaNacimientoInput) {
                 const [ano, mes, dia] = fechaNacimientoInput.split('-').map(Number);
-                // Crear fecha en hora local (mes es 0-indexed en JavaScript)
                 const fechaLocal = new Date(ano, mes - 1, dia);
                 fechaNacimiento = fechaLocal.getTime();
             }
 
+            // Obtener valores de campos opcionales para SP
+            const cedulaValue = document.getElementById('cedula').value.trim();
+            const correoValue = document.getElementById('correo').value.trim();
+            const empresaValue = document.getElementById('empresa').value;
+            const estadoValue = document.getElementById('estado').value;
+
             const datosEmpleado = {
                 nombre: document.getElementById('nombre').value.trim(),
-                cedula: document.getElementById('cedula').value.trim(),
-                correo: document.getElementById('correo').value.trim(),
+                cedula: tipoEmpleado === 'SP' ? (cedulaValue || '') : cedulaValue,
+                correo: tipoEmpleado === 'SP' ? (correoValue || '') : correoValue,
                 telefono: document.getElementById('telefono').value.trim(),
-                fechaIngreso: new Date(document.getElementById('fechaIngreso').value).getTime(),
+                fechaIngreso: fechaIngreso,
                 fechaNacimiento: fechaNacimiento,
-                salarioMensual: salarioMensual,
+                salarioMensual: tipoEmpleado === 'SP' ? (salarioMensual || 0) : salarioMensual,
                 salarioHorario: salarioHorarioInput || null, // Guardar como referencia
-                jornada: jornadaCodigo,
+                jornada: jornadaCodigo || null,
                 cargo: document.getElementById('cargo').value.trim(),
                 departamento: document.getElementById('departamento').value.trim(),
-                empresa: document.getElementById('empresa').value,
+                empresa: tipoEmpleado === 'SP' ? (empresaValue || '') : empresaValue,
                 banco: document.getElementById('banco').value || '',
-                estado: document.getElementById('estado').value,
+                estado: tipoEmpleado === 'SP' ? (estadoValue || 'activo') : estadoValue,
+                tipoEmpleado,
                 hijos: parseInt(document.getElementById('hijos').value) || 0,
                 estadoCivil: document.getElementById('estadoCivil').value
             };
@@ -746,11 +895,13 @@ const EmpleadosModule = {
                 return;
             }
 
-            // Verificar cédula única
-            if (!Validators.validarCedulaUnica(datosEmpleado.cedula, empleadoId, this.empleados)) {
-                this.mostrarErrorCampo('cedula', 'Esta cédula ya está registrada');
-                Utils.showToast('La cédula ya existe', 'error');
-                return;
+            // Verificar cédula única solo si la cédula está presente
+            if (datosEmpleado.cedula && datosEmpleado.cedula.trim()) {
+                if (!Validators.validarCedulaUnica(datosEmpleado.cedula, empleadoId, this.empleados)) {
+                    this.mostrarErrorCampo('cedula', 'Esta cédula ya está registrada');
+                    Utils.showToast('La cédula ya existe', 'error');
+                    return;
+                }
             }
 
             Utils.showLoading('Guardando empleado...');

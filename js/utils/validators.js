@@ -183,41 +183,79 @@ const Validators = {
      */
     validarEmpleado(empleado) {
         const errores = {};
+        const esSP = empleado.tipoEmpleado === 'SP';
         
-        if (!empleado.nombre || empleado.nombre.trim().length < 3) {
-            errores.nombre = 'El nombre es obligatorio (mínimo 3 caracteres)';
-        }
-        
-        if (!this.validarCedula(empleado.cedula)) {
-            errores.cedula = 'La cédula es requerida';
-        }
-        
-        if (!this.validarEmail(empleado.correo)) {
-            errores.correo = 'Email inválido';
-        }
-        
-        if (empleado.telefono && !this.validarTelefono(empleado.telefono)) {
-            errores.telefono = 'Teléfono inválido (8 dígitos)';
-        }
-        
-        if (!empleado.fechaIngreso) {
-            errores.fechaIngreso = 'Fecha de ingreso es obligatoria';
-        }
-        
-        if (!this.validarMonto(empleado.salarioMensual) || empleado.salarioMensual <= 0) {
-            errores.salarioMensual = 'Salario mensual debe ser un número positivo';
-        }
-        
-        if (!empleado.jornada) {
-            errores.jornada = 'Jornada laboral es obligatoria';
-        }
-        
-        if (!empleado.cargo || empleado.cargo.trim().length < 2) {
-            errores.cargo = 'Cargo es obligatorio';
-        }
-        
-        if (!empleado.departamento || empleado.departamento.trim().length < 2) {
-            errores.departamento = 'Departamento es obligatorio';
+        // Para empleados SP, solo validar campos obligatorios
+        if (esSP) {
+            // Nombre es obligatorio
+            if (!empleado.nombre || empleado.nombre.trim().length < 3) {
+                errores.nombre = 'El nombre es obligatorio (mínimo 3 caracteres)';
+            }
+            
+            // Departamento es obligatorio
+            if (!empleado.departamento || empleado.departamento.trim().length < 2) {
+                errores.departamento = 'Departamento es obligatorio';
+            }
+            
+            // Cargo es obligatorio
+            if (!empleado.cargo || empleado.cargo.trim().length < 2) {
+                errores.cargo = 'Cargo es obligatorio';
+            }
+            
+            // Salario por hora es obligatorio para SP
+            if (!this.validarMonto(empleado.salarioHorario) || empleado.salarioHorario <= 0) {
+                errores.salarioHorario = 'Para empleados SP debe indicar salario por hora';
+            }
+            
+            // Validar campos opcionales solo si están presentes
+            if (empleado.cedula && !this.validarCedula(empleado.cedula)) {
+                errores.cedula = 'La cédula no es válida';
+            }
+            
+            if (empleado.correo && !this.validarEmail(empleado.correo)) {
+                errores.correo = 'Email inválido';
+            }
+            
+            if (empleado.telefono && !this.validarTelefono(empleado.telefono)) {
+                errores.telefono = 'Teléfono inválido (8 dígitos)';
+            }
+        } else {
+            // Para empleados normales, validar todos los campos obligatorios
+            if (!empleado.nombre || empleado.nombre.trim().length < 3) {
+                errores.nombre = 'El nombre es obligatorio (mínimo 3 caracteres)';
+            }
+            
+            if (!this.validarCedula(empleado.cedula)) {
+                errores.cedula = 'La cédula es requerida';
+            }
+            
+            if (!this.validarEmail(empleado.correo)) {
+                errores.correo = 'Email inválido';
+            }
+            
+            if (empleado.telefono && !this.validarTelefono(empleado.telefono)) {
+                errores.telefono = 'Teléfono inválido (8 dígitos)';
+            }
+
+            if (!empleado.fechaIngreso) {
+                errores.fechaIngreso = 'Fecha de ingreso es obligatoria';
+            }
+            
+            if (!this.validarMonto(empleado.salarioMensual) || empleado.salarioMensual <= 0) {
+                errores.salarioMensual = 'Salario mensual debe ser un número positivo';
+            }
+            
+            if (!empleado.jornada) {
+                errores.jornada = 'Jornada laboral es obligatoria';
+            }
+            
+            if (!empleado.cargo || empleado.cargo.trim().length < 2) {
+                errores.cargo = 'Cargo es obligatorio';
+            }
+            
+            if (!empleado.departamento || empleado.departamento.trim().length < 2) {
+                errores.departamento = 'Departamento es obligatorio';
+            }
         }
         
         return {

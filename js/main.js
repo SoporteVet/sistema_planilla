@@ -11,7 +11,7 @@ const Utils = {
     showToast(message, type = 'info') {
         const container = document.getElementById('toastContainer');
         const id = `toast-${Date.now()}`;
-        
+
         const colors = {
             success: 'bg-green-500',
             error: 'bg-red-500',
@@ -61,7 +61,7 @@ const Utils = {
      */
     showLoading(message = 'Cargando...') {
         let overlay = document.getElementById('loadingOverlay');
-        
+
         if (!overlay) {
             overlay = document.createElement('div');
             overlay.id = 'loadingOverlay';
@@ -166,6 +166,15 @@ const AppRouter = {
             case 'usuarios':
                 UsuariosModule.init();
                 break;
+            case 'cumpleanos':
+                CumpleanosModule.render();
+                break;
+            case 'servicios-profesionales':
+                await ServiciosProfesionalesModule.render();
+                break;
+            case 'control-asistencia':
+                await ControlAsistenciaModule.render();
+                break;
             default:
                 this.renderDashboard();
         }
@@ -185,17 +194,17 @@ const AppRouter = {
         const html = `
             <div class="space-y-6">
                 <!-- Bienvenida -->
-                <div class="bg-gradient-to-r from-blue-600 to-blue-800 rounded-lg shadow-lg p-8 text-white">
-                    <h1 class="text-3xl font-bold mb-2">Bienvenido al Sistema de Planillas SMP</h1>
-                    <p class="text-blue-100">Sistema de gestión de planillas para San Martin de Porres</p>
+                <div class="bg-gradient-to-r from-blue-600 to-blue-800 rounded-lg shadow-lg p-4 lg:p-8 text-white">
+                    <h1 class="text-xl lg:text-3xl font-bold mb-2">Bienvenido a Planify</h1>
+                    <p class="text-sm lg:text-base text-blue-100">Sistema de gestión de planillas para San Martin de Porres</p>
                 </div>
 
                 <!-- Estadísticas Principales -->
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
                     <div class="stat-card">
                         <div class="flex items-center justify-between mb-2">
                             <div class="stat-value text-blue-600">${empleadosActivos.length}</div>
-                            <svg class="w-12 h-12 text-blue-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg class="w-8 h-8 lg:w-12 lg:h-12 text-blue-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
                             </svg>
                         </div>
@@ -205,7 +214,7 @@ const AppRouter = {
                     <div class="stat-card">
                         <div class="flex items-center justify-between mb-2">
                             <div class="stat-value text-green-600">${Formatters.formatearMoneda(totalNomina)}</div>
-                            <svg class="w-12 h-12 text-green-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg class="w-8 h-8 lg:w-12 lg:h-12 text-green-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                             </svg>
                         </div>
@@ -215,7 +224,7 @@ const AppRouter = {
                     <div class="stat-card">
                         <div class="flex items-center justify-between mb-2">
                             <div class="stat-value text-purple-600">${planillasArray}</div>
-                            <svg class="w-12 h-12 text-purple-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg class="w-8 h-8 lg:w-12 lg:h-12 text-purple-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                             </svg>
                         </div>
@@ -225,7 +234,7 @@ const AppRouter = {
                     <div class="stat-card">
                         <div class="flex items-center justify-between mb-2">
                             <div class="stat-value text-yellow-600">${empleados.length}</div>
-                            <svg class="w-12 h-12 text-yellow-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg class="w-8 h-8 lg:w-12 lg:h-12 text-yellow-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
                             </svg>
                         </div>
@@ -234,7 +243,7 @@ const AppRouter = {
                 </div>
 
                 <!-- Acciones Rápidas -->
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
                     <div class="card hover:shadow-lg transition cursor-pointer" onclick="AppRouter.navigate('empleados')">
                         <div class="flex items-center space-x-4">
                             <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
@@ -287,7 +296,7 @@ const AppRouter = {
 
 // Inicialización de la aplicación
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('Sistema de Planillas - Costa Rica');
+    console.log('Planify - Costa Rica');
     console.log('Inicializando aplicación...');
 
     // Inicializar autenticación
@@ -310,11 +319,61 @@ document.addEventListener('DOMContentLoaded', () => {
     PlanillasModule.init();
     AguinaldosModule.init();
     FeriadosModule.init();
+    CumpleanosModule.init();
+    ServiciosProfesionalesModule.init();
+    ControlAsistenciaModule.init();
 
     console.log('Aplicación inicializada correctamente');
+});
+
+// Función para toggle del sidebar en móvil
+function toggleSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebarOverlay');
+
+    if (sidebar && overlay) {
+        const isOpen = sidebar.classList.contains('open');
+
+        if (isOpen) {
+            sidebar.classList.remove('open');
+            overlay.classList.add('hidden');
+            document.body.style.overflow = '';
+        } else {
+            sidebar.classList.add('open');
+            overlay.classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+        }
+    }
+}
+
+// Cerrar sidebar al hacer clic en un enlace (móvil)
+document.addEventListener('DOMContentLoaded', () => {
+    // Cerrar sidebar cuando se hace clic en un enlace de navegación en móvil
+    document.querySelectorAll('.nav-link').forEach(link => {
+        link.addEventListener('click', () => {
+            if (window.innerWidth < 1024) {
+                setTimeout(() => {
+                    toggleSidebar();
+                }, 300);
+            }
+        });
+    });
+
+    // Cerrar sidebar al cambiar tamaño de ventana (si se expande a desktop)
+    window.addEventListener('resize', () => {
+        const sidebar = document.getElementById('sidebar');
+        const overlay = document.getElementById('sidebarOverlay');
+
+        if (window.innerWidth >= 1024) {
+            if (sidebar) sidebar.classList.remove('open');
+            if (overlay) overlay.classList.add('hidden');
+            document.body.style.overflow = '';
+        }
+    });
 });
 
 // Exportar para uso global
 window.AppRouter = AppRouter;
 window.Utils = Utils;
+window.toggleSidebar = toggleSidebar;
 

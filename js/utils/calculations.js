@@ -299,8 +299,23 @@ const Calculations = {
      * @returns {object} { diasAcumulados, diasDisponibles, anosServicio }
      */
     calcularVacaciones(fechaIngreso, diasTomados = 0) {
+        if (!fechaIngreso) {
+            return {
+                diasAcumulados: 0,
+                diasDisponibles: 0,
+                anosServicio: 0
+            };
+        }
+
         const ahora = new Date();
         const ingreso = new Date(fechaIngreso);
+        if (isNaN(ingreso.getTime())) {
+            return {
+                diasAcumulados: 0,
+                diasDisponibles: 0,
+                anosServicio: 0
+            };
+        }
         const milisegundosPorAno = 1000 * 60 * 60 * 24 * 365.25;
         const anosServicio = (ahora - ingreso) / milisegundosPorAno;
         

@@ -36,6 +36,7 @@ const CumpleanosModule = {
         const hoy = new Date();
         const diaHoy = hoy.getDate();
         const mesHoy = hoy.getMonth() + 1;
+        const añoHoy = hoy.getFullYear();
 
         this.cumpleanosHoy = [];
         this.cumpleanosProximos = [];
@@ -47,16 +48,16 @@ const CumpleanosModule = {
             const diaNacimiento = fechaNacimiento.getDate();
             const mesNacimiento = fechaNacimiento.getMonth() + 1;
 
+            // Cumpleaños de hoy
             if (diaNacimiento === diaHoy && mesNacimiento === mesHoy) {
                 this.cumpleanosHoy.push(empleado);
-            } else if (mesNacimiento === mesHoy && diaNacimiento > diaHoy) {
-                this.cumpleanosProximos.push(empleado);
-            } else if (mesNacimiento > mesHoy) {
+            } else {
+                // Agregar a próximos cumpleaños
                 this.cumpleanosProximos.push(empleado);
             }
         });
 
-        // Ordenar próximos cumpleaños por fecha
+        // Ordenar próximos cumpleaños por fecha (más cercanos primero)
         this.cumpleanosProximos.sort((a, b) => {
             const fechaA = new Date(a.fechaNacimiento);
             const fechaB = new Date(b.fechaNacimiento);
@@ -64,9 +65,20 @@ const CumpleanosModule = {
             const mesB = fechaB.getMonth() + 1;
             const diaA = fechaA.getDate();
             const diaB = fechaB.getDate();
-
-            if (mesA !== mesB) return mesA - mesB;
-            return diaA - diaB;
+            
+            // Calcular la fecha del próximo cumpleaños para cada empleado
+            let proximoCumpleañosA = new Date(añoHoy, mesA - 1, diaA);
+            let proximoCumpleañosB = new Date(añoHoy, mesB - 1, diaB);
+            
+            // Si el cumpleaños ya pasó este año, calcular para el próximo año
+            if (proximoCumpleañosA < hoy) {
+                proximoCumpleañosA = new Date(añoHoy + 1, mesA - 1, diaA);
+            }
+            if (proximoCumpleañosB < hoy) {
+                proximoCumpleañosB = new Date(añoHoy + 1, mesB - 1, diaB);
+            }
+            
+            return proximoCumpleañosA.getTime() - proximoCumpleañosB.getTime();
         });
 
         if (this.currentView === 'cumpleanos') {
@@ -75,10 +87,100 @@ const CumpleanosModule = {
     },
 
     /**
+     * Obtiene los cumpleaños del mes actual (pendientes) y del próximo mes
+     */
+    obtenerCumpleanosMeses() {
+        const hoy = new Date();
+        const añoHoy = hoy.getFullYear();
+        const mesHoy = hoy.getMonth() + 1;
+        const diaHoy = hoy.getDate();
+        
+        // Calcular el próximo mes
+        let proximoMes = mesHoy + 1;
+        let añoProximoMes = añoHoy;
+        if (proximoMes > 12) {
+            proximoMes = 1;
+            añoProximoMes = añoHoy + 1;
+        }
+        
+        const cumpleanosMesActual = [];
+        const cumpleanosProximoMes = [];
+        
+        this.cumpleanosProximos.forEach(empleado => {
+            const fechaNacimiento = new Date(empleado.fechaNacimiento);
+            const mesNacimiento = fechaNacimiento.getMonth() + 1;
+            const diaNacimiento = fechaNacimiento.getDate();
+            
+            // Si es del mes actual y aún no ha pasado
+            if (mesNacimiento === mesHoy && diaNacimiento >= diaHoy) {
+                const empleadoConDia = Object.assign({}, empleado);
+                empleadoConDia.dia = diaNacimiento;
+                cumpleanosMesActual.push(empleadoConDia);
+            }
+            // Si es del próximo mes
+            else if (mesNacimiento === proximoMes) {
+                const empleadoConDia = Object.assign({}, empleado);
+                empleadoConDia.dia = diaNacimiento;
+                cumpleanosProximoMes.push(empleadoConDia);
+            }
+        });
+        
+        // Ordenar por día
+        cumpleanosMesActual.sort((a, b) => a.dia - b.dia);
+        cumpleanosProximoMes.sort((a, b) => a.dia - b.dia);
+        
+        return {
+            mesActual: {
+                año: añoHoy,
+                mes: mesHoy,
+                empleados: cumpleanosMesActual
+            },
+            proximoMes: {
+                año: añoProximoMes,
+                mes: proximoMes,
+                empleados: cumpleanosProximoMes
+            }
+        };
+    },
+
+    /**
+     * Obtiene el nombre del mes en español
+     */
+    obtenerNombreMes(mes) {
+        const meses = [
+            'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+            'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+        ];
+        return meses[mes - 1];
+    },
+
+    /**
      * Renderiza la vista de cumpleaños
      */
     render() {
         this.currentView = 'cumpleanos';
+        
+        // Asegurar que los empleados estén cargados
+        if (this.empleados.length === 0) {
+            this.cargarEmpleados();
+        }
+        
+        const meses = this.obtenerCumpleanosMeses();
+        
+        // Función auxiliar para limpiar propiedades temporales
+        const limpiarEmpleado = (emp) => {
+            const empleado = {};
+            Object.keys(emp).forEach(key => {
+                if (key !== 'dia') {
+                    empleado[key] = emp[key];
+                }
+            });
+            return empleado;
+        };
+        
+        const nombreMesActual = this.obtenerNombreMes(meses.mesActual.mes);
+        const nombreProximoMes = this.obtenerNombreMes(meses.proximoMes.mes);
+        
         const html = `
             <div class="space-y-6">
                 <div class="flex justify-between items-center">
@@ -103,14 +205,24 @@ const CumpleanosModule = {
                     `}
                 </div>
 
-                <!-- Próximos Cumpleaños -->
+                <!-- Cumpleaños del Mes Actual (pendientes) -->
+                ${meses.mesActual.empleados.length > 0 ? `
+                    <div class="card">
+                        <h3 class="text-lg font-semibold text-gray-800 mb-4">
+                            📅 ${nombreMesActual} ${meses.mesActual.año} (${meses.mesActual.empleados.length})
+                        </h3>
+                        ${this.renderCumpleanosLista(meses.mesActual.empleados.map(limpiarEmpleado), false)}
+                    </div>
+                ` : ''}
+
+                <!-- Cumpleaños del Próximo Mes -->
                 <div class="card">
                     <h3 class="text-lg font-semibold text-gray-800 mb-4">
-                        📅 Próximos Cumpleaños
+                        📅 ${nombreProximoMes} ${meses.proximoMes.año} (${meses.proximoMes.empleados.length})
                     </h3>
-                    ${this.cumpleanosProximos.length > 0 ? this.renderCumpleanosLista(this.cumpleanosProximos.slice(0, 10), false) : `
+                    ${meses.proximoMes.empleados.length > 0 ? this.renderCumpleanosLista(meses.proximoMes.empleados.map(limpiarEmpleado), false) : `
                         <div class="text-center py-8 text-gray-500">
-                            <p>No hay próximos cumpleaños registrados</p>
+                            <p>No hay cumpleaños en ${nombreProximoMes}</p>
                         </div>
                     `}
                 </div>

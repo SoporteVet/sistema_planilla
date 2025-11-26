@@ -1,48 +1,56 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema de Planillas - Costa Rica</title>
-    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="theme-color" content="#1E40AF">
+    <title>Planify - Costa Rica</title>
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="img/logo.png">
+    <link rel="apple-touch-icon" href="img/logo.png">
+
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    
+
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0"></script>
-    
+
     <!-- date-fns -->
     <script src="https://cdn.jsdelivr.net/npm/date-fns@3.0.0/index.min.js"></script>
-    
+
     <!-- jsPDF -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
-    
+
     <!-- SheetJS for Excel export -->
     <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
-    
+
     <!-- html2canvas for PDF generation -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-    
+
     <!-- EmailJS -->
     <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
-    
+
     <!-- Firebase -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
-    
+
     <!-- Custom CSS -->
     <link rel="stylesheet" href="css/custom.css">
-    
+
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-        
+
         * {
             font-family: 'Inter', sans-serif;
         }
-        
+
         :root {
             --color-primary: #1E40AF;
             --color-secondary: #10B981;
@@ -52,6 +60,7 @@
         }
     </style>
 </head>
+
 <body class="bg-gray-50">
     <!-- Loading Screen -->
     <div id="loadingScreen" class="fixed inset-0 bg-white z-50 flex items-center justify-center">
@@ -63,13 +72,13 @@
 
     <!-- Login Screen -->
     <div id="loginScreen" class="hidden fixed inset-0 bg-gradient-to-br from-blue-900 to-blue-700 z-40">
-        <div class="flex items-center justify-center min-h-screen">
-            <div class="bg-white rounded-lg shadow-xl p-8 w-full max-w-md">
-                <div class="text-center mb-8">
-                    <h1 class="text-3xl font-bold text-gray-800">Sistema de Planillas</h1>
-                    <p class="text-gray-600 mt-2">Costa Rica</p>
+        <div class="flex items-center justify-center min-h-screen p-4">
+            <div class="bg-white rounded-lg shadow-xl p-6 lg:p-8 w-full max-w-md">
+                <div class="text-center mb-6 lg:mb-8">
+                    <h1 class="text-2xl lg:text-3xl font-bold text-gray-800">Sistema de Planillas</h1>
+                    <p class="text-gray-600 mt-2 text-sm lg:text-base">Costa Rica</p>
                 </div>
-                
+
                 <form id="loginForm" class="space-y-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">Correo Electrónico</label>
@@ -77,17 +86,17 @@
                             class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                             placeholder="usuario@empresa.com">
                     </div>
-                    
+
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">Contraseña</label>
                         <input type="password" id="loginPassword" required
                             class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                             placeholder="••••••••">
                     </div>
-                    
+
                     <div id="loginError" class="hidden bg-red-50 text-red-600 p-3 rounded-lg text-sm"></div>
-                    
-                    <button type="submit" 
+
+                    <button type="submit"
                         class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition font-medium">
                         Iniciar Sesión
                     </button>
@@ -98,91 +107,156 @@
 
     <!-- Main App Container -->
     <div id="appContainer" class="hidden">
+        <!-- Sidebar Overlay (Mobile) -->
+        <div id="sidebarOverlay" class="hidden fixed inset-0 bg-black bg-opacity-50 z-30 lg:hidden"
+            onclick="toggleSidebar()"></div>
+
         <!-- Sidebar -->
-        <aside id="sidebar" class="fixed left-0 top-0 h-full w-64 bg-white shadow-lg z-30 transform transition-transform duration-300">
-            <div class="p-6 border-b border-gray-200">
-                <h2 class="text-xl font-bold text-gray-800">Sistema Planillas</h2>
-                <p class="text-sm text-gray-600">Costa Rica</p>
+        <aside id="sidebar"
+            class="fixed left-0 top-0 h-full w-64 bg-white shadow-lg z-40 transform transition-transform duration-300 -translate-x-full lg:translate-x-0">
+            <div class="p-6 border-b border-gray-200 flex items-center justify-between">
+                <div>
+                    <h2 class="text-xl font-bold text-gray-800">Planify</h2>
+                    <p class="text-sm text-gray-600">SMP</p>
+                </div>
+                <button id="closeSidebarBtn" class="lg:hidden text-gray-500 hover:text-gray-700"
+                    onclick="toggleSidebar()">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12">
+                        </path>
+                    </svg>
+                </button>
             </div>
-            
+
             <nav class="p-4">
                 <ul class="space-y-2">
                     <li>
-                        <a href="#" data-view="dashboard" class="nav-link flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-blue-50 text-gray-700 hover:text-blue-600 transition">
+                        <a href="#" data-view="dashboard"
+                            class="nav-link flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-blue-50 text-gray-700 hover:text-blue-600 transition">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6">
+                                </path>
                             </svg>
                             <span>Dashboard</span>
                         </a>
                     </li>
                     <li>
-                        <a href="#" data-view="empleados" class="nav-link flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-blue-50 text-gray-700 hover:text-blue-600 transition">
+                        <a href="#" data-view="empleados"
+                            class="nav-link flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-blue-50 text-gray-700 hover:text-blue-600 transition">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z">
+                                </path>
                             </svg>
                             <span>Empleados</span>
                         </a>
                     </li>
                     <li>
-                        <a href="#" data-view="asistencias" class="nav-link flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-blue-50 text-gray-700 hover:text-blue-600 transition">
+                        <a href="#" data-view="asistencias"
+                            class="nav-link flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-blue-50 text-gray-700 hover:text-blue-600 transition">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                             </svg>
                             <span>Registro de Horas</span>
                         </a>
                     </li>
                     <li>
-                        <a href="#" data-view="bonos" class="nav-link flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-blue-50 text-gray-700 hover:text-blue-600 transition">
+                        <a href="#" data-view="bonos"
+                            class="nav-link flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-blue-50 text-gray-700 hover:text-blue-600 transition">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1">
+                                </path>
                             </svg>
                             <span>Bonos y Rebajos</span>
                         </a>
                     </li>
                     <li>
-                        <a href="#" data-view="planillas" class="nav-link flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-blue-50 text-gray-700 hover:text-blue-600 transition">
+                        <a href="#" data-view="planillas"
+                            class="nav-link flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-blue-50 text-gray-700 hover:text-blue-600 transition">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
+                                </path>
                             </svg>
                             <span>Planillas</span>
                         </a>
                     </li>
                     <li>
-                        <a href="#" data-view="aguinaldos" class="nav-link flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-blue-50 text-gray-700 hover:text-blue-600 transition">
+                        <a href="#" data-view="servicios-profesionales"
+                            class="nav-link flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-blue-50 text-gray-700 hover:text-blue-600 transition">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
+                                </path>
+                            </svg>
+                            <span>Servicios Profesionales</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" data-view="control-asistencia"
+                            class="nav-link flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-blue-50 text-gray-700 hover:text-blue-600 transition">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4">
+                                </path>
+                            </svg>
+                            <span>Control de Asistencia</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" data-view="aguinaldos"
+                            class="nav-link flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-blue-50 text-gray-700 hover:text-blue-600 transition">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7">
+                                </path>
                             </svg>
                             <span>Aguinaldos</span>
                         </a>
                     </li>
                     <li>
-                        <a href="#" data-view="feriados" class="nav-link flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-blue-50 text-gray-700 hover:text-blue-600 transition">
+                        <a href="#" data-view="feriados"
+                            class="nav-link flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-blue-50 text-gray-700 hover:text-blue-600 transition">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z">
+                                </path>
                             </svg>
                             <span>Feriados</span>
                         </a>
                     </li>
                     <li>
-                        <a href="#" data-view="reportes" class="nav-link flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-blue-50 text-gray-700 hover:text-blue-600 transition">
+                        <a href="#" data-view="reportes"
+                            class="nav-link flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-blue-50 text-gray-700 hover:text-blue-600 transition">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
+                                </path>
                             </svg>
                             <span>Reportes</span>
                         </a>
                     </li>
                     <li>
-                        <a href="#" data-view="cumpleanos" class="nav-link flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-blue-50 text-gray-700 hover:text-blue-600 transition">
+                        <a href="#" data-view="cumpleanos"
+                            class="nav-link flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-blue-50 text-gray-700 hover:text-blue-600 transition">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7">
+                                </path>
                             </svg>
                             <span>Cumpleaños</span>
                         </a>
                     </li>
                     <li>
-                        <a href="#" data-view="usuarios" class="nav-link flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-blue-50 text-gray-700 hover:text-blue-600 transition">
+                        <a href="#" data-view="usuarios"
+                            class="nav-link flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-blue-50 text-gray-700 hover:text-blue-600 transition">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z">
+                                </path>
                             </svg>
                             <span>Usuarios</span>
                         </a>
@@ -192,37 +266,48 @@
         </aside>
 
         <!-- Main Content -->
-        <div class="ml-64">
+        <div class="lg:ml-64">
             <!-- Header -->
             <header class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-20">
-                <div class="flex items-center justify-between px-8 py-4">
-                    <div>
+                <div class="flex items-center justify-between px-4 lg:px-8 py-4">
+                    <div class="flex items-center space-x-4">
+                        <!-- Mobile Menu Button -->
+                        <button id="mobileMenuBtn" class="lg:hidden text-gray-600 hover:text-gray-800 p-2"
+                            onclick="toggleSidebar()">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M4 6h16M4 12h16M4 18h16"></path>
+                            </svg>
+                        </button>
                         <nav class="flex" aria-label="Breadcrumb">
-                            <ol id="breadcrumb" class="flex items-center space-x-2 text-sm text-gray-500">
+                            <ol id="breadcrumb" class="flex items-center space-x-2 text-xs lg:text-sm text-gray-500">
                                 <li>Dashboard</li>
                             </ol>
                         </nav>
                     </div>
-                    
-                    <div class="flex items-center space-x-4">
-                        <span id="currentUserName" class="text-sm text-gray-700"></span>
-                        <span id="currentUserRole" class="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-medium"></span>
-                        <button id="logoutBtn" class="text-sm text-red-600 hover:text-red-700 font-medium">
-                            Cerrar Sesión
+
+                    <div class="flex items-center space-x-2 lg:space-x-4">
+                        <span id="currentUserName" class="hidden sm:inline text-xs lg:text-sm text-gray-700"></span>
+                        <span id="currentUserRole"
+                            class="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-medium"></span>
+                        <button id="logoutBtn"
+                            class="text-xs lg:text-sm text-red-600 hover:text-red-700 font-medium px-2 py-1">
+                            <span class="hidden sm:inline">Cerrar Sesión</span>
+                            <span class="sm:hidden">Salir</span>
                         </button>
                     </div>
                 </div>
             </header>
 
             <!-- Content Area -->
-            <main id="mainContent" class="p-8">
+            <main id="mainContent" class="p-4 lg:p-8">
                 <!-- Dynamic content loaded here -->
             </main>
         </div>
     </div>
 
     <!-- Toast Notification Container -->
-    <div id="toastContainer" class="fixed bottom-4 right-4 z-50 space-y-2"></div>
+    <div id="toastContainer" class="fixed bottom-4 right-4 left-4 lg:left-auto z-50 space-y-2"></div>
 
     <!-- Modal Container -->
     <div id="modalContainer"></div>
@@ -245,13 +330,15 @@
     <script src="js/modules/reportes.js"></script>
     <script src="js/modules/usuarios.js"></script>
     <script src="js/modules/cumpleanos.js"></script>
-    
+    <script src="js/modules/servicios-profesionales.js"></script>
+    <script src="js/modules/control-asistencia.js"></script>
+
     <!-- Email and Comprobante Services -->
     <script src="js/config/emailjs-config.js"></script>
     <script src="js/utils/comprobante-generator.js"></script>
     <script src="js/utils/email-service-simple.js"></script>
-    
+
     <script src="js/main.js"></script>
 </body>
-</html>
 
+</html>

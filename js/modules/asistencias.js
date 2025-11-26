@@ -253,6 +253,19 @@ const AsistenciasModule = {
             }
         });
 
+        // Calcular días trabajados automáticamente
+        // Si hay un valor manual existente, usarlo; si no, usar 15 días por defecto (total de días en una quincena)
+        const diasTrabajadosManualExistente = asistenciasExistentes.find(a => a.diasTrabajadosManual !== undefined && a.diasTrabajadosManual !== null)?.diasTrabajadosManual;
+        let diasTrabajadosCalculados = '';
+        
+        if (diasTrabajadosManualExistente !== undefined && diasTrabajadosManualExistente !== null) {
+            // Si ya existe un valor manual, usarlo
+            diasTrabajadosCalculados = diasTrabajadosManualExistente;
+        } else {
+            // Por defecto, usar 15 días (total de días en una quincena)
+            diasTrabajadosCalculados = '15';
+        }
+
         const modal = `
             <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 modal-backdrop" id="modalHorasQuincenales">
                 <div class="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto m-4">
@@ -289,9 +302,9 @@ const AsistenciasModule = {
                             <label class="form-label">Días Trabajados (Manual)</label>
                             <input type="number" id="diasTrabajadosQuincena" class="form-control" step="0.01" 
                                 min="0" max="15" 
-                                value="${asistenciasExistentes.find(a => a.diasTrabajadosManual !== undefined)?.diasTrabajadosManual || ''}">
+                                value="${diasTrabajadosCalculados}">
                             <div class="form-help">
-                                Ingrese manualmente los días trabajados que aparecerán en el comprobante de pago. Si se deja vacío, se calculará automáticamente.
+                                Por defecto se establecen 15 días (total de días en la quincena). Puede modificarlo si es necesario.
                             </div>
                         </div>
 

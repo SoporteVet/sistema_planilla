@@ -716,6 +716,10 @@ const PlanillasModule = {
                                         Aprobar Planilla
                                     </button>
                                 ` : ''}
+                                <button onclick="PlanillasModule.enviarComprobantesMasivos('${planilla.id}')" 
+                                    class="btn btn-primary ml-2" title="Enviar comprobantes por correo a todos los empleados">
+                                    📧 Enviar Correos Masivos
+                                </button>
                             </div>
                             <div class="flex space-x-4">
                                 <button onclick="PDFGenerator.generarPlanillaPDF(${JSON.stringify(planilla).replace(/"/g, '&quot;')})" 
@@ -1059,6 +1063,218 @@ const PlanillasModule = {
         } catch (error) {
             console.error('Error enviando comprobante:', error);
             Utils.showToast('Error al enviar comprobante: ' + error.message, 'error');
+            Utils.hideLoading();
+        }
+    },
+
+    /**
+     * Envía comprobantes por correo a todos los empleados de la planilla que tengan correo
+     */
+    async enviarComprobantesMasivos(planillaId) {
+        try {
+            const planilla = this.planillas.find(p => p.id === planillaId);
+            if (!planilla) {
+                Utils.showToast('Planilla no encontrada', 'error');
+                return;
+            }
+
+            // Verificar EmailJS
+            if (typeof EmailServiceSimple === 'undefined') {
+                Utils.showToast('EmailJS no está disponible. Asegúrese de que el servicio de email esté cargado.', 'error');
+                return;
+            }
+
+            // Crear instancia del servicio
+            const emailService = new EmailServiceSimple();
+            
+            // Verificar configuración
+            if (!emailService.verificarConfiguracion()) {
+                Utils.showToast('EmailJS no está configurado correctamente', 'error');
+                return;
+            }
+
+            // Obtener todos los empleados de la planilla
+            const empleadosArray = Object.keys(planilla.empleados || {}).map(key => ({
+                id: key,
+                ...planilla.empleados[key]
+            }));
+
+            // Filtrar empleados que tienen correo
+            const empleadosConCorreo = empleadosArray.filter(emp => {
+                const empleadoCompleto = this.empleados.find(e => e.id === emp.id || e.cedula === emp.cedula);
+                return empleadoCompleto && empleadoCompleto.correo && empleadoCompleto.correo.trim() !== '';
+            });
+
+            if (empleadosConCorreo.length === 0) {
+                Utils.showToast('No hay empleados con correo electrónico registrado en esta planilla', 'warning');
+                return;
+            }
+
+            // Confirmar acción
+            const mensaje = `¿Desea enviar comprobantes por correo a ${empleadosConCorreo.length} empleado(s)?\n\n` +
+                          `Esta acción enviará un correo a cada empleado con su comprobante de pago.`;
+            
+            if (!confirm(mensaje)) {
+                return;
+            }
+
+            Utils.showLoading(`Enviando correos (0/${empleadosConCorreo.length})...`);
+
+            let exitosos = 0;
+            let fallidos = 0;
+            const errores = [];
+
+            // Enviar correos uno por uno
+            for (let i = 0; i < empleadosConCorreo.length; i++) {
+                const emp = empleadosConCorreo[i];
+                const empleadoCompleto = this.empleados.find(e => e.id === emp.id || e.cedula === emp.cedula);
+                
+                try {
+                    Utils.showLoading(`Enviando correos (${i + 1}/${empleadosConCorreo.length}): ${empleadoCompleto.nombre}...`);
+
+                    // Reutilizar la lógica de enviarComprobante pero sin mostrar toasts individuales
+                    const datosPlanilla = emp;
+                    
+                    // Preparar datos
+                    const fechaInicio = new Date(planilla.periodoInicio);
+                    const fechaFin = new Date(planilla.periodoFin);
+                    const fechaInicioStr = fechaInicio.toISOString().split('T')[0];
+                    const fechaFinStr = fechaFin.toISOString().split('T')[0];
+                    
+                    // Calcular salario base
+                    const salarioBase = (datosPlanilla.salarioBruto || 0) - 
+                                       (datosPlanilla.pagoHorasExtra || 0) - 
+                                       (datosPlanilla.pagoFeriados || 0);
+                    
+                    const subtotalQuincenal = datosPlanilla.subtotalQuincenal || 
+                                             ((datosPlanilla.salarioDiario || 0) * (datosPlanilla.diasTrabajados || 0));
+                    
+                    const rebajosPorHoras = datosPlanilla.rebajosPorHoras || { total: 0, horasFaltantes: 0, detalles: [] };
+                    
+                    const calculos = {
+                        salarioBaseMensual: datosPlanilla.salarioBaseMensual || empleadoCompleto.salarioMensual,
+                        salarioDiario: datosPlanilla.salarioDiario || Calculations.calcularSalarioDiario(empleadoCompleto.salarioMensual, empleadoCompleto.jornada),
+                        diasTrabajados: datosPlanilla.diasTrabajados || 0,
+                        salarioBase: salarioBase > 0 ? salarioBase : subtotalQuincenal,
+                        subtotalQuincenal: subtotalQuincenal,
+                        horasExtra: datosPlanilla.horasExtra || 0,
+                        montoHorasExtra: datosPlanilla.pagoHorasExtra || 0,
+                        horasAdicionales: datosPlanilla.horasAdicionales || 0,
+                        pagoHorasAdicionales: datosPlanilla.pagoHorasAdicionales || 0,
+                        horasFeriado: datosPlanilla.diasFeriadosTrabajados ? datosPlanilla.diasFeriadosTrabajados * 8 : 0,
+                        pagoFeriados: datosPlanilla.pagoFeriados || 0,
+                        horasExtraFeriado: 0,
+                        totalExtraFeriado: 0,
+                        salarioBruto: datosPlanilla.salarioBruto || 0,
+                        descuentoCCSS: datosPlanilla.descuentoCCSS || 0,
+                        impuestoRenta: datosPlanilla.impuestoRenta || 0,
+                        otrosDescuentos: datosPlanilla.otrosDescuentos || datosPlanilla.rebajos || 0,
+                        rebajos: datosPlanilla.rebajos || 0,
+                        rebajosPorHoras: rebajosPorHoras,
+                        salarioNeto: datosPlanilla.salarioNeto || 0,
+                        observaciones: datosPlanilla.observaciones || 'Sin observaciones especiales'
+                    };
+
+                    // Formatear período
+                    let periodoFormateado = '';
+                    if (planilla.tipoPeriodo === 'quincenal') {
+                        const diaInicio = fechaInicio.getDate();
+                        const nombreMes = fechaInicio.toLocaleDateString('es-CR', { month: 'long' });
+                        const primeraLetraMayuscula = nombreMes.charAt(0).toUpperCase() + nombreMes.slice(1);
+                        
+                        if (diaInicio >= 1 && diaInicio <= 15) {
+                            periodoFormateado = `IQ ${primeraLetraMayuscula}`;
+                        } else {
+                            periodoFormateado = `IIQ ${primeraLetraMayuscula}`;
+                        }
+                    } else {
+                        const nombreMes = fechaInicio.toLocaleDateString('es-CR', { month: 'long' });
+                        periodoFormateado = nombreMes.charAt(0).toUpperCase() + nombreMes.slice(1);
+                    }
+
+                    const planillaInfo = {
+                        periodo: periodoFormateado,
+                        fechaInicio: fechaInicioStr,
+                        fechaFin: fechaFinStr
+                    };
+
+                    // Obtener asistencias del período
+                    const asistencias = await FirebaseHelpers.getAsistenciasPeriodo(
+                        empleadoCompleto.id,
+                        fechaInicioStr.replace(/-/g, ''),
+                        fechaFinStr.replace(/-/g, '')
+                    );
+
+                    // Generar PDF
+                    const pdf = await ComprobanteGenerator.generarComprobantePDF(
+                        empleadoCompleto,
+                        calculos,
+                        planillaInfo,
+                        fechaInicioStr,
+                        fechaFinStr,
+                        true,
+                        asistencias
+                    );
+
+                    // Enviar por correo
+                    const resultado = await emailService.enviarComprobante(
+                        empleadoCompleto,
+                        calculos,
+                        planillaInfo,
+                        pdf,
+                        asistencias
+                    );
+
+                    if (resultado.success) {
+                        exitosos++;
+                    } else {
+                        fallidos++;
+                        errores.push(`${empleadoCompleto.nombre}: ${resultado.error || 'Error desconocido'}`);
+                    }
+
+                    // Pequeña pausa entre envíos para evitar límites de rate
+                    if (i < empleadosConCorreo.length - 1) {
+                        await new Promise(resolve => setTimeout(resolve, 500));
+                    }
+
+                } catch (error) {
+                    console.error(`Error enviando comprobante a ${empleadoCompleto?.nombre || 'empleado desconocido'}:`, error);
+                    fallidos++;
+                    errores.push(`${empleadoCompleto?.nombre || 'Empleado desconocido'}: ${error.message}`);
+                }
+            }
+
+            Utils.hideLoading();
+
+            // Mostrar resumen
+            let mensajeResumen = `Envío masivo completado:\n\n` +
+                               `✓ Exitosos: ${exitosos}\n` +
+                               `✗ Fallidos: ${fallidos}`;
+            
+            if (errores.length > 0) {
+                mensajeResumen += `\n\nErrores:\n${errores.slice(0, 5).join('\n')}`;
+                if (errores.length > 5) {
+                    mensajeResumen += `\n... y ${errores.length - 5} más`;
+                }
+            }
+
+            if (exitosos > 0) {
+                Utils.showToast(`Se enviaron ${exitosos} comprobante(s) exitosamente`, 'success');
+            }
+            
+            if (fallidos > 0) {
+                Utils.showToast(`Hubo ${fallidos} error(es) al enviar comprobantes. Revise la consola para más detalles.`, 'warning');
+                console.log('Errores de envío masivo:', errores);
+            }
+
+            // Mostrar alerta con detalles si hay errores
+            if (fallidos > 0) {
+                alert(mensajeResumen);
+            }
+
+        } catch (error) {
+            console.error('Error en envío masivo:', error);
+            Utils.showToast('Error al enviar comprobantes masivos: ' + error.message, 'error');
             Utils.hideLoading();
         }
     },
