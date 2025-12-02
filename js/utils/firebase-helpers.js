@@ -906,6 +906,18 @@ const FirebaseHelpers = {
 
             registrosDia.forEach(registro => {
                 if (registro.tipo === 'entrada') {
+                    // Si había una entrada previa sin salida, agregarla al resultado
+                    if (entrada) {
+                        resultado.push({
+                            fecha,
+                            horaEntrada: entrada.hora,
+                            horaSalida: 'Pendiente',
+                            horasTrabajadas: 0,
+                            entrada: entrada,
+                            salida: null,
+                            pendiente: true
+                        });
+                    }
                     entrada = registro;
                 } else if (registro.tipo === 'salida' && entrada) {
                     // Calcular horas entre entrada y salida
@@ -919,12 +931,26 @@ const FirebaseHelpers = {
                         horaSalida: registro.hora,
                         horasTrabajadas: parseFloat(horas.toFixed(2)),
                         entrada: entrada,
-                        salida: registro
+                        salida: registro,
+                        pendiente: false
                     });
 
                     entrada = null;
                 }
             });
+
+            // Si queda una entrada sin salida al final del día, agregarla
+            if (entrada) {
+                resultado.push({
+                    fecha,
+                    horaEntrada: entrada.hora,
+                    horaSalida: 'Pendiente',
+                    horasTrabajadas: 0,
+                    entrada: entrada,
+                    salida: null,
+                    pendiente: true
+                });
+            }
         });
 
         return resultado;

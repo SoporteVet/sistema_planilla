@@ -49,35 +49,68 @@ const ServiciosProfesionalesModule = {
             // Limpiar registros anteriores
             this.registrosHoras = [];
 
-            // Si hay filtros de fecha, usarlos
-            const fechaInicio = this.filtros.fechaInicio || Formatters.formatearFechaKey(new Date(new Date().setDate(new Date().getDate() - 30)));
-            const fechaFin = this.filtros.fechaFin || Formatters.formatearFechaKey(new Date());
+            // Calcular fechas de inicio y fin
+            let fechaInicio, fechaFin;
+            
+            if (this.filtros.fechaInicio) {
+                // Si hay filtro de fecha inicio, convertir de YYYY-MM-DD a YYYYMMDD
+                fechaInicio = this.filtros.fechaInicio.replace(/-/g, '');
+            } else {
+                // Por defecto, últimos 30 días
+                const fechaHace30Dias = new Date();
+                fechaHace30Dias.setDate(fechaHace30Dias.getDate() - 30);
+                fechaInicio = Formatters.formatearFechaKey(fechaHace30Dias);
+            }
+            
+            if (this.filtros.fechaFin) {
+                // Si hay filtro de fecha fin, convertir de YYYY-MM-DD a YYYYMMDD
+                fechaFin = this.filtros.fechaFin.replace(/-/g, '');
+            } else {
+                // Por defecto, hoy
+                fechaFin = Formatters.formatearFechaKey(new Date());
+            }
+
+            console.log(`Cargando registros desde ${fechaInicio} hasta ${fechaFin}`);
 
             // 1. Cargar registros AUTOMÁTICOS desde control de asistencia
             for (const empleado of this.empleadosSP) {
-                const registrosAsistencia = await FirebaseHelpers.obtenerRegistrosAsistenciaPeriodo(
-                    empleado.id,
-                    fechaInicio,
-                    fechaFin
-                );
+                try {
+                    const registrosAsistencia = await FirebaseHelpers.obtenerRegistrosAsistenciaPeriodo(
+                        empleado.id,
+                        fechaInicio,
+                        fechaFin
+                    );
 
-                // Calcular horas trabajadas desde los registros de entrada/salida
-                const registrosConHoras = FirebaseHelpers.calcularHorasDesdeRegistros(registrosAsistencia);
+                    console.log(`Empleado ${empleado.nombre}: ${registrosAsistencia.length} registros de asistencia encontrados`);
 
-                // Convertir a formato compatible con la tabla
-                registrosConHoras.forEach(registro => {
-                    this.registrosHoras.push({
-                        id: `auto_${empleado.id}_${registro.fecha}_${registro.entrada.timestamp}`,
-                        empleadoId: empleado.id,
-                        fecha: new Date(parseInt(registro.fecha.substring(0, 4)), parseInt(registro.fecha.substring(4, 6)) - 1, parseInt(registro.fecha.substring(6, 8))).getTime(),
-                        horaEntrada: registro.horaEntrada,
-                        horaSalida: registro.horaSalida,
-                        horasTrabajadas: registro.horasTrabajadas,
-                        salarioHorario: this.obtenerSalarioHora(empleado),
-                        totalPagar: registro.horasTrabajadas * this.obtenerSalarioHora(empleado),
-                        origen: 'automatico'
+                    // Calcular horas trabajadas desde los registros de entrada/salida
+                    const registrosConHoras = FirebaseHelpers.calcularHorasDesdeRegistros(registrosAsistencia);
+
+                    console.log(`Empleado ${empleado.nombre}: ${registrosConHoras.length} períodos de trabajo calculados`);
+
+                    // Convertir a formato compatible con la tabla
+                    registrosConHoras.forEach(registro => {
+                        // Convertir fecha YYYYMMDD a timestamp
+                        const año = parseInt(registro.fecha.substring(0, 4));
+                        const mes = parseInt(registro.fecha.substring(4, 6)) - 1; // Mes es 0-indexed
+                        const dia = parseInt(registro.fecha.substring(6, 8));
+                        const fechaTimestamp = new Date(año, mes, dia).getTime();
+
+                        this.registrosHoras.push({
+                            id: `auto_${empleado.id}_${registro.fecha}_${registro.entrada.timestamp}`,
+                            empleadoId: empleado.id,
+                            fecha: fechaTimestamp,
+                            horaEntrada: registro.horaEntrada,
+                            horaSalida: registro.horaSalida,
+                            horasTrabajadas: registro.horasTrabajadas,
+                            salarioHorario: this.obtenerSalarioHora(empleado),
+                            totalPagar: registro.horasTrabajadas * this.obtenerSalarioHora(empleado),
+                            origen: 'automatico'
+                        });
                     });
-                });
+                } catch (error) {
+                    console.error(`Error cargando registros para empleado ${empleado.nombre}:`, error);
+                }
             }
 
             // 2. Cargar registros MANUALES desde servicios_profesionales
@@ -237,19 +270,30 @@ const ServiciosProfesionalesModule = {
 
         return registrosFiltrados.map(registro => {
             const empleado = this.empleadosSP.find(e => e.id === registro.empleadoId);
-            const horasTrabajadas = this.calcularHoras(registro.horaEntrada, registro.horaSalida);
+            const esPendiente = registro.pendiente || registro.horaSalida === 'Pendiente';
+            const horasTrabajadas = esPendiente ? 0 : (registro.horasTrabajadas || this.calcularHoras(registro.horaEntrada, registro.horaSalida));
             const salarioHorario = this.obtenerSalarioHora(empleado);
             const totalPagar = horasTrabajadas * salarioHorario;
 
             return `
-                <tr>
+                <tr class="${esPendiente ? 'bg-yellow-50' : ''}">
                     <td>${Formatters.formatearFecha(registro.fecha)}</td>
                     <td class="font-medium">${empleado?.nombre || 'N/A'}</td>
                     <td>${registro.horaEntrada}</td>
-                    <td>${registro.horaSalida}</td>
-                    <td class="font-semibold">${horasTrabajadas.toFixed(2)} hrs</td>
+                    <td>
+                        ${esPendiente ? `
+                            <span class="px-2 py-1 bg-yellow-100 text-yellow-800 rounded text-sm font-medium">Pendiente</span>
+                        ` : registro.horaSalida}
+                    </td>
+                    <td class="font-semibold">
+                        ${esPendiente ? `
+                            <span class="text-gray-400">0.00 hrs</span>
+                        ` : `${horasTrabajadas.toFixed(2)} hrs`}
+                    </td>
                     <td>${Formatters.formatearMoneda(salarioHorario)}</td>
-                    <td class="font-semibold text-green-600">${Formatters.formatearMoneda(totalPagar)}</td>
+                    <td class="font-semibold ${esPendiente ? 'text-gray-400' : 'text-green-600'}">
+                        ${esPendiente ? 'Pendiente' : Formatters.formatearMoneda(totalPagar)}
+                    </td>
                     <td>
                         ${registro.origen === 'manual' ? `
                             <div class="flex space-x-2">
@@ -266,7 +310,10 @@ const ServiciosProfesionalesModule = {
                                     </svg>
                                 </button>
                             </div>
-                        ` : `<span class="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded">Auto</span>`}
+                        ` : `
+                            <span class="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded">Auto</span>
+                            ${esPendiente ? '<span class="text-xs px-2 py-1 bg-yellow-100 text-yellow-700 rounded ml-1">Sin salida</span>' : ''}
+                        `}
                     </td>
                 </tr>
             `;
@@ -300,7 +347,8 @@ const ServiciosProfesionalesModule = {
                 };
             }
 
-            const horasTrabajadas = this.calcularHoras(registro.horaEntrada, registro.horaSalida);
+            const esPendiente = registro.pendiente || registro.horaSalida === 'Pendiente';
+            const horasTrabajadas = esPendiente ? 0 : (registro.horasTrabajadas || this.calcularHoras(registro.horaEntrada, registro.horaSalida));
             const salarioHorario = this.obtenerSalarioHora(empleado);
             const totalPagar = horasTrabajadas * salarioHorario;
 
