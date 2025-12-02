@@ -66,23 +66,27 @@ const Auth = {
             // Cargar módulo apropiado según el rol (con delay para evitar conflictos)
             setTimeout(() => {
                 if (window.AppRouter) {
-                    console.log('Navegando con rol:', FirebaseHelpers.currentUserRole);
-
                     // Si es operador de asistencia, ir directo a control de asistencia
                     if (FirebaseHelpers.currentUserRole === 'operador_asistencia') {
                         // Limpiar cualquier hash en la URL que pueda interferir
                         if (window.location.hash) {
-                            console.log('Limpiando hash:', window.location.hash);
                             window.location.hash = '';
                         }
-                        console.log('Redirigiendo a control-asistencia');
                         window.AppRouter.navigate('control-asistencia');
                     } else {
-                        console.log('Redirigiendo a dashboard');
                         window.AppRouter.navigate('dashboard');
                     }
+                } else {
+                    // Reintentar si AppRouter no está disponible
+                    setTimeout(() => {
+                        if (window.AppRouter && FirebaseHelpers.currentUserRole === 'operador_asistencia') {
+                            window.AppRouter.navigate('control-asistencia');
+                        } else if (window.AppRouter) {
+                            window.AppRouter.navigate('dashboard');
+                        }
+                    }, 200);
                 }
-            }, 300); // Aumentado a 300ms para asegurar que todos los módulos se hayan inicializado
+            }, 300); // Delay para asegurar que todos los módulos se hayan inicializado
 
         } catch (error) {
             console.error('Error handling user login:', error);
@@ -257,7 +261,7 @@ const Auth = {
 
         // Mapeo de vistas a permisos
         const viewPermissions = {
-            'dashboard': '*', // Todos pueden ver dashboard
+            'dashboard': '*', // Todos pueden ver dashboard excepto operador_asistencia
             'empleados': 'empleados',
             'asistencias': 'asistencias',
             'bonos': 'bonos',
@@ -276,7 +280,7 @@ const Auth = {
             const view = link.dataset.view;
             const requiredPermission = viewPermissions[view];
 
-            // Operador de asistencia SOLO ve control-asistencia
+            // Operador de asistencia SOLO ve control-asistencia (no dashboard)
             if (rol === 'operador_asistencia') {
                 if (view === 'control-asistencia') {
                     link.parentElement.style.display = '';
@@ -285,6 +289,7 @@ const Auth = {
                 }
             } else {
                 // Para otros roles, validar normalmente
+                // Dashboard es accesible para todos excepto operador_asistencia
                 if (requiredPermission === '*' || permisos.includes(requiredPermission)) {
                     link.parentElement.style.display = '';
                 } else {

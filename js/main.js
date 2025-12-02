@@ -127,6 +127,11 @@ const AppRouter = {
      * Navega a una vista
      */
     async navigate(view) {
+        // Evitar loops infinitos
+        if (this.currentView === view) {
+            return;
+        }
+
         this.currentView = view;
 
         // Mapeo de vistas a permisos requeridos
@@ -145,9 +150,11 @@ const AppRouter = {
             'usuarios': 'usuarios'
         };
 
-        // Operador de asistencia SOLO puede acceder a control-asistencia
+        // Operador de asistencia SOLO puede acceder a control-asistencia (no dashboard)
         if (FirebaseHelpers.currentUserRole === 'operador_asistencia') {
             if (view !== 'control-asistencia') {
+                // Si intenta acceder al dashboard o cualquier otra vista, redirigir a control-asistencia
+                this.currentView = null; // Reset para permitir la navegación
                 this.navigate('control-asistencia');
                 return;
             }
@@ -161,6 +168,7 @@ const AppRouter = {
             if (!hasPermission) {
                 console.warn(`Usuario sin permisos para: ${view}`);
                 Utils.showToast('No tiene permisos para acceder a este módulo', 'error');
+                this.currentView = null; // Reset para permitir la navegación
                 this.navigate('dashboard');
                 return;
             }
@@ -213,7 +221,12 @@ const AppRouter = {
                 await ControlAsistenciaModule.render();
                 break;
             default:
-                this.renderDashboard();
+                // Si es operador_asistencia, redirigir a control-asistencia en lugar de dashboard
+                if (FirebaseHelpers.currentUserRole === 'operador_asistencia') {
+                    this.navigate('control-asistencia');
+                } else {
+                    this.renderDashboard();
+                }
         }
     },
 
@@ -221,6 +234,13 @@ const AppRouter = {
      * Renderiza el dashboard principal
      */
     async renderDashboard() {
+        // Operador de asistencia no puede ver el dashboard
+        if (FirebaseHelpers.currentUserRole === 'operador_asistencia') {
+            console.log('Operador de asistencia no puede acceder al dashboard, redirigiendo a control-asistencia');
+            this.navigate('control-asistencia');
+            return;
+        }
+
         const empleados = await FirebaseHelpers.getEmpleados();
         const empleadosActivos = empleados.filter(e => e.estado === 'activo');
         const totalNomina = empleadosActivos.reduce((sum, e) => sum + (e.salarioMensual || 0), 0);
