@@ -70,8 +70,22 @@ const Formatters = {
         if (fecha instanceof Date) {
             fechaObj = fecha;
         } else if (typeof fecha === 'number') {
-            // Si es un timestamp, crear Date y usar métodos locales
+            // Si es un timestamp, crear Date
             fechaObj = new Date(fecha);
+            
+            // Para evitar problemas de zona horaria con fechas (sin hora específica),
+            // si el timestamp representa medianoche local, usar componentes locales directamente
+            // Esto es importante cuando el timestamp fue creado con new Date(año, mes, dia, 0, 0, 0, 0)
+            const horas = fechaObj.getHours();
+            const minutos = fechaObj.getMinutes();
+            const segundos = fechaObj.getSeconds();
+            const milisegundos = fechaObj.getMilliseconds();
+            
+            // Si es medianoche (o muy cerca), reconstruir la fecha usando componentes locales
+            // para evitar desfases por zona horaria
+            if (horas === 0 && minutos === 0 && segundos === 0 && milisegundos === 0) {
+                fechaObj = new Date(fechaObj.getFullYear(), fechaObj.getMonth(), fechaObj.getDate());
+            }
         } else {
             fechaObj = new Date(fecha);
         }

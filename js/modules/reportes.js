@@ -96,3 +96,4 @@ const ReportesModule = {
 };
 
 window.ReportesModule = ReportesModule;
+
