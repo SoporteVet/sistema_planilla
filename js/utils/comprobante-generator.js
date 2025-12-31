@@ -86,14 +86,29 @@ const ComprobanteGenerator = {
      * Prepara los datos para el comprobante
      */
     prepararDatos(empleado, calculos, planilla, asistencias = []) {
+        // Obtener la jornada del empleado para cálculos correctos
+        const jornada = empleado.jornada ? CONFIG.getJornadaByCodigo(empleado.jornada) : null;
+        const horasPorDiaJornada = jornada ? jornada.horasPorDia : 8;
+        
         // Contar días de incapacidad CCSS
         let diasIncapacidadCCSS = 0;
         let horasIncapacidadCCSS = 0;
+        
+        // Calcular horas en feriado desde asistencias (usando jornada específica)
+        let horasFeriadoTrabajadas = 0;
+        let diasFeriadosTrabajados = 0;
+        
         if (asistencias && asistencias.length > 0) {
             asistencias.forEach(a => {
                 if (a.tipoDia === CONFIG.TIPOS_DIA.INCAPACIDAD_CCSS) {
                     diasIncapacidadCCSS++;
                     horasIncapacidadCCSS += a.horasTrabajadas || 0;
+                }
+                // Contar horas en feriados trabajados
+                if (a.tipoDia === CONFIG.TIPOS_DIA.FERIADO_TRABAJADO) {
+                    diasFeriadosTrabajados++;
+                    // Usar las horas realmente trabajadas en el feriado, o las horas de la jornada
+                    horasFeriadoTrabajadas += a.horasTrabajadas || horasPorDiaJornada;
                 }
             });
         }
@@ -102,6 +117,14 @@ const ComprobanteGenerator = {
         if (diasIncapacidadCCSS === 0 && calculos.rebajosPorHoras?.diasIncapacidadCCSS) {
             diasIncapacidadCCSS = calculos.rebajosPorHoras.diasIncapacidadCCSS;
             horasIncapacidadCCSS = calculos.rebajosPorHoras.horasIncapacidadCCSS || 0;
+        }
+        
+        // Si no se calcularon horas de feriado desde asistencias, usar el cálculo
+        if (horasFeriadoTrabajadas === 0 && calculos.horasFeriado) {
+            horasFeriadoTrabajadas = calculos.horasFeriado;
+        } else if (horasFeriadoTrabajadas === 0 && calculos.diasFeriadosTrabajados) {
+            // Usar horas de la jornada del empleado, no 8 fijo
+            horasFeriadoTrabajadas = calculos.diasFeriadosTrabajados * horasPorDiaJornada;
         }
         
         // Formatear observaciones desde asistencias
@@ -202,10 +225,10 @@ const ComprobanteGenerator = {
             salario_hora: Formatters.formatearMonedaPrecisa(empleado.salarioHora || empleado.salarioHorario || 0, 7),
             subtotal_quincenal: Formatters.formatearMoneda(calculos.subtotalQuincenal || 0),
             dias_laborados: calculos.diasLaborados || calculos.diasTrabajados || 0,
-            horas_feriado: (calculos.horasFeriado || calculos.diasFeriadosTrabajados ? calculos.diasFeriadosTrabajados * 8 : 0).toFixed(2),
+            horas_feriado: horasFeriadoTrabajadas.toFixed(2),
             total_feriado: Formatters.formatearMoneda(calculos.pagoFeriados || calculos.montoFeriado || 0),
             horas_extra_feriado: (calculos.horasExtraFeriado || 0).toFixed(2),
-            total_extra_feriado: Formatters.formatearMoneda(calculos.totalExtraFeriado || calculos.montoExtraFeriado || 0),
+            total_extra_feriado: Formatters.formatearMoneda(calculos.totalExtraFeriado || calculos.pagoHorasExtraFeriado || calculos.montoExtraFeriado || 0),
             horas_extras: calculos.horasExtra || 0,
             monto_horas_extras: Formatters.formatearMoneda(calculos.montoHorasExtra || calculos.pagoHorasExtra || 0),
             horas_adicionales: (calculos.horasAdicionales || 0).toFixed(2),

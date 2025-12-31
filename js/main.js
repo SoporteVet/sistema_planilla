@@ -147,12 +147,13 @@ const AppRouter = {
             'feriados': 'feriados',
             'reportes': 'reportes',
             'cumpleanos': 'cumpleanos',
-            'usuarios': 'usuarios'
+            'usuarios': 'usuarios',
+            'autorizacion-email': '*' // Todos pueden acceder
         };
 
-        // Operador de asistencia SOLO puede acceder a control-asistencia (no dashboard)
+        // Operador de asistencia SOLO puede acceder a control-asistencia y autorizacion-email (no dashboard)
         if (FirebaseHelpers.currentUserRole === 'operador_asistencia') {
-            if (view !== 'control-asistencia') {
+            if (view !== 'control-asistencia' && view !== 'autorizacion-email') {
                 // Si intenta acceder al dashboard o cualquier otra vista, redirigir a control-asistencia
                 this.currentView = null; // Reset para permitir la navegación
                 this.navigate('control-asistencia');
@@ -219,6 +220,9 @@ const AppRouter = {
                 break;
             case 'control-asistencia':
                 await ControlAsistenciaModule.render();
+                break;
+            case 'autorizacion-email':
+                await AutorizacionEmailModule.render();
                 break;
             default:
                 // Si es operador_asistencia, redirigir a control-asistencia en lugar de dashboard
@@ -379,6 +383,7 @@ document.addEventListener('DOMContentLoaded', () => {
     CumpleanosModule.init();
     ServiciosProfesionalesModule.init();
     ControlAsistenciaModule.init();
+    AutorizacionEmailModule.init();
 
     console.log('Aplicación inicializada correctamente');
 });

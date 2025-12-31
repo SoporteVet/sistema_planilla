@@ -239,6 +239,8 @@ const AsistenciasModule = {
         let diasINSExistentes = 0;
         let diasPermisoExistentes = 0;
         let diasFeriadosExistentes = 0;
+        let horasFeriadosExistentes = 0;
+        let horasExtraFeriadosExistentes = 0;
 
         asistenciasExistentes.forEach(a => {
             horasTrabajadasExistentes += a.horasTrabajadas || 0;
@@ -255,6 +257,8 @@ const AsistenciasModule = {
             }
             if (a.tipoDia === CONFIG.TIPOS_DIA.FERIADO_TRABAJADO) {
                 diasFeriadosExistentes += 1;
+                horasFeriadosExistentes += a.horasTrabajadas || 0;
+                horasExtraFeriadosExistentes += a.horasExtra || 0;
             }
         });
 
@@ -375,6 +379,22 @@ const AsistenciasModule = {
                             </div>
                         </div>
 
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="form-group">
+                                <label class="form-label">Horas en Feriado</label>
+                                <input type="number" id="horasFeriadosQuincena" class="form-control" step="0.25" min="0" 
+                                    value="${horasFeriadosExistentes || 0}">
+                                <div class="form-help">Total de horas trabajadas en días feriados</div>
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label">Horas Extra Feriados</label>
+                                <input type="number" id="horasExtraFeriadosQuincena" class="form-control" step="0.25" min="0" 
+                                    value="${horasExtraFeriadosExistentes || 0}">
+                                <div class="form-help">Horas extra trabajadas en días feriados (pago 3x del salario horario)</div>
+                            </div>
+                        </div>
+
                         <div class="form-group">
                             <label class="form-label">Observaciones</label>
                             <textarea id="observacionesQuincena" class="form-control" rows="3" placeholder="Observaciones adicionales..."></textarea>
@@ -421,6 +441,8 @@ const AsistenciasModule = {
             const horasINS = parseFloat(document.getElementById('horasINSQuincena').value) || 0;
             const diasPermiso = parseFloat(document.getElementById('diasPermisoQuincena').value) || 0;
             const diasFeriados = parseFloat(document.getElementById('diasFeriadosQuincena').value) || 0;
+            const horasFeriados = parseFloat(document.getElementById('horasFeriadosQuincena').value) || 0;
+            const horasExtraFeriados = parseFloat(document.getElementById('horasExtraFeriadosQuincena').value) || 0;
             const diasTrabajadosManual = document.getElementById('diasTrabajadosQuincena').value ? parseFloat(document.getElementById('diasTrabajadosQuincena').value) : null;
             const observaciones = document.getElementById('observacionesQuincena').value || '';
 
@@ -443,13 +465,18 @@ const AsistenciasModule = {
             // Las incapacidades CCSS e INS no cuentan como horas trabajadas (pero se usan para cálculo del 50%)
             // Los permisos sin goce no cuentan como horas trabajadas
             // Los feriados trabajados SÍ cuentan como horas trabajadas (con pago doble)
-            const horasParaFeriados = diasFeriados * (jornada.horasPorDia || 7); // Usar horasPorDia o 7 como fallback
+            // Usar las horas en feriado especificadas, o calcular automáticamente si no se especificaron
+            const horasParaFeriados = horasFeriados > 0 ? horasFeriados : (diasFeriados * (jornada.horasPorDia || 7));
             const horasParaDiasNormales = horasTrabajadas - horasParaFeriados;
             const diasNormales = diasEnQuincena - diasCCSS - diasINS - diasPermiso - diasFeriados;
             const horasPorDiaNormal = diasNormales > 0 ? horasParaDiasNormales / diasNormales : 0;
 
-            // Distribuir horas extra solo en días normales
-            const horasExtraPorDia = (diasNormales > 0 && horasExtra > 0) ? horasExtra / diasNormales : 0;
+            // Distribuir horas extra solo en días normales (excluyendo horas extra feriados)
+            const horasExtraNormales = horasExtra - horasExtraFeriados;
+            const horasExtraPorDia = (diasNormales > 0 && horasExtraNormales > 0) ? horasExtraNormales / diasNormales : 0;
+            
+            // Distribuir horas extra feriados entre los días feriados
+            const horasExtraFeriadosPorDia = (diasFeriados > 0 && horasExtraFeriados > 0) ? horasExtraFeriados / diasFeriados : 0;
 
             // Distribuir horas adicionales solo en días normales
             const horasAdicionalesPorDia = (diasNormales > 0 && horasAdicionales > 0) ? horasAdicionales / diasNormales : 0;
@@ -500,7 +527,10 @@ const AsistenciasModule = {
                     contadorPermiso++;
                 } else if (contadorFeriados < diasFeriados) {
                     tipoDia = CONFIG.TIPOS_DIA.FERIADO_TRABAJADO;
-                    horasDia = jornada.horasPorDia; // Cuenta como horas trabajadas (con pago doble)
+                    // Usar las horas en feriado especificadas, distribuidas proporcionalmente
+                    const horasFeriadosPorDia = (diasFeriados > 0 && horasParaFeriados > 0) ? horasParaFeriados / diasFeriados : (jornada.horasPorDia || 7);
+                    horasDia = horasFeriadosPorDia; // Cuenta como horas trabajadas (con pago doble)
+                    horasExtraDia = horasExtraFeriadosPorDia; // Horas extra en feriado
                     contadorFeriados++;
                 } else {
                     // Día normal

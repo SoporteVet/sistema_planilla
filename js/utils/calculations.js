@@ -89,6 +89,21 @@ const Calculations = {
     },
 
     /**
+     * Calcula el pago ADICIONAL por horas extra en feriado (3x adicional)
+     * NOTA: Son 4x en total, pero 1x ya viene en el salario base, solo se paga 3x adicional
+     * @param {number} salarioMensual - Salario mensual base
+     * @param {string} codigoJornada - Código de la jornada
+     * @param {number} horasExtraFeriado - Número de horas extra en feriado
+     * @returns {number} Monto ADICIONAL a pagar por horas extra en feriado
+     */
+    calcularHorasExtraFeriado(salarioMensual, codigoJornada, horasExtraFeriado) {
+        if (horasExtraFeriado <= 0) return 0;
+        
+        const salarioHorario = this.calcularSalarioHorario(salarioMensual, codigoJornada);
+        return horasExtraFeriado * salarioHorario * CONFIG.HORAS_EXTRA.MULTIPLICADOR_FERIADO;
+    },
+
+    /**
      * Calcula el pago por horas adicionales (1x - pago normal)
      * @param {number} salarioMensual - Salario mensual base
      * @param {string} codigoJornada - Código de la jornada
@@ -118,11 +133,12 @@ const Calculations = {
     },
 
     /**
-     * Calcula el pago por feriados trabajados (2x)
+     * Calcula el pago ADICIONAL por feriados trabajados (1x adicional)
+     * NOTA: Son 2x en total, pero 1x ya viene en el salario base, solo se paga 1x adicional
      * @param {number} salarioMensual - Salario mensual base
      * @param {string} codigoJornada - Código de la jornada
      * @param {number} diasFeriado - Número de días feriados trabajados
-     * @returns {number} Monto a pagar por feriados
+     * @returns {number} Monto ADICIONAL a pagar por feriados
      */
     calcularFeriadosTrabajados(salarioMensual, codigoJornada, diasFeriado, asistenciasFeriados = []) {
         if (diasFeriado <= 0) return 0;
@@ -135,7 +151,7 @@ const Calculations = {
             let totalFeriados = 0;
             asistenciasFeriados.forEach(asist => {
                 const horasDia = asist.horasTrabajadas || jornada.horasPorDia;
-                // Feriado trabajado: pago doble (2x)
+                // Feriado trabajado: pago adicional (1x adicional, el otro 1x ya está en salario base)
                 totalFeriados += (salarioHorario * horasDia) * CONFIG.FERIADO_TRABAJADO.MULTIPLICADOR;
             });
             return totalFeriados;
@@ -340,6 +356,7 @@ const Calculations = {
             codigoJornada,
             diasTrabajados = 0,
             horasExtra = 0,
+            horasExtraFeriado = 0, // Horas extras en feriado (3x)
             horasAdicionales = 0,
             diasFeriados = 0,
             diasLibresTrabajados = 0,
@@ -391,6 +408,11 @@ const Calculations = {
                         codigoJornada,
                         asist.horasTrabajadas
                     );
+                } else if (asist.tipoDia === CONFIG.TIPOS_DIA.FERIADO_TRABAJADO) {
+                    // Feriados trabajados: SUMAN a horasLaboradas para que NO se cuenten como ausencia
+                    // Luego se pagan por separado con pago doble (2x)
+                    const horasFeriado = asist.horasTrabajadas || jornada.horasPorDia;
+                    horasLaboradas += horasFeriado;
                 } else if (asist.tipoDia === CONFIG.TIPOS_DIA.INCAPACIDAD_CCSS) {
                     // Incapacidad CCSS: NO se suman a horasLaboradas
                     // Las horas de incapacidad se deben RESTAR del salario (son horas faltantes)
@@ -407,7 +429,6 @@ const Calculations = {
                     // Permisos sin goce: NO se suman horas (se restarán del salario base)
                     // No hacer nada aquí, se calculará la ausencia al final
                 }
-                // NOTA: Los feriados trabajados se calculan por separado con pago doble
             });
         } else {
             // Si no hay asistencias detalladas, asumir que trabajó todas las horas esperadas
@@ -440,6 +461,12 @@ const Calculations = {
         // PASO 5: Sumar horas extras, horas adicionales, feriados, etc. para obtener Salario Bruto
         const pagoHorasExtra = this.calcularHorasExtra(salarioMensual, codigoJornada, horasExtra);
         
+        // Calcular horas extras en feriado (3x) por separado
+        const pagoHorasExtraFeriado = this.calcularHorasExtraFeriado(salarioMensual, codigoJornada, horasExtraFeriado);
+        if (horasExtraFeriado > 0) {
+            console.log(`[Calculations] Pago horas extra en feriado (${horasExtraFeriado} horas): ${pagoHorasExtraFeriado}`);
+        }
+        
         // Calcular horas adicionales desde asistencias si no se proporciona directamente o si el valor es 0
         let horasAdicionalesTotal = horasAdicionales || 0;
         // Siempre verificar en asistencias para asegurar que se capturen todas las horas adicionales
@@ -469,10 +496,11 @@ const Calculations = {
         // Permisos sin goce (se restan del salario base)
         const descuentoPermisos = this.calcularDescuentoPermiso(salarioMensual, codigoJornada, diasPermiso);
         
-        // Salario Bruto = Salario Ordinario + Horas Extras + Horas Adicionales + otros conceptos
+        // Salario Bruto = Salario Ordinario + Horas Extras + Horas Extras Feriado + Horas Adicionales + otros conceptos
         // NOTA: Los rebajos (bonos/rebajos) NO se restan aquí, se restarán DESPUÉS de calcular CCSS
         const salarioBruto = salarioOrdinario
             + pagoHorasExtra
+            + pagoHorasExtraFeriado // Agregar pago de horas extras en feriado (3x)
             + pagoHorasAdicionales
             + pagoFeriados
             + pagoDiasLibresTrabajados
@@ -486,6 +514,10 @@ const Calculations = {
             salarioBruto: Math.max(0, salarioBruto),
             salarioOrdinario: salarioOrdinario,
             montoCCSSCCSS: montoCCSSCCSS,
+            pagoHorasExtra: pagoHorasExtra, // Pago por horas extras normales (1.5x)
+            horasExtra: horasExtra, // Total de horas extras normales
+            pagoHorasExtraFeriado: pagoHorasExtraFeriado, // Pago por horas extras en feriado (3x)
+            horasExtraFeriado: horasExtraFeriado, // Total de horas extras en feriado
             pagoHorasAdicionales: pagoHorasAdicionales, // Pago por horas adicionales (1x)
             horasAdicionales: horasAdicionalesTotal, // Total de horas adicionales
             subtotalQuincenal: salarioQuincenalBase, // Salario quincenal base (antes de rebajos)

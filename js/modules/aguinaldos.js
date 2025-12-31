@@ -144,7 +144,7 @@ const AguinaldosModule = {
         const html = `
             <div class="card space-y-4">
                 <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                    <div>
+                    <div class="flex-1">
                         <h4 class="text-lg font-semibold text-gray-800">${empleado.nombre}</h4>
                         <p class="text-sm text-gray-500">${Formatters.formatearCedula(empleado.cedula)} · Ingreso: ${Formatters.formatearFecha(empleado.fechaIngreso)}</p>
                     </div>
@@ -154,6 +154,18 @@ const AguinaldosModule = {
                         <div class="text-sm text-gray-500">Aguinaldo proyectado</div>
                         <div class="text-lg font-semibold text-green-600">${Formatters.formatearMoneda(aguinaldo)}</div>
                         <div class="text-xs text-gray-400">Periodos con monto: ${periodosConMonto}/12</div>
+                        <div class="mt-3 flex gap-2 justify-end">
+                            <button onclick="AguinaldosModule.generarComprobante('${empleado.id}')" 
+                                class="btn btn-sm btn-secondary text-xs" title="Descargar comprobante PDF">
+                                📄 Comprobante
+                            </button>
+                            ${empleado.correo ? `
+                                <button onclick="AguinaldosModule.enviarComprobante('${empleado.id}')" 
+                                    class="btn btn-sm btn-primary text-xs" title="Enviar comprobante por correo">
+                                    ✉️ Enviar
+                                </button>
+                            ` : ''}
+                        </div>
                     </div>
                 </div>
                 <div class="table-container">
@@ -276,8 +288,12 @@ const AguinaldosModule = {
 
                 ${cardsHtml}
 
-                <div class="flex justify-end">
-                    <button onclick="AguinaldosModule.exportarPDF()" class="btn btn-secondary">Exportar PDF</button>
+                <div class="flex justify-end gap-3">
+                    <button onclick="AguinaldosModule.enviarComprobantesMasivos()" 
+                        class="btn btn-primary" title="Enviar comprobantes por correo a todos los empleados">
+                        📧 Enviar Comprobantes Masivos
+                    </button>
+                    <button onclick="AguinaldosModule.exportarPDF()" class="btn btn-secondary">Exportar Reporte PDF</button>
                 </div>
             </div>
         `;
@@ -365,10 +381,276 @@ const AguinaldosModule = {
         });
 
         PDFGenerator.generarReporteAguinaldo(datos, this.añoActual);
+    },
+
+    /**
+     * Genera comprobante de aguinaldo para un empleado
+     */
+    async generarComprobante(empleadoId) {
+        try {
+            const empleado = this.empleados.find(e => e.id === empleadoId);
+            if (!empleado) {
+                Utils.showToast('Empleado no encontrado', 'error');
+                return;
+            }
+
+            // Obtener resumen del empleado
+            const resumen = this.aguinaldosResumen[empleadoId];
+            if (!resumen) {
+                Utils.showToast('No se encontraron datos de aguinaldo para este empleado', 'error');
+                return;
+            }
+
+            Utils.showLoading('Generando comprobante...');
+
+            // Preparar datos para el comprobante
+            const datosAguinaldo = {
+                periodos: resumen.periodos,
+                totalBruto: resumen.totalBruto,
+                montoAguinaldo: resumen.montoAguinaldo,
+                periodosConMonto: resumen.periodosConMonto
+            };
+
+            // Generar PDF
+            const pdf = await ComprobanteAguinaldoGenerator.generarComprobantePDF(
+                empleado,
+                datosAguinaldo,
+                this.añoActual,
+                false
+            );
+
+            // Descargar
+            ComprobanteAguinaldoGenerator.descargarComprobante(pdf, empleado.nombre, this.añoActual);
+
+            Utils.hideLoading();
+            Utils.showToast('Comprobante generado exitosamente', 'success');
+
+        } catch (error) {
+            console.error('Error generando comprobante:', error);
+            Utils.showToast('Error al generar comprobante: ' + error.message, 'error');
+            Utils.hideLoading();
+        }
+    },
+
+    /**
+     * Envía comprobante de aguinaldo por correo
+     */
+    async enviarComprobante(empleadoId) {
+        try {
+            const empleado = this.empleados.find(e => e.id === empleadoId);
+            if (!empleado) {
+                Utils.showToast('Empleado no encontrado', 'error');
+                return;
+            }
+
+            if (!empleado.correo || empleado.correo.trim() === '') {
+                Utils.showToast('El empleado no tiene un correo electrónico registrado', 'error');
+                return;
+            }
+
+            // Obtener resumen del empleado
+            const resumen = this.aguinaldosResumen[empleadoId];
+            if (!resumen) {
+                Utils.showToast('No se encontraron datos de aguinaldo para este empleado', 'error');
+                return;
+            }
+
+            Utils.showLoading('Enviando comprobante por correo...');
+
+            // Verificar EmailJS
+            if (typeof EmailServiceSimple === 'undefined') {
+                Utils.showToast('EmailJS no está disponible. Asegúrese de que el servicio de email esté cargado.', 'error');
+                Utils.hideLoading();
+                return;
+            }
+
+            // Crear instancia del servicio
+            const emailService = new EmailServiceSimple();
+
+            // Verificar configuración
+            if (!emailService.verificarConfiguracion()) {
+                Utils.showToast('EmailJS no está configurado correctamente', 'error');
+                Utils.hideLoading();
+                return;
+            }
+
+            // Preparar datos para el comprobante
+            const datosAguinaldo = {
+                periodos: resumen.periodos,
+                totalBruto: resumen.totalBruto,
+                montoAguinaldo: resumen.montoAguinaldo,
+                periodosConMonto: resumen.periodosConMonto
+            };
+
+            // Generar PDF
+            const pdf = await ComprobanteAguinaldoGenerator.generarComprobantePDF(
+                empleado,
+                datosAguinaldo,
+                this.añoActual,
+                true
+            );
+
+            // Enviar por correo
+            const resultado = await emailService.enviarComprobanteAguinaldo(
+                empleado,
+                datosAguinaldo,
+                this.añoActual,
+                pdf
+            );
+
+            Utils.hideLoading();
+
+            if (resultado.success) {
+                Utils.showToast(`Comprobante enviado exitosamente a ${empleado.correo}`, 'success');
+            } else {
+                Utils.showToast(`Error enviando comprobante: ${resultado.error}`, 'error');
+            }
+
+        } catch (error) {
+            console.error('Error enviando comprobante:', error);
+            Utils.showToast('Error al enviar comprobante: ' + error.message, 'error');
+            Utils.hideLoading();
+        }
+    },
+
+    /**
+     * Envía comprobantes de aguinaldo por correo a todos los empleados que tengan correo
+     */
+    async enviarComprobantesMasivos() {
+        try {
+            // Verificar EmailJS
+            if (typeof EmailServiceSimple === 'undefined') {
+                Utils.showToast('EmailJS no está disponible. Asegúrese de que el servicio de email esté cargado.', 'error');
+                return;
+            }
+
+            // Crear instancia del servicio
+            const emailService = new EmailServiceSimple();
+
+            // Verificar configuración
+            if (!emailService.verificarConfiguracion()) {
+                Utils.showToast('EmailJS no está configurado correctamente', 'error');
+                return;
+            }
+
+            // Filtrar empleados activos que NO sean SP y que tengan correo
+            const empleadosActivos = this.empleados.filter(e =>
+                e.estado !== CONFIG.ESTADOS_EMPLEADO.INACTIVO &&
+                e.tipoEmpleado !== 'SP'
+            );
+
+            const empleadosConCorreo = empleadosActivos.filter(emp => 
+                emp.correo && emp.correo.trim() !== '' && this.aguinaldosResumen[emp.id]
+            );
+
+            if (empleadosConCorreo.length === 0) {
+                Utils.showToast('No hay empleados con correo electrónico registrado para enviar aguinaldos', 'warning');
+                return;
+            }
+
+            // Confirmar acción
+            const mensaje = `¿Desea enviar comprobantes de aguinaldo ${this.añoActual} por correo a ${empleadosConCorreo.length} empleado(s)?\n\n` +
+                `Esta acción enviará un correo a cada empleado con su comprobante de aguinaldo.`;
+
+            if (!confirm(mensaje)) {
+                return;
+            }
+
+            Utils.showLoading(`Enviando correos (0/${empleadosConCorreo.length})...`);
+
+            let exitosos = 0;
+            let fallidos = 0;
+            const errores = [];
+
+            // Enviar correos uno por uno
+            for (let i = 0; i < empleadosConCorreo.length; i++) {
+                const empleado = empleadosConCorreo[i];
+                const resumen = this.aguinaldosResumen[empleado.id];
+
+                try {
+                    Utils.showLoading(`Enviando correos (${i + 1}/${empleadosConCorreo.length}): ${empleado.nombre}...`);
+
+                    // Preparar datos
+                    const datosAguinaldo = {
+                        periodos: resumen.periodos,
+                        totalBruto: resumen.totalBruto,
+                        montoAguinaldo: resumen.montoAguinaldo,
+                        periodosConMonto: resumen.periodosConMonto
+                    };
+
+                    // Generar PDF
+                    const pdf = await ComprobanteAguinaldoGenerator.generarComprobantePDF(
+                        empleado,
+                        datosAguinaldo,
+                        this.añoActual,
+                        true
+                    );
+
+                    // Enviar por correo
+                    const resultado = await emailService.enviarComprobanteAguinaldo(
+                        empleado,
+                        datosAguinaldo,
+                        this.añoActual,
+                        pdf
+                    );
+
+                    if (resultado.success) {
+                        exitosos++;
+                    } else {
+                        fallidos++;
+                        errores.push(`${empleado.nombre}: ${resultado.error || 'Error desconocido'}`);
+                    }
+
+                    // Pequeña pausa entre envíos para evitar límites de rate
+                    if (i < empleadosConCorreo.length - 1) {
+                        await new Promise(resolve => setTimeout(resolve, 500));
+                    }
+
+                } catch (error) {
+                    console.error(`Error enviando comprobante a ${empleado.nombre}:`, error);
+                    fallidos++;
+                    errores.push(`${empleado.nombre}: ${error.message}`);
+                }
+            }
+
+            Utils.hideLoading();
+
+            // Mostrar resumen
+            let mensajeResumen = `Envío masivo de aguinaldos completado:\n\n` +
+                `✓ Exitosos: ${exitosos}\n` +
+                `✗ Fallidos: ${fallidos}`;
+
+            if (errores.length > 0) {
+                mensajeResumen += `\n\nErrores:\n${errores.slice(0, 5).join('\n')}`;
+                if (errores.length > 5) {
+                    mensajeResumen += `\n... y ${errores.length - 5} más`;
+                }
+            }
+
+            if (exitosos > 0) {
+                Utils.showToast(`Se enviaron ${exitosos} comprobante(s) de aguinaldo exitosamente`, 'success');
+            }
+
+            if (fallidos > 0) {
+                Utils.showToast(`Hubo ${fallidos} error(es) al enviar comprobantes. Revise la consola para más detalles.`, 'warning');
+                console.log('Errores de envío masivo:', errores);
+            }
+
+            // Mostrar alerta con detalles si hay errores
+            if (fallidos > 0) {
+                alert(mensajeResumen);
+            }
+
+        } catch (error) {
+            console.error('Error en envío masivo de aguinaldos:', error);
+            Utils.showToast('Error al enviar comprobantes masivos: ' + error.message, 'error');
+            Utils.hideLoading();
+        }
     }
 };
 
 window.AguinaldosModule = AguinaldosModule;
+
 
 
 

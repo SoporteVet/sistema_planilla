@@ -37,7 +37,8 @@ const DB_PATHS = {
     USUARIOS: 'usuarios',
     AUDITORIA: 'auditoria',
     SERVICIOS_PROFESIONALES: 'servicios_profesionales',
-    CONTROL_ASISTENCIA: 'control_asistencia'
+    CONTROL_ASISTENCIA: 'control_asistencia',
+    AUTORIZACIONES_EMAIL: 'autorizaciones_email'
 };
 
 // Jornadas Laborales Costarricenses
@@ -49,6 +50,7 @@ const JORNADAS = {
         diasPorSemana: 6,
         horasPorMes: 240,
         horasPorQuincena: 120,
+        horarioEntrada: '08:00', // Horario típico de entrada
         descripcion: '8 horas/día, 6 días/semana'
     },
     MIXTA: {
@@ -58,6 +60,7 @@ const JORNADAS = {
         diasPorSemana: 5,
         horasPorMes: 210,
         horasPorQuincena: 105,
+        horarioEntrada: '08:00', // Horario típico de entrada
         descripcion: '7 horas/día, 5 días/semana'
     },
     NOCTURNA: {
@@ -67,6 +70,7 @@ const JORNADAS = {
         diasPorSemana: 5,
         horasPorMes: 180,
         horasPorQuincena: 90,
+        horarioEntrada: '18:00', // Horario típico de entrada nocturna
         descripcion: '6 horas/día, 5 días/semana'
     },
     DIURNA_ACUMULATIVA: {
@@ -78,6 +82,7 @@ const JORNADAS = {
         diasPorSemana: 5,
         horasPorMes: 240,
         horasPorQuincena: 120,
+        horarioEntrada: '08:00', // Horario típico de entrada
         descripcion: '8-10 horas/día (variable), 5 días/semana, total 240 horas/mes'
     },
     MIXTA_ACUMULATIVA: {
@@ -89,6 +94,7 @@ const JORNADAS = {
         diasPorSemana: 5,
         horasPorMes: 210,
         horasPorQuincena: 105,
+        horarioEntrada: '08:00', // Horario típico de entrada
         descripcion: 'Horas variables por día, debe cumplir 105 horas quincenales en total'
     }
 };
@@ -160,14 +166,15 @@ const CREDITOS_FISCALES = {
 
 // Horas Extra
 const HORAS_EXTRA = {
-    MULTIPLICADOR: 1.5, // 1.5x del salario horario (50% adicional)
+    MULTIPLICADOR: 1.5, // 1.5x del salario horario (50% adicional en día normal)
+    MULTIPLICADOR_FERIADO: 3, // 3x del salario horario ADICIONAL (horas extras en feriado, el 1x base ya viene en salario)
     MAX_DIARIAS: 4,     // Máximo 4 horas extras por día (informativo)
     MAX_SEMANALES: 12   // Máximo 12 horas extras por semana (informativo)
 };
 
 // Feriados Trabajados
 const FERIADO_TRABAJADO = {
-    MULTIPLICADOR: 2 // 2x del salario diario (100% adicional)
+    MULTIPLICADOR: 1 // 1x ADICIONAL del salario diario (el otro 1x ya viene en horas trabajadas del salario base)
 };
 
 // Aguinaldo

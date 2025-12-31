@@ -272,7 +272,8 @@ const Auth = {
             'feriados': 'feriados',
             'reportes': 'reportes',
             'cumpleanos': 'cumpleanos',
-            'usuarios': 'usuarios'
+            'usuarios': 'usuarios',
+            'autorizacion-email': '*' // Todos pueden acceder
         };
 
         // Filtrar enlaces de navegación
@@ -280,9 +281,9 @@ const Auth = {
             const view = link.dataset.view;
             const requiredPermission = viewPermissions[view];
 
-            // Operador de asistencia SOLO ve control-asistencia (no dashboard)
+            // Operador de asistencia SOLO ve control-asistencia y autorizacion-email (no dashboard)
             if (rol === 'operador_asistencia') {
-                if (view === 'control-asistencia') {
+                if (view === 'control-asistencia' || view === 'autorizacion-email') {
                     link.parentElement.style.display = '';
                 } else {
                     link.parentElement.style.display = 'none';
@@ -399,6 +400,7 @@ const Auth = {
 
 // Export to window
 window.Auth = Auth;
+
 
 
 

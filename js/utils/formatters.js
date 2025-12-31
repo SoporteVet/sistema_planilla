@@ -473,6 +473,28 @@ const Formatters = {
         if (dias < 30) return `Hace ${dias} ${dias === 1 ? 'día' : 'días'}`;
 
         return this.formatearFecha(fechaObj);
+    },
+
+    /**
+     * Formatea fecha para nombres de archivo (YYYYMMDD_HHMMSS)
+     * @param {Date|string|number} fecha - Fecha
+     * @returns {string} Fecha formateada para archivos
+     */
+    formatearFechaArchivo(fecha) {
+        const fechaObj = fecha instanceof Date ? fecha : new Date(fecha);
+
+        if (isNaN(fechaObj.getTime())) {
+            return 'fecha_invalida';
+        }
+
+        const year = fechaObj.getFullYear();
+        const month = String(fechaObj.getMonth() + 1).padStart(2, '0');
+        const day = String(fechaObj.getDate()).padStart(2, '0');
+        const hours = String(fechaObj.getHours()).padStart(2, '0');
+        const minutes = String(fechaObj.getMinutes()).padStart(2, '0');
+        const seconds = String(fechaObj.getSeconds()).padStart(2, '0');
+
+        return `${year}${month}${day}_${hours}${minutes}${seconds}`;
     }
 };
 

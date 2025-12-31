@@ -386,6 +386,7 @@ const PlanillasModule = {
                     // Calcular datos de asistencia
                     let diasTrabajados = 0;
                     let horasExtra = 0;
+                    let horasExtraFeriado = 0; // Horas extras en feriado (3x)
                     let horasAdicionales = 0;
                     let diasFeriados = 0;
                     let diasCCSSEmpresa = 0;
@@ -417,6 +418,10 @@ const PlanillasModule = {
                         switch (asist.tipoDia) {
                             case CONFIG.TIPOS_DIA.FERIADO_TRABAJADO:
                                 diasFeriados++;
+                                // Las horas extras en feriados se separan
+                                if (asist.horasExtra && asist.horasExtra > 0) {
+                                    horasExtraFeriado += asist.horasExtra;
+                                }
                                 break;
                             case CONFIG.TIPOS_DIA.DIA_LIBRE_TRABAJADO:
                                 diasLibresTrabajados++;
@@ -449,7 +454,10 @@ const PlanillasModule = {
                         }
 
                         // Calcular horas extra y adicionales (siempre se calculan)
-                        horasExtra += asist.horasExtra || 0;
+                        // Solo sumar horas extras si NO es un feriado (las de feriado ya se sumaron arriba)
+                        if (asist.tipoDia !== CONFIG.TIPOS_DIA.FERIADO_TRABAJADO) {
+                            horasExtra += asist.horasExtra || 0;
+                        }
                         const horasAdicionalesDia = asist.horasAdicionales || 0;
                         horasAdicionales += horasAdicionalesDia;
                         if (horasAdicionalesDia > 0) {
@@ -481,6 +489,7 @@ const PlanillasModule = {
                         codigoJornada: empleado.jornada,
                         diasTrabajados,
                         horasExtra,
+                        horasExtraFeriado, // Horas extras en feriado (3x)
                         diasFeriados,
                         diasLibresTrabajados,
                         horasDiasLibres,
@@ -519,9 +528,22 @@ const PlanillasModule = {
                         diasTrabajados,
                         horasExtra,
                         pagoHorasExtra: Calculations.calcularHorasExtra(empleado.salarioMensual, empleado.jornada, horasExtra),
+                        horasExtraFeriado, // Horas extras en feriado (separadas)
+                        pagoHorasExtraFeriado: Calculations.calcularHorasExtraFeriado(empleado.salarioMensual, empleado.jornada, horasExtraFeriado),
                         horasAdicionales,
                         pagoHorasAdicionales: Calculations.calcularHorasAdicionales(empleado.salarioMensual, empleado.jornada, horasAdicionales),
                         diasFeriadosTrabajados: diasFeriados,
+                        horasFeriado: (() => {
+                            // Calcular horas en feriado desde asistencias (usando jornada específica del empleado)
+                            const asistenciasFeriados = asistencias.filter(a => a.tipoDia === CONFIG.TIPOS_DIA.FERIADO_TRABAJADO);
+                            if (asistenciasFeriados.length > 0) {
+                                return asistenciasFeriados.reduce((total, a) => {
+                                    return total + (a.horasTrabajadas || jornada.horasPorDia);
+                                }, 0);
+                            }
+                            // Si no hay asistencias, usar días * horas de la jornada
+                            return diasFeriados * jornada.horasPorDia;
+                        })(),
                         pagoFeriados: Calculations.calcularFeriadosTrabajados(
                             empleado.salarioMensual,
                             empleado.jornada,
@@ -824,10 +846,12 @@ const PlanillasModule = {
                 montoHorasExtra: datosPlanilla.pagoHorasExtra || 0,
                 horasAdicionales: datosPlanilla.horasAdicionales || 0,
                 pagoHorasAdicionales: datosPlanilla.pagoHorasAdicionales || 0,
-                horasFeriado: datosPlanilla.diasFeriadosTrabajados ? datosPlanilla.diasFeriadosTrabajados * 8 : 0,
+                diasFeriadosTrabajados: datosPlanilla.diasFeriadosTrabajados || 0,
+                horasFeriado: datosPlanilla.horasFeriado || 0,
                 pagoFeriados: datosPlanilla.pagoFeriados || 0,
-                horasExtraFeriado: 0,
-                totalExtraFeriado: 0,
+                horasExtraFeriado: datosPlanilla.horasExtraFeriado || 0,
+                totalExtraFeriado: datosPlanilla.pagoHorasExtraFeriado || 0,
+                pagoHorasExtraFeriado: datosPlanilla.pagoHorasExtraFeriado || 0,
                 salarioBruto: datosPlanilla.salarioBruto || 0,
                 descuentoCCSS: datosPlanilla.descuentoCCSS || 0,
                 impuestoRenta: datosPlanilla.impuestoRenta || 0,
@@ -924,6 +948,16 @@ const PlanillasModule = {
                 return;
             }
 
+            // Recargar datos del empleado desde Firebase para obtener el correo más reciente
+            try {
+                const empleadoActualizado = await FirebaseHelpers.getEmpleado(empleadoEncontrado.id);
+                if (empleadoActualizado && empleadoActualizado.correo) {
+                    empleadoEncontrado.correo = empleadoActualizado.correo;
+                }
+            } catch (error) {
+                console.warn('No se pudo recargar el empleado, usando datos en memoria:', error);
+            }
+
             if (!empleadoEncontrado.correo || empleadoEncontrado.correo.trim() === '') {
                 Utils.showToast('El empleado no tiene un correo electrónico registrado', 'error');
                 return;
@@ -992,10 +1026,12 @@ const PlanillasModule = {
                 subtotalQuincenal: subtotalQuincenal,
                 horasExtra: datosPlanilla.horasExtra || 0,
                 montoHorasExtra: datosPlanilla.pagoHorasExtra || 0,
-                horasFeriado: datosPlanilla.diasFeriadosTrabajados ? datosPlanilla.diasFeriadosTrabajados * 8 : 0,
+                diasFeriadosTrabajados: datosPlanilla.diasFeriadosTrabajados || 0,
+                horasFeriado: datosPlanilla.horasFeriado || 0,
                 pagoFeriados: datosPlanilla.pagoFeriados || 0,
-                horasExtraFeriado: 0,
-                totalExtraFeriado: 0,
+                horasExtraFeriado: datosPlanilla.horasExtraFeriado || 0,
+                totalExtraFeriado: datosPlanilla.pagoHorasExtraFeriado || 0,
+                pagoHorasExtraFeriado: datosPlanilla.pagoHorasExtraFeriado || 0,
                 salarioBruto: datosPlanilla.salarioBruto || 0,
                 descuentoCCSS: datosPlanilla.descuentoCCSS || 0,
                 impuestoRenta: datosPlanilla.impuestoRenta || 0,
@@ -1047,6 +1083,20 @@ const PlanillasModule = {
                 asistencias
             );
 
+            // Asegurar que el correo esté disponible (usar correo o email)
+            if (!empleadoEncontrado.correo && empleadoEncontrado.email) {
+                empleadoEncontrado.correo = empleadoEncontrado.email;
+            }
+            
+            // Log para debugging
+            console.log('Enviando comprobante a:', {
+                empleadoId: empleadoId,
+                nombre: empleadoEncontrado.nombre,
+                correo: empleadoEncontrado.correo,
+                email: empleadoEncontrado.email,
+                correoUsado: empleadoEncontrado.correo || empleadoEncontrado.email
+            });
+            
             // Enviar por correo (el HTML se genera dentro del servicio)
             const resultado = await emailService.enviarComprobante(
                 empleadoEncontrado,
@@ -1165,10 +1215,12 @@ const PlanillasModule = {
                         montoHorasExtra: datosPlanilla.pagoHorasExtra || 0,
                         horasAdicionales: datosPlanilla.horasAdicionales || 0,
                         pagoHorasAdicionales: datosPlanilla.pagoHorasAdicionales || 0,
-                        horasFeriado: datosPlanilla.diasFeriadosTrabajados ? datosPlanilla.diasFeriadosTrabajados * 8 : 0,
+                        diasFeriadosTrabajados: datosPlanilla.diasFeriadosTrabajados || 0,
+                        horasFeriado: datosPlanilla.horasFeriado || 0,
                         pagoFeriados: datosPlanilla.pagoFeriados || 0,
-                        horasExtraFeriado: 0,
-                        totalExtraFeriado: 0,
+                        horasExtraFeriado: datosPlanilla.horasExtraFeriado || 0,
+                        totalExtraFeriado: datosPlanilla.pagoHorasExtraFeriado || 0,
+                        pagoHorasExtraFeriado: datosPlanilla.pagoHorasExtraFeriado || 0,
                         salarioBruto: datosPlanilla.salarioBruto || 0,
                         descuentoCCSS: datosPlanilla.descuentoCCSS || 0,
                         impuestoRenta: datosPlanilla.impuestoRenta || 0,

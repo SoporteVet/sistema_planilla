@@ -18,6 +18,41 @@ const EMAILJS_CONFIG = {
     PDF_DOWNLOAD_BASE_URL: window.location.origin
 };
 
+/**
+ * CONFIGURACIÓN IMPORTANTE PARA HOTMAIL/OUTLOOK
+ * ============================================
+ * 
+ * Para que los correos lleguen correctamente a Hotmail/Outlook, debes:
+ * 
+ * 1. En EmailJS Dashboard (https://dashboard.emailjs.com):
+ *    - Ve a "Email Services" > Tu servicio
+ *    - Asegúrate de verificar tu dominio de correo
+ *    - Configura SPF y DKIM en tu proveedor DNS
+ * 
+ * 2. Configuración de plantilla en EmailJS:
+ *    - Usa la variable {{comprobante_html}} para el contenido HTML
+ *    - NO agregues estilos adicionales en la plantilla
+ *    - La plantilla debe ser simple:
+ * 
+ *      Subject: {{subject}}
+ *      
+ *      {{{comprobante_html}}}
+ * 
+ * 3. SPF Record (Agregar en tu DNS):
+ *    v=spf1 include:_spf.emailjs.com ~all
+ * 
+ * 4. DKIM: EmailJS lo configura automáticamente si verificas tu dominio
+ * 
+ * 5. Remitente verificado:
+ *    - Usa siempre el mismo correo como remitente
+ *    - Verifica el correo en EmailJS
+ *    - Evita cambiar de remitente frecuentemente
+ * 
+ * 6. Lista blanca de Hotmail:
+ *    - Pide a los empleados que agreguen tu correo a contactos
+ *    - Esto mejora significativamente la entrega
+ */
+
 // Inicializar EmailJS cuando esté disponible
 function initializeEmailJS() {
     if (typeof emailjs !== 'undefined' && EMAILJS_CONFIG.USER_ID) {
@@ -148,6 +183,7 @@ window.generatePDFDownloadLink = generatePDFDownloadLink;
 window.generateEmailDownloadLink = generateEmailDownloadLink;
 window.createSmallPDF = createSmallPDF;
 window.uploadPDFToStorage = uploadPDFToStorage;
+
 
 
 

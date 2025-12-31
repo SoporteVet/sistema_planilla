@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comprobante de Aguinaldo</title>
+</head>
+<body style="margin: 0; padding: 20px; background-color: #f4f4f4; font-family: Arial, sans-serif; font-size: 13px; line-height: 1.5; color: #1f2937;">
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width: 800px; margin: 0 auto; background-color: #f4f4f4;">
+        <tr>
+            <td>
+                <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background: white; padding: 20px; border: 1px solid #ddd; border-radius: 12px; overflow: hidden;">
+                    <!-- Header -->
+                    <tr>
+                        <td style="text-align: right; padding-bottom: 15px; border-bottom: 3px solid #1e3a8a;">
+                            <h2 style="margin: 0 0 8px 0; color: #1e3a8a; font-size: 20px; font-weight: bold;">{{empresa}}</h2>
+                            <p style="margin: 4px 0; color: #4b5563; font-size: 12px;">San Rafael Abajo de Desamparados</p>
+                            <p style="margin: 4px 0; color: #4b5563; font-size: 12px;">Tel: 4000-1365 | WhatsApp: 8839-2214</p>
+                        </td>
+                    </tr>
+                    
+                    <!-- Title -->
+                    <tr>
+                        <td style="text-align: center; background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); color: white; padding: 12px 20px; font-weight: bold; font-size: 18px; margin: 20px 0; border-radius: 12px;">
+                            Comprobante de Pago
+                        </td>
+                    </tr>
+                    
+                    <!-- Información del Colaborador -->
+                    <tr>
+                        <td>
+                            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="width: 100%; background: #f8fafc; border: 2px solid #1e3a8a; border-radius: 10px; margin-bottom: 20px;">
+                                <tr>
+                                    <td style="background: #1e3a8a; color: white; padding: 8px 12px; font-size: 14px; font-weight: bold; text-align: center; border-radius: 6px 6px 0 0;">
+                                        Identificación del colaborador
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 15px;">
+                                        <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                                            <tr>
+                                                <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;">
+                                                    <span style="font-weight: bold; color: #374151; font-size: 13px; min-width: 180px; display: inline-block;">Identificación:</span>
+                                                    <span style="color: #1f2937; font-size: 13px;">{{empleado_cedula}}</span>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;">
+                                                    <span style="font-weight: bold; color: #374151; font-size: 13px; min-width: 180px; display: inline-block;">Aguinaldo:</span>
+                                                    <span style="font-weight: bold; color: #1e3a8a; font-size: 13px;">{{año}}</span>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td style="padding: 8px 0;">
+                                                    <span style="font-weight: bold; color: #374151; font-size: 13px; min-width: 180px; display: inline-block;">Período:</span>
+                                                    <span style="color: #1f2937; font-size: 13px;">{{periodo_completo}}</span>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    
+                    <!-- Nombre del Colaborador -->
+                    <tr>
+                        <td>
+                            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="width: 100%; background: #f8fafc; border: 2px solid #1e3a8a; border-radius: 10px; margin-bottom: 20px;">
+                                <tr>
+                                    <td style="padding: 15px;">
+                                        <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                                            <tr>
+                                                <td style="padding: 8px 0;">
+                                                    <span style="font-weight: bold; color: #374151; font-size: 13px; min-width: 180px; display: inline-block;">Nombre del colaborador:</span>
+                                                    <span style="font-weight: bold; color: #1f2937; font-size: 15px;">{{empleado_nombre}}</span>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    
+                    <!-- Sección de Aguinaldo -->
+                    <tr>
+                        <td>
+                            <div style="background: #1e3a8a; color: white; padding: 10px 15px; font-weight: bold; text-align: center; margin-bottom: 15px; border-radius: 8px; font-size: 15px;">
+                                Detalle de ingresos en el mes
+                            </div>
+                            
+                            <!-- Tabla de Salarios Mensuales -->
+                            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="width: 100%; border: 2px solid #1e3a8a; border-radius: 10px; margin-bottom: 20px; border-collapse: separate; border-spacing: 0;">
+                                <thead>
+                                    <tr>
+                                        <th style="background: #1e3a8a; color: white; padding: 12px 15px; text-align: left; font-weight: bold; font-size: 14px; border-radius: 8px 0 0 0;">Salarios Mensuales</th>
+                                        <th style="background: #1e3a8a; color: white; padding: 12px 15px; text-align: right; font-weight: bold; font-size: 14px; border-radius: 0 8px 0 0;">Monto</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td style="padding: 8px 12px; border-bottom: 1px solid #e5e7eb; font-size: 14px; background: #ffffff;">dic-{{año_anterior}}</td>
+                                        <td style="padding: 8px 12px; border-bottom: 1px solid #e5e7eb; text-align: right; font-size: 14px; color: #059669; font-weight: 600;">{{salario_dic}}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 8px 12px; border-bottom: 1px solid #e5e7eb; font-size: 14px; background: #f9fafb;">ene-{{año}}</td>
+                                        <td style="padding: 8px 12px; border-bottom: 1px solid #e5e7eb; text-align: right; font-size: 14px; color: #059669; font-weight: 600;">{{salario_ene}}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 8px 12px; border-bottom: 1px solid #e5e7eb; font-size: 14px; background: #ffffff;">feb-{{año}}</td>
+                                        <td style="padding: 8px 12px; border-bottom: 1px solid #e5e7eb; text-align: right; font-size: 14px; color: #059669; font-weight: 600;">{{salario_feb}}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 8px 12px; border-bottom: 1px solid #e5e7eb; font-size: 14px; background: #f9fafb;">mar-{{año}}</td>
+                                        <td style="padding: 8px 12px; border-bottom: 1px solid #e5e7eb; text-align: right; font-size: 14px; color: #059669; font-weight: 600;">{{salario_mar}}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 8px 12px; border-bottom: 1px solid #e5e7eb; font-size: 14px; background: #ffffff;">abr-{{año}}</td>
+                                        <td style="padding: 8px 12px; border-bottom: 1px solid #e5e7eb; text-align: right; font-size: 14px; color: #059669; font-weight: 600;">{{salario_abr}}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 8px 12px; border-bottom: 1px solid #e5e7eb; font-size: 14px; background: #f9fafb;">may-{{año}}</td>
+                                        <td style="padding: 8px 12px; border-bottom: 1px solid #e5e7eb; text-align: right; font-size: 14px; color: #059669; font-weight: 600;">{{salario_may}}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 8px 12px; border-bottom: 1px solid #e5e7eb; font-size: 14px; background: #ffffff;">jun-{{año}}</td>
+                                        <td style="padding: 8px 12px; border-bottom: 1px solid #e5e7eb; text-align: right; font-size: 14px; color: #059669; font-weight: 600;">{{salario_jun}}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 8px 12px; border-bottom: 1px solid #e5e7eb; font-size: 14px; background: #f9fafb;">jul-{{año}}</td>
+                                        <td style="padding: 8px 12px; border-bottom: 1px solid #e5e7eb; text-align: right; font-size: 14px; color: #059669; font-weight: 600;">{{salario_jul}}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 8px 12px; border-bottom: 1px solid #e5e7eb; font-size: 14px; background: #ffffff;">ago-{{año}}</td>
+                                        <td style="padding: 8px 12px; border-bottom: 1px solid #e5e7eb; text-align: right; font-size: 14px; color: #059669; font-weight: 600;">{{salario_ago}}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 8px 12px; border-bottom: 1px solid #e5e7eb; font-size: 14px; background: #f9fafb;">sept-{{año}}</td>
+                                        <td style="padding: 8px 12px; border-bottom: 1px solid #e5e7eb; text-align: right; font-size: 14px; color: #059669; font-weight: 600;">{{salario_sept}}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 8px 12px; border-bottom: 1px solid #e5e7eb; font-size: 14px; background: #ffffff;">oct-{{año}}</td>
+                                        <td style="padding: 8px 12px; border-bottom: 1px solid #e5e7eb; text-align: right; font-size: 14px; color: #059669; font-weight: 600;">{{salario_oct}}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 8px 12px; font-size: 14px; background: #f9fafb; border-radius: 0 0 0 8px;">nov-{{año}}</td>
+                                        <td style="padding: 8px 12px; text-align: right; font-size: 14px; color: #059669; font-weight: 600; border-radius: 0 0 8px 0;">{{salario_nov}}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                            
+                            <!-- Totales -->
+                            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="width: 100%; background: #f0f9ff; border: 2px solid #1e3a8a; border-radius: 10px; margin-bottom: 20px;">
+                                <tr>
+                                    <td style="padding: 15px;">
+                                        <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                                            <tr>
+                                                <td style="padding: 10px 15px; margin-bottom: 8px; background: white; border-radius: 8px; border: 1px solid #e5e7eb;">
+                                                    <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                                                        <tr>
+                                                            <td style="font-weight: bold; font-size: 15px; color: #1e3a8a;">Total de Salarios</td>
+                                                            <td style="text-align: right; font-size: 16px; font-weight: bold; color: #059669;">{{total_salarios}}</td>
+                                                        </tr>
+                                                    </table>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td style="background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); color: white; font-size: 20px; font-weight: bold; text-align: center; padding: 18px; border-radius: 12px;">
+                                                    <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                                                        <tr>
+                                                            <td style="text-align: left; font-size: 18px;">AGUINALDO</td>
+                                                            <td style="text-align: right; font-size: 24px;">{{aguinaldo}}</td>
+                                                        </tr>
+                                                    </table>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    
+                    <!-- Felicitación -->
+                    <tr>
+                        <td style="text-align: center; margin: 25px 0 15px 0; font-size: 24px; font-weight: bold; color: #dc2626; font-style: italic; font-family: 'Brush Script MT', cursive, 'Arial';">
+                            ¡Felices Fiestas!
+                        </td>
+                    </tr>
+                    
+                    <!-- Mensaje Final -->
+                    <tr>
+                        <td style="text-align: center; margin-top: 20px; padding: 15px; background: #fef3c7; border-left: 4px solid #f59e0b; border-radius: 8px; font-size: 12px; color: #78350f; line-height: 1.6;">
+                            <strong>{{empresa}}</strong> le da las gracias por su esfuerzo, compromiso y apoyo en este {{año}}
+                        </td>
+                    </tr>
+                    
+                    <!-- Footer -->
+                    <tr>
+                        <td style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; color: #666; font-size: 10px;">
+                            <p style="margin: 5px 0;"><strong>{{empresa}}</strong></p>
+                            <p style="margin: 5px 0;">San Rafael Abajo de Desamparados</p>
+                            <p style="margin: 5px 0;">Tel: 4000-1365 | WhatsApp: 8839-2214</p>
+                            <p style="margin: 5px 0;">Fecha de envío: {{fecha_envio}}</p>
+                            <p style="margin: 5px 0; font-style: italic;">Este es un mensaje automático, por favor no responder a este correo.</p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>

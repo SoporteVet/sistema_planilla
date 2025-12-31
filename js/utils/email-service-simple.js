@@ -6,8 +6,9 @@ class EmailServiceSimple {
 
     /**
      * Envía un comprobante por email usando EmailJS de forma simplificada
+     * OPTIMIZADO PARA HOTMAIL/OUTLOOK
      */
-    async enviarComprobante(empleado, calculos, planilla, pdf, asistencias = []) {
+    async enviarComprobante(empleado, calculos, planilla, pdf) {
         try {
             // Verificar configuración
             if (!this.verificarConfiguracion()) {
@@ -21,18 +22,38 @@ class EmailServiceSimple {
             // Descargar PDF localmente
             this.descargarPDF(pdfBlob, fileName);
 
-            // Preparar datos optimizados para el email con TODOS los valores individuales
-            const templateParams = this.prepararDatosEmail(empleado, calculos, planilla, asistencias);
+            // Preparar datos optimizados para el email
+            const templateParams = this.prepararDatosEmail(empleado, calculos, planilla);
+
+            // Generar HTML del comprobante (optimizado para Hotmail)
+            const comprobanteHTML = this.generarHTMLComprobante(templateParams);
             
-            // Log para debugging
-            console.log('=== Enviando email ===');
-            console.log('Parámetros enviados:', {
+            // Generar versión de texto plano (importante para Hotmail)
+            const comprobanteTexto = this.generarTextoPlano(templateParams);
+            
+            // Agregar ambas versiones al templateParams
+            templateParams.comprobante_html = comprobanteHTML;
+            templateParams.comprobante_texto = comprobanteTexto;
+            
+            // Obtener el correo del empleado (usar 'correo' o 'email' para compatibilidad)
+            const correoEmpleado = empleado.correo || empleado.email;
+            
+            // Verificar si es correo Hotmail/Outlook y optimizar
+            const esHotmail = this.esCorreoHotmail(correoEmpleado);
+            if (esHotmail) {
+                console.log('Detectado correo Hotmail/Outlook - Aplicando optimizaciones');
+                // Agregar encabezados específicos para Hotmail
+                templateParams.reply_to = 'noreply@sistemadeplanillas.com';
+                templateParams.importance = 'normal';
+            }
+
+            // Log de los parámetros para debugging
+            console.log('Enviando email con parámetros:', {
                 serviceId: window.EMAILJS_CONFIG.SERVICE_ID,
                 templateId: window.EMAILJS_CONFIG.TEMPLATE_ID,
-                templateParamsKeys: Object.keys(templateParams),
-                empleado_nombre: templateParams.empleado_nombre,
-                salario_neto: templateParams.salario_neto,
-                empresa: templateParams.empresa
+                destinatario: correoEmpleado,
+                esHotmail: esHotmail,
+                templateParams: { ...templateParams, comprobante_html: '(HTML contenido)', comprobante_texto: '(Texto plano)' }
             });
 
             // Enviar email
@@ -45,7 +66,8 @@ class EmailServiceSimple {
             return {
                 success: response.status === 200,
                 messageId: response.text,
-                fileName: fileName
+                fileName: fileName,
+                esHotmail: esHotmail
             };
 
         } catch (error) {
@@ -56,393 +78,250 @@ class EmailServiceSimple {
 
     /**
      * Genera el HTML del comprobante de pago para email
-     * @param {Object} templateParams - Datos preparados del email (incluye empleado, calculos, planilla)
+     * OPTIMIZADO PARA HOTMAIL/OUTLOOK
+     * @param {Object} datos - Datos preparados del comprobante
      * @returns {string} HTML del comprobante
      */
-    generarHTMLComprobante(templateParams) {
-        // Usar la misma función de preparación que el generador de PDF
-        const empleado = templateParams.empleado || {};
-        const calculos = templateParams.calculos || {};
-        const planilla = templateParams.planilla || {};
-        const asistencias = templateParams.asistencias || [];
-
-        // Preparar datos usando la misma lógica que ComprobanteGenerator
-        const datos = this.prepararDatosComprobante(empleado, calculos, planilla, asistencias);
-
-        // Generar el HTML usando la misma estructura que el PDF pero con estilos inline para email
-        return this.generarHTMLEmailConEstilosInline(datos);
-    }
-
-    /**
-     * Prepara los datos del comprobante igual que ComprobanteGenerator
-     */
-    prepararDatosComprobante(empleado, calculos, planilla, asistencias = []) {
-        // Contar días de incapacidad CCSS
-        let diasIncapacidadCCSS = 0;
-        let horasIncapacidadCCSS = 0;
-        if (asistencias && asistencias.length > 0) {
-            asistencias.forEach(a => {
-                if (a.tipoDia === CONFIG.TIPOS_DIA.INCAPACIDAD_CCSS) {
-                    diasIncapacidadCCSS++;
-                    horasIncapacidadCCSS += a.horasTrabajadas || 0;
-                }
-            });
-        }
-        
-        // Si no hay asistencias, usar los datos del cálculo
-        if (diasIncapacidadCCSS === 0 && calculos.rebajosPorHoras?.diasIncapacidadCCSS) {
-            diasIncapacidadCCSS = calculos.rebajosPorHoras.diasIncapacidadCCSS;
-            horasIncapacidadCCSS = calculos.rebajosPorHoras.horasIncapacidadCCSS || 0;
-        }
-        
-        // Formatear observaciones desde asistencias
-        let observacionesTexto = 'Sin observaciones especiales';
-        const observacionesArray = [];
-        
-        // Agregar información de incapacidad CCSS si existe
-        if (diasIncapacidadCCSS > 0) {
-            observacionesArray.push(`Incapacidad CCSS: ${diasIncapacidadCCSS} día${diasIncapacidadCCSS > 1 ? 's' : ''} (${horasIncapacidadCCSS.toFixed(2)} horas)`);
-        }
-        
-        // Agregar otras observaciones desde asistencias
-        if (asistencias && asistencias.length > 0) {
-            const otrasObservaciones = asistencias
-                .filter(a => a.observaciones && a.observaciones.trim() !== '' && !a.observaciones.includes('Registro quincenal'))
-                .map(a => {
-                    let fecha = '';
-                    if (a.fecha) {
-                        // Si la fecha está en formato YYYYMMDD (string de 8 dígitos)
-                        if (typeof a.fecha === 'string' && /^\d{8}$/.test(a.fecha)) {
-                            const ano = parseInt(a.fecha.substring(0, 4));
-                            const mes = parseInt(a.fecha.substring(4, 6)) - 1; // Mes es 0-indexed
-                            const dia = parseInt(a.fecha.substring(6, 8));
-                            const fechaObj = new Date(ano, mes, dia);
-                            if (!isNaN(fechaObj.getTime())) {
-                                fecha = fechaObj.toLocaleDateString('es-CR');
-                            }
-                        } else {
-                            // Intentar parsear como Date normal
-                            try {
-                                const fechaObj = new Date(a.fecha);
-                                if (!isNaN(fechaObj.getTime())) {
-                                    fecha = fechaObj.toLocaleDateString('es-CR');
-                                }
-                            } catch (e) {
-                                fecha = '';
-                            }
-                        }
-                    }
-                    return fecha ? `${fecha}: ${a.observaciones}` : a.observaciones;
-                });
-            observacionesArray.push(...otrasObservaciones);
-        }
-        
-        if (observacionesArray.length > 0) {
-            observacionesTexto = observacionesArray.join('\n');
-        } else if (calculos.observaciones && calculos.observaciones !== 'Sin observaciones especiales') {
-            observacionesTexto = calculos.observaciones;
-        }
-
-        // Formatear período
-        let periodoStr = planilla.periodo || '';
-        if (!periodoStr) {
-            let fechaInicio = null;
-            if (planilla.periodoInicio) {
-                fechaInicio = new Date(planilla.periodoInicio);
-            } else if (planilla.fechaInicio) {
-                fechaInicio = new Date(planilla.fechaInicio);
+    generarHTMLComprobante(datos) {
+        // Función helper para formatear moneda (remover símbolo si ya está)
+        const formatearMoneda = (valor) => {
+            if (!valor || valor === '₡0.00' || valor === '0.00') return '₡0.00';
+            // Si ya tiene el símbolo, retornarlo tal cual
+            if (typeof valor === 'string' && valor.includes('₡')) {
+                return valor;
             }
-            
-            if (fechaInicio && !isNaN(fechaInicio.getTime())) {
-                // Si es quincenal, formatear como "IQ Mes" o "IIQ Mes"
-                if (planilla.tipoPeriodo === 'quincenal') {
-                    const diaInicio = fechaInicio.getDate();
-                    const nombreMes = fechaInicio.toLocaleDateString('es-CR', { month: 'long' });
-                    const primeraLetraMayuscula = nombreMes.charAt(0).toUpperCase() + nombreMes.slice(1);
-                    
-                    // Determinar si es primera (1-15) o segunda (16-30) quincena
-                    if (diaInicio >= 1 && diaInicio <= 15) {
-                        periodoStr = `IQ ${primeraLetraMayuscula}`;
-                    } else {
-                        periodoStr = `IIQ ${primeraLetraMayuscula}`;
-                    }
-                } else {
-                    // Para mensual, mostrar el mes completo
-                    const nombreMes = fechaInicio.toLocaleDateString('es-CR', { month: 'long' });
-                    const primeraLetraMayuscula = nombreMes.charAt(0).toUpperCase() + nombreMes.slice(1);
-                    periodoStr = primeraLetraMayuscula;
-                }
-            } else if (planilla.fechaInicio && planilla.fechaFin) {
-                // Fallback: mostrar rango de fechas
-                const inicio = new Date(planilla.fechaInicio);
-                const fin = new Date(planilla.fechaFin);
-                periodoStr = `${inicio.toLocaleDateString('es-CR')} - ${fin.toLocaleDateString('es-CR')}`;
-            }
-        }
-
-        return {
-            empleado_nombre: empleado.nombre || empleado.nombreEmpleado || '',
-            empleado_cedula: Formatters.formatearCedula(empleado.cedula),
-            empleado_puesto: empleado.puesto || empleado.cargo || '',
-            empleado_departamento: empleado.departamento || 'Operativo',
-            depositado_en: empleado.banco || empleado.depositadoEn || 'Bac San José',
-            periodo: periodoStr,
-            empresa: empleado.empresa || 'Sistema de Planillas',
-            salario_mensual: Formatters.formatearMoneda(calculos.salarioBaseMensual || empleado.salarioMensual || 0),
-            salario_diario: Formatters.formatearMoneda(calculos.salarioDiario || 0),
-            salario_hora: Formatters.formatearMonedaPrecisa(empleado.salarioHora || empleado.salarioHorario || 0, 7),
-            subtotal_quincenal: Formatters.formatearMoneda(calculos.subtotalQuincenal || 0),
-            dias_laborados: calculos.diasLaborados || calculos.diasTrabajados || 0,
-            horas_feriado: (calculos.horasFeriado || (calculos.diasFeriadosTrabajados ? calculos.diasFeriadosTrabajados * 8 : 0)).toFixed(2),
-            total_feriado: Formatters.formatearMoneda(calculos.pagoFeriados || calculos.montoFeriado || 0),
-            horas_extra_feriado: (calculos.horasExtraFeriado || 0).toFixed(2),
-            total_extra_feriado: Formatters.formatearMoneda(calculos.totalExtraFeriado || calculos.montoExtraFeriado || 0),
-            horas_extras: calculos.horasExtra || 0,
-            monto_horas_extras: Formatters.formatearMoneda(calculos.montoHorasExtra || calculos.pagoHorasExtra || 0),
-            horas_adicionales: (calculos.horasAdicionales || 0).toFixed(2),
-            monto_horas_adicionales: Formatters.formatearMoneda(calculos.pagoHorasAdicionales || calculos.montoHorasAdicionales || 0),
-            subtotal_pagado: Formatters.formatearMoneda(calculos.subtotalPagado || calculos.salarioBase || 0),
-            salario_bruto: Formatters.formatearMoneda(calculos.salarioBruto || 0),
-            ccss: Formatters.formatearMoneda(calculos.descuentoCCSS || calculos.ccss || 0),
-            ccss_porcentaje: '10.67',
-            impuesto_renta: Formatters.formatearMoneda(calculos.impuestoRenta || 0),
-            rebajo_horas: Formatters.formatearMoneda(calculos.rebajosPorHoras?.total || calculos.rebajoHoras || 0),
-            rebajo_horas_es_incapacidad: calculos.rebajosPorHoras?.esIncapacidadCCSS || false,
-            rebajo_horas_label: calculos.rebajosPorHoras?.esIncapacidadCCSS ? 'Incapacidad CCSS' : 'Rebajo por horas',
-            otras_deducciones: Formatters.formatearMoneda(calculos.otrosDescuentos || calculos.rebajos || 0),
-            total_deducciones: Formatters.formatearMoneda(
-                (calculos.descuentoCCSS || calculos.ccss || 0) +
-                (calculos.impuestoRenta || 0) +
-                (calculos.otrosDescuentos || calculos.rebajos || 0) +
-                (calculos.rebajosPorHoras?.total || calculos.rebajoHoras || 0)
-            ),
-            salario_neto: Formatters.formatearMoneda(calculos.salarioNeto || 0),
-            observaciones: observacionesTexto,
-            fecha_envio: new Date().toLocaleDateString('es-CR')
+            // Si es número, formatearlo
+            const num = typeof valor === 'string' ? parseFloat(valor.replace(/[₡,]/g, '')) : Number(valor);
+            if (isNaN(num) || num === 0) return '₡0.00';
+            return new Intl.NumberFormat('es-CR', {
+                style: 'currency',
+                currency: 'CRC',
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            }).format(num);
         };
-    }
 
-    /**
-     * Genera el HTML del comprobante con estilos inline para email
-     */
-    generarHTMLEmailConEstilosInline(datos) {
-        // Asegurar que todos los valores son strings seguros
-        const safeHTML = (val) => {
-            if (val === null || val === undefined) return '';
-            return String(val).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        // Función helper para asegurar valores string
+        const safeString = (val, defaultVal = '') => {
+            if (val === null || val === undefined) return defaultVal;
+            return String(val);
         };
-        
+
+        // Función helper para formatear números sin símbolo de moneda
+        const formatearNumero = (valor) => {
+            if (!valor || valor === 0) return '0.00';
+            const num = typeof valor === 'string' ? parseFloat(valor.replace(/[₡,]/g, '')) : Number(valor);
+            if (isNaN(num)) return '0.00';
+            return num.toFixed(2);
+        };
+
+        // Extraer y formatear todos los valores
+        const empresa = safeString(datos.empresa || datos.empleado?.empresa || 'Sistema de Planillas');
+        const empleadoNombre = safeString(datos.empleado_nombre || datos.empleado?.nombre || '');
+        const empleadoCedula = safeString(datos.empleado_cedula || datos.empleado?.cedula || '');
+        const empleadoDepartamento = safeString(datos.empleado_departamento || datos.empleado?.departamento || 'Operativo');
+        const empleadoPuesto = safeString(datos.empleado_puesto || datos.empleado?.puesto || '');
+        const periodo = safeString(datos.periodo || '');
+        const depositadoEn = safeString(datos.depositado_en || datos.empleado?.banco || 'Bac San José');
+        const fechaEnvio = safeString(datos.fecha_envio || new Date().toLocaleDateString('es-CR'));
+
+        // Valores monetarios (ya vienen formateados desde prepararDatosEmail)
+        const salarioMensual = formatearMoneda(datos.salario_mensual || datos.calculos?.salarioBaseMensual || 0);
+        const salarioDiario = formatearMoneda(datos.salario_diario || datos.calculos?.salarioDiario || 0);
+        const salarioHora = formatearMoneda(datos.salario_hora || datos.empleado?.salarioHora || 0);
+        const subtotalQuincenal = formatearMoneda(datos.subtotal_quincenal || datos.calculos?.subtotalQuincenal || 0);
+        const ccss = formatearMoneda(datos.ccss || datos.calculos?.descuentoCCSS || 0);
+        const ccssPorcentaje = safeString(datos.ccss_porcentaje || '10.67');
+        const impuestoRenta = formatearMoneda(datos.impuesto_renta || datos.calculos?.impuestoRenta || 0);
+        const rebajoHoras = formatearMoneda(datos.rebajo_horas || datos.calculos?.rebajosPorHoras?.total || 0);
+        const otrasDeducciones = formatearMoneda(datos.otras_deducciones || datos.calculos?.otrosDescuentos || 0);
+        const totalDeducciones = formatearMoneda(datos.total_deducciones || 
+            (parseFloat(ccss.replace(/[₡,]/g, '')) + 
+             parseFloat(impuestoRenta.replace(/[₡,]/g, '')) + 
+             parseFloat(otrasDeducciones.replace(/[₡,]/g, '')) + 
+             parseFloat(rebajoHoras.replace(/[₡,]/g, ''))));
+        const diasLaborados = safeString(datos.dias_laborados || datos.calculos?.diasTrabajados || 0);
+        const horasFeriado = formatearNumero(datos.horas_feriado || datos.calculos?.horasFeriado || 0);
+        const totalFeriado = formatearMoneda(datos.total_feriado || datos.calculos?.pagoFeriados || 0);
+        const horasExtraFeriado = formatearNumero(datos.horas_extra_feriado || datos.calculos?.horasExtraFeriado || 0);
+        const totalExtraFeriado = formatearMoneda(datos.total_extra_feriado || datos.calculos?.totalExtraFeriado || 0);
+        const horasExtras = safeString(datos.horas_extras || datos.calculos?.horasExtra || 0);
+        const montoHorasExtras = formatearMoneda(datos.monto_horas_extras || datos.calculos?.montoHorasExtra || 0);
+        const subtotalPagado = formatearMoneda(datos.subtotal_pagado || datos.calculos?.subtotalPagado || 0);
+        const salarioBruto = formatearMoneda(datos.salario_bruto || datos.calculos?.salarioBruto || 0);
+        const salarioNeto = formatearMoneda(datos.salario_neto || datos.calculos?.salarioNeto || 0);
+        const observaciones = safeString(datos.observaciones || datos.calculos?.observaciones || 'Sin observaciones especiales');
+
+        // Generar HTML OPTIMIZADO PARA HOTMAIL/OUTLOOK
+        // Usar solo estilos inline simples, sin border-radius ni sombras complejas
         return `<!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Comprobante de Pago</title>
 </head>
-<body style="margin: 0; padding: 20px; background-color: #f4f4f4; font-family: Arial, sans-serif; font-size: 11px; line-height: 1.4; color: #333;">
-    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width: 800px; margin: 0 auto; background-color: #f4f4f4;">
+<body style="margin: 0; padding: 0; background-color: #f4f4f4; font-family: Arial, sans-serif;">
+    <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #f4f4f4;">
         <tr>
-            <td>
-                <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background: white; padding: 20px; border: 1px solid #ddd;">
+            <td align="center" style="padding: 20px 10px;">
+                <table width="600" border="0" cellspacing="0" cellpadding="0" style="background-color: #ffffff; border: 1px solid #dddddd;">
                     <!-- Header -->
                     <tr>
-                        <td style="text-align: right; padding-bottom: 15px; margin-bottom: 20px;">
-                            <h2 style="margin: 0; color: #007bff; font-size: 18px; font-weight: bold;">${safeHTML(datos.empresa)}</h2>
-                            <p style="margin: 5px 0; color: #666; font-size: 14px;">San Rafael Abajo de Desamparados</p>
-                            <p style="margin: 5px 0; color: #666; font-size: 14px;">Tel: 4000-1365 | WhatsApp: 8839-2214</p>
+                        <td style="padding: 20px; text-align: right; border-bottom: 2px solid #1e3a8a;">
+                            <h2 style="margin: 0 0 8px 0; color: #1e3a8a; font-size: 18px;">${empresa}</h2>
+                            <p style="margin: 4px 0; color: #666666; font-size: 12px;">San Rafael Abajo de Desamparados</p>
+                            <p style="margin: 4px 0; color: #666666; font-size: 12px;">Tel: 4000-1365 | WhatsApp: 8839-2214</p>
                         </td>
-            </tr>
+                    </tr>
                     
                     <!-- Title -->
-            <tr>
-                        <td style="text-align: center; background: #007bff; color: white; padding: 8px 20px; font-weight: bold; font-size: 14px; margin-bottom: 15px;">
-                            Comprobante de Pago
-                        </td>
-            </tr>
-                    
-                    <!-- Datos del Colaborador -->
                     <tr>
-                        <td>
-                            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="width: 100%; border-collapse: collapse; margin-bottom: 15px; border: 2px solid #007bff;">
+                        <td style="padding: 15px 20px;">
+                            <table width="100%" border="0" cellspacing="0" cellpadding="0">
                                 <tr>
-                                    <th colspan="2" style="background: #007bff; color: white; padding: 8px; text-align: left; font-weight: bold; border: 1px solid #007bff;">DATOS DEL COLABORADOR</th>
+                                    <td align="center" style="background-color: #1e3a8a; color: #ffffff; padding: 10px; font-size: 16px; font-weight: bold;">
+                                        Comprobante de Pago
+                                    </td>
                                 </tr>
-                                <tr style="background: #ffffff;">
-                                    <td style="padding: 6px 8px; border: 1px solid #ddd;"><strong>Nombre del colaborador</strong></td>
-                                    <td style="padding: 6px 8px; border: 1px solid #ddd;">${safeHTML(datos.empleado_nombre)}</td>
+                            </table>
+                        </td>
+                    </tr>
+                    
+                    <!-- Employee Info -->
+                    <tr>
+                        <td style="padding: 10px 20px;">
+                            <table width="100%" border="0" cellspacing="0" cellpadding="5" style="border: 1px solid #1e3a8a;">
+                                <tr>
+                                    <td colspan="2" style="background-color: #1e3a8a; color: #ffffff; padding: 8px; font-weight: bold;">DATOS DEL COLABORADOR</td>
                                 </tr>
-                                <tr style="background: #f9f9f9;">
-                                    <td style="padding: 6px 8px; border: 1px solid #ddd;"><strong>Identificación</strong></td>
-                                    <td style="padding: 6px 8px; border: 1px solid #ddd;">${safeHTML(datos.empleado_cedula)}</td>
-            </tr>
-                                <tr style="background: #ffffff;">
-                                    <td style="padding: 6px 8px; border: 1px solid #ddd;"><strong>Departamento</strong></td>
-                                    <td style="padding: 6px 8px; border: 1px solid #ddd;">${safeHTML(datos.empleado_departamento)}</td>
-            </tr>
-                                <tr style="background: #f9f9f9;">
-                                    <td style="padding: 6px 8px; border: 1px solid #ddd;"><strong>Puesto</strong></td>
-                                    <td style="padding: 6px 8px; border: 1px solid #ddd;">${safeHTML(datos.empleado_puesto)}</td>
-            </tr>
-                                <tr style="background: #ffffff;">
-                                    <td style="padding: 6px 8px; border: 1px solid #ddd;"><strong>Periodo de pago</strong></td>
-                                    <td style="padding: 6px 8px; border: 1px solid #ddd;">${safeHTML(datos.periodo)}</td>
-            </tr>
-                                <tr style="background: #f9f9f9;">
-                                    <td style="padding: 6px 8px; border: 1px solid #ddd;"><strong>Depositado en</strong></td>
-                                    <td style="padding: 6px 8px; border: 1px solid #ddd;">${safeHTML(datos.depositado_en)}</td>
-            </tr>
-                                <tr style="background: #ffffff;">
-                                    <td style="padding: 6px 8px; border: 1px solid #ddd;"><strong>Cuenta</strong></td>
-                                    <td style="padding: 6px 8px; border: 1px solid #ddd;"></td>
-            </tr>
-        </table>
+                                <tr style="background-color: #f9f9f9;">
+                                    <td style="padding: 6px 8px; font-weight: bold; width: 40%;">Nombre:</td>
+                                    <td style="padding: 6px 8px;">${empleadoNombre}</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 6px 8px; font-weight: bold;">Identificacion:</td>
+                                    <td style="padding: 6px 8px;">${empleadoCedula}</td>
+                                </tr>
+                                <tr style="background-color: #f9f9f9;">
+                                    <td style="padding: 6px 8px; font-weight: bold;">Departamento:</td>
+                                    <td style="padding: 6px 8px;">${empleadoDepartamento}</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 6px 8px; font-weight: bold;">Puesto:</td>
+                                    <td style="padding: 6px 8px;">${empleadoPuesto}</td>
+                                </tr>
+                                <tr style="background-color: #f9f9f9;">
+                                    <td style="padding: 6px 8px; font-weight: bold;">Periodo:</td>
+                                    <td style="padding: 6px 8px;">${periodo}</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 6px 8px; font-weight: bold;">Depositado en:</td>
+                                    <td style="padding: 6px 8px;">${depositadoEn}</td>
+                                </tr>
+                            </table>
                         </td>
                     </tr>
                     
                     <!-- Section Title -->
                     <tr>
-                        <td style="background: #007bff; color: white; padding: 8px; font-weight: bold; text-align: center; margin-top: 15px; margin-bottom: 10px; border-radius: 10px;">
-                            Detalle de Ingresos en el mes
+                        <td style="padding: 10px 20px;">
+                            <table width="100%" border="0" cellspacing="0" cellpadding="0">
+                                <tr>
+                                    <td align="center" style="background-color: #1e3a8a; color: #ffffff; padding: 8px; font-weight: bold;">
+                                        Detalle de Ingresos
+                                    </td>
+                                </tr>
+                            </table>
                         </td>
                     </tr>
                     
-                    <!-- Detalle de Ingresos -->
+                    <!-- Payment Details -->
                     <tr>
-                        <td>
-                            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="width: 100%; border: 2px solid #007bff; border-collapse: separate; border-spacing: 0; margin-bottom: 15px; border-radius: 10px; overflow: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
-            <thead>
-                <tr>
-                                        <th style="width: 50%; background: #007bff; color: white; padding: 8px; border: 1px solid white; font-weight: bold; text-align: center; border-radius: 5px;">INGRESOS</th>
-                                        <th style="width: 25%; background: #007bff; color: white; padding: 8px; border: 1px solid white; font-weight: bold; text-align: center; border-radius: 5px;"></th>
-                                        <th style="width: 25%; background: #E74C3C; color: white; padding: 8px; border: 1px solid white; font-weight: bold; text-align: center; border-radius: 5px;">DEDUCCIONES</th>
-                                        <th style="width: 25%; background: #E74C3C; color: white; padding: 8px; border: 1px solid white; font-weight: bold; text-align: center; border-radius: 5px;"></th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                                        <td style="padding: 6px 8px; border: 1px solid #ddd; text-align: left; border-radius: 5px;">Salario Mensual</td>
-                                        <td style="padding: 6px 8px; border: 1px solid #ddd; text-align: right; border-radius: 5px;">${datos.salario_mensual}</td>
-                                        <td style="padding: 6px 8px; border: 1px solid #ddd; text-align: left; border-radius: 5px;">C.C.S.S. ${datos.ccss_porcentaje}%</td>
-                                        <td style="padding: 6px 8px; border: 1px solid #ddd; text-align: right; border-radius: 5px;">${datos.ccss}</td>
-                </tr>
-                <tr>
-                                        <td style="padding: 6px 8px; border: 1px solid #ddd; text-align: left; border-radius: 5px;">Salario diario</td>
-                                        <td style="padding: 6px 8px; border: 1px solid #ddd; text-align: right; border-radius: 5px;">${datos.salario_diario}</td>
-                                        <td style="padding: 6px 8px; border: 1px solid #ddd; text-align: left; border-radius: 5px;">Impuesto de Renta</td>
-                                        <td style="padding: 6px 8px; border: 1px solid #ddd; text-align: right; border-radius: 5px;">${datos.impuesto_renta}</td>
-                </tr>
-                <tr>
-                                        <td style="padding: 6px 8px; border: 1px solid #ddd; text-align: left; border-radius: 5px;">Salario x hora</td>
-                                        <td style="padding: 6px 8px; border: 1px solid #ddd; text-align: right; border-radius: 5px;">${datos.salario_hora}</td>
-                                        <td style="padding: 6px 8px; border: 1px solid #ddd; text-align: left; border-radius: 5px;">${datos.rebajo_horas_label}</td>
-                                        <td style="padding: 6px 8px; border: 1px solid #ddd; text-align: right; border-radius: 5px;">${datos.rebajo_horas}</td>
-                </tr>
-                <tr>
-                                        <td style="padding: 6px 8px; border: 1px solid #ddd; border-radius: 5px;"></td>
-                                        <td style="padding: 6px 8px; border: 1px solid #ddd; border-radius: 5px;"></td>
-                                        <td style="padding: 6px 8px; border: 1px solid #ddd; text-align: left; border-radius: 5px;">Otras deducciones</td>
-                                        <td style="padding: 6px 8px; border: 1px solid #ddd; text-align: right; border-radius: 5px;">${datos.otras_deducciones}</td>
-                </tr>
-                <tr>
-                                        <td style="padding: 6px 8px; border: 1px solid #ddd; text-align: left; border-radius: 5px;">Días laborados</td>
-                                        <td style="padding: 6px 8px; border: 1px solid #ddd; text-align: right; border-radius: 5px;">${datos.dias_laborados}</td>
-                                        <td style="padding: 6px 8px; border: 1px solid #ddd; border-radius: 5px;"></td>
-                                        <td style="padding: 6px 8px; border: 1px solid #ddd; border-radius: 5px;"></td>
-                </tr>
-                <tr>
-                                        <td style="padding: 6px 8px; border: 1px solid #ddd; text-align: left; border-radius: 5px;">Subtotal quincenal</td>
-                                        <td style="padding: 6px 8px; border: 1px solid #ddd; text-align: right; border-radius: 5px;">${datos.subtotal_quincenal}</td>
-                                        <td style="padding: 6px 8px; border: 1px solid #ddd; border-radius: 5px;"></td>
-                                        <td style="padding: 6px 8px; border: 1px solid #ddd; border-radius: 5px;"></td>
-                </tr>
-                <tr>
-                                        <td style="padding: 6px 8px; border: 1px solid #ddd; text-align: left; border-radius: 5px;">Horas laboradas feriado</td>
-                                        <td style="padding: 6px 8px; border: 1px solid #ddd; text-align: right; border-radius: 5px;">${datos.horas_feriado}</td>
-                                        <td style="padding: 6px 8px; border: 1px solid #ddd; border-radius: 5px;"></td>
-                                        <td style="padding: 6px 8px; border: 1px solid #ddd; border-radius: 5px;"></td>
-                </tr>
-                <tr>
-                                        <td style="padding: 6px 8px; border: 1px solid #ddd; text-align: left; border-radius: 5px;">Total</td>
-                                        <td style="padding: 6px 8px; border: 1px solid #ddd; text-align: right; border-radius: 5px;">${datos.total_feriado}</td>
-                                        <td style="padding: 6px 8px; border: 1px solid #ddd; border-radius: 5px;"></td>
-                                        <td style="padding: 6px 8px; border: 1px solid #ddd; border-radius: 5px;"></td>
-                </tr>
-                <tr>
-                                        <td style="padding: 6px 8px; border: 1px solid #ddd; text-align: left; border-radius: 5px;">Horas extras feriado</td>
-                                        <td style="padding: 6px 8px; border: 1px solid #ddd; text-align: right; border-radius: 5px;">${datos.horas_extra_feriado}</td>
-                                        <td style="padding: 6px 8px; border: 1px solid #ddd; border-radius: 5px;"></td>
-                                        <td style="padding: 6px 8px; border: 1px solid #ddd; border-radius: 5px;"></td>
-                </tr>
-                <tr>
-                                        <td style="padding: 6px 8px; border: 1px solid #ddd; text-align: left; border-radius: 5px;">Total</td>
-                                        <td style="padding: 6px 8px; border: 1px solid #ddd; text-align: right; border-radius: 5px;">${datos.total_extra_feriado}</td>
-                                        <td style="padding: 6px 8px; border: 1px solid #ddd; border-radius: 5px;"></td>
-                                        <td style="padding: 6px 8px; border: 1px solid #ddd; border-radius: 5px;"></td>
-                </tr>
-                <tr>
-                                        <td style="padding: 6px 8px; border: 1px solid #ddd; text-align: left; border-radius: 5px;">Horas extras</td>
-                                        <td style="padding: 6px 8px; border: 1px solid #ddd; text-align: right; border-radius: 5px;">${datos.horas_extras}</td>
-                                        <td style="padding: 6px 8px; border: 1px solid #ddd; border-radius: 5px;"></td>
-                                        <td style="padding: 6px 8px; border: 1px solid #ddd; border-radius: 5px;"></td>
-                </tr>
-                <tr>
-                                        <td style="padding: 6px 8px; border: 1px solid #ddd; text-align: left; border-radius: 5px;">Total</td>
-                                        <td style="padding: 6px 8px; border: 1px solid #ddd; text-align: right; border-radius: 5px;">${datos.monto_horas_extras}</td>
-                                        <td style="padding: 6px 8px; border: 1px solid #ddd; border-radius: 5px;"></td>
-                                        <td style="padding: 6px 8px; border: 1px solid #ddd; border-radius: 5px;"></td>
-                </tr>
-                <tr>
-                                        <td style="padding: 6px 8px; border: 1px solid #ddd; text-align: left; border-radius: 5px;">Horas adicionales</td>
-                                        <td style="padding: 6px 8px; border: 1px solid #ddd; text-align: right; border-radius: 5px;">${datos.horas_adicionales}</td>
-                                        <td style="padding: 6px 8px; border: 1px solid #ddd; border-radius: 5px;"></td>
-                                        <td style="padding: 6px 8px; border: 1px solid #ddd; border-radius: 5px;"></td>
-                </tr>
-                <tr>
-                                        <td style="padding: 6px 8px; border: 1px solid #ddd; text-align: left; border-radius: 5px;">Total</td>
-                                        <td style="padding: 6px 8px; border: 1px solid #ddd; text-align: right; border-radius: 5px;">${datos.monto_horas_adicionales}</td>
-                                        <td style="padding: 6px 8px; border: 1px solid #ddd; border-radius: 5px;"></td>
-                                        <td style="padding: 6px 8px; border: 1px solid #ddd; border-radius: 5px;"></td>
-                </tr>
-                <tr>
-                                        <td style="padding: 6px 8px; border: 1px solid #ddd; text-align: left; border-radius: 5px;">Sub-total Pagado</td>
-                                        <td style="padding: 6px 8px; border: 1px solid #ddd; text-align: right; border-radius: 5px;">${datos.subtotal_pagado}</td>
-                                        <td style="padding: 6px 8px; border: 1px solid #ddd; border-radius: 5px;"></td>
-                                        <td style="padding: 6px 8px; border: 1px solid #ddd; border-radius: 5px;"></td>
-                </tr>
-                <tr style="font-weight: bold; background: #e8f4f8;">
-                                        <td style="padding: 6px 8px; border: 1px solid #ddd; text-align: left; border-radius: 5px;">SALARIO BRUTO</td>
-                                        <td style="padding: 6px 8px; border: 1px solid #ddd; text-align: right; border-radius: 5px;">${datos.salario_bruto}</td>
-                                        <td style="padding: 6px 8px; border: 1px solid #ddd; text-align: left; border-radius: 5px;">Total de Deducciones</td>
-                                        <td style="padding: 6px 8px; border: 1px solid #ddd; text-align: right; border-radius: 5px;">${datos.total_deducciones}</td>
-                </tr>
-            </tbody>
-        </table>
+                        <td style="padding: 10px 20px;">
+                            <table width="100%" border="1" cellspacing="0" cellpadding="6" style="border-collapse: collapse; border: 1px solid #1e3a8a;">
+                                <tr style="background-color: #1e3a8a; color: #ffffff;">
+                                    <th style="text-align: left; padding: 8px;">INGRESOS</th>
+                                    <th style="text-align: right; padding: 8px; width: 20%;">Monto</th>
+                                    <th style="text-align: left; padding: 8px; background-color: #dc3545;">DEDUCCIONES</th>
+                                    <th style="text-align: right; padding: 8px; width: 20%; background-color: #dc3545;">Monto</th>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 6px 8px;">Salario Mensual</td>
+                                    <td style="padding: 6px 8px; text-align: right;">${salarioMensual}</td>
+                                    <td style="padding: 6px 8px;">CCSS ${ccssPorcentaje}%</td>
+                                    <td style="padding: 6px 8px; text-align: right;">${ccss}</td>
+                                </tr>
+                                <tr style="background-color: #f9f9f9;">
+                                    <td style="padding: 6px 8px;">Salario diario</td>
+                                    <td style="padding: 6px 8px; text-align: right;">${salarioDiario}</td>
+                                    <td style="padding: 6px 8px;">Imp. Renta</td>
+                                    <td style="padding: 6px 8px; text-align: right;">${impuestoRenta}</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 6px 8px;">Dias laborados: ${diasLaborados}</td>
+                                    <td style="padding: 6px 8px; text-align: right;">${subtotalQuincenal}</td>
+                                    <td style="padding: 6px 8px;">Rebajo horas</td>
+                                    <td style="padding: 6px 8px; text-align: right;">${rebajoHoras}</td>
+                                </tr>
+                                <tr style="background-color: #f9f9f9;">
+                                    <td style="padding: 6px 8px;">Hrs feriado: ${horasFeriado}</td>
+                                    <td style="padding: 6px 8px; text-align: right;">${totalFeriado}</td>
+                                    <td style="padding: 6px 8px;">Otras deduc.</td>
+                                    <td style="padding: 6px 8px; text-align: right;">${otrasDeducciones}</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 6px 8px;">Hrs extra: ${horasExtras}</td>
+                                    <td style="padding: 6px 8px; text-align: right;">${montoHorasExtras}</td>
+                                    <td style="padding: 6px 8px;"></td>
+                                    <td style="padding: 6px 8px; text-align: right;"></td>
+                                </tr>
+                                <tr style="background-color: #e3f2fd; font-weight: bold;">
+                                    <td style="padding: 8px;">SALARIO BRUTO</td>
+                                    <td style="padding: 8px; text-align: right;">${salarioBruto}</td>
+                                    <td style="padding: 8px;">TOTAL DEDUCCIONES</td>
+                                    <td style="padding: 8px; text-align: right;">${totalDeducciones}</td>
+                                </tr>
+                            </table>
                         </td>
                     </tr>
                     
-                    <!-- Salario Neto -->
+                    <!-- Net Salary -->
                     <tr>
-                        <td style="background: #007bff; color: white; font-size: 16px; font-weight: bold; text-align: center; padding: 12px; margin-top: 15px; border-radius: 15px;">
-                            SALARIO NETO: ${datos.salario_neto}
+                        <td style="padding: 15px 20px;">
+                            <table width="100%" border="0" cellspacing="0" cellpadding="0">
+                                <tr>
+                                    <td align="center" style="background-color: #1e3a8a; color: #ffffff; padding: 15px; font-size: 18px; font-weight: bold;">
+                                        SALARIO NETO: ${salarioNeto}
+                                    </td>
+                                </tr>
+                            </table>
                         </td>
                     </tr>
                     
-                    <!-- Observaciones -->
+                    <!-- Notes -->
                     <tr>
-                        <td style="margin-top: 20px; padding: 10px; background: #f0f8ff; border-left: 4px solid #007bff; font-size: 10px; border-radius: 10px;">
-            <strong>Observaciones:</strong><br>
-                            ${datos.observaciones.replace(/\n/g, '<br>')}
+                        <td style="padding: 10px 20px;">
+                            <table width="100%" border="0" cellspacing="0" cellpadding="10" style="background-color: #f0f8ff; border-left: 4px solid #1e3a8a;">
+                                <tr>
+                                    <td style="font-size: 11px;">
+                                        <strong>Observaciones:</strong><br>
+                                        ${observaciones.replace(/\n/g, '<br>')}
+                                    </td>
+                                </tr>
+                            </table>
                         </td>
                     </tr>
                     
                     <!-- Footer -->
                     <tr>
-                        <td style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; color: #666; font-size: 10px;">
-                            <p style="margin: 5px 0;"><strong>${datos.empresa}</strong></p>
+                        <td style="padding: 20px; text-align: center; border-top: 1px solid #dddddd; font-size: 11px; color: #666666;">
+                            <p style="margin: 5px 0;"><strong>${empresa}</strong></p>
                             <p style="margin: 5px 0;">San Rafael Abajo de Desamparados</p>
                             <p style="margin: 5px 0;">Tel: 4000-1365 | WhatsApp: 8839-2214</p>
-                            <p style="margin: 5px 0;">Fecha de envío: ${datos.fecha_envio}</p>
-                            <p style="margin: 5px 0; font-style: italic;">Este es un mensaje automático, por favor no responder a este correo.</p>
+                            <p style="margin: 5px 0;">Fecha: ${fechaEnvio}</p>
+                            <p style="margin: 10px 0 5px 0; font-style: italic; font-size: 10px;">Mensaje automatico - No responder</p>
                         </td>
                     </tr>
                 </table>
@@ -456,71 +335,18 @@ class EmailServiceSimple {
     /**
      * Prepara los datos del email optimizados
      */
-    prepararDatosEmail(empleado, calculos, planilla, asistencias = []) {
-        // Preparar datos usando la misma lógica que prepararDatosComprobante
-        const datosComprobante = this.prepararDatosComprobante(empleado, calculos, planilla, asistencias);
-        
-        // Preparar datos adicionales para EmailJS
-        const safeString = (value) => {
-            if (value === null || value === undefined) return '';
-            let str = String(value);
-            str = str.normalize('NFC');
-            return str.trim();
-        };
-        const safeEmail = (value) => {
-            const email = safeString(value);
-            return email.includes('@') ? email : 'test@example.com';
-        };
-        
-        // Combinar todos los datos
-        return {
-            // Datos básicos de EmailJS
-            to_email: safeEmail(empleado.email),
-            to_name: safeString(empleado.nombre || empleado.nombreEmpleado),
-            from_name: safeString(empleado.empresa || 'Sistema de Planillas'),
-            subject: `Comprobante de Pago - ${safeString(planilla.periodo)}`,
-            
-            // Todos los datos del comprobante (ya formateados)
-            empleado_nombre: datosComprobante.empleado_nombre,
-            empleado_cedula: datosComprobante.empleado_cedula,
-            empleado_puesto: datosComprobante.empleado_puesto,
-            empleado_departamento: datosComprobante.empleado_departamento,
-            depositado_en: datosComprobante.depositado_en,
-            periodo: datosComprobante.periodo,
-            empresa: datosComprobante.empresa,
-            salario_mensual: datosComprobante.salario_mensual,
-            salario_diario: datosComprobante.salario_diario,
-            salario_hora: datosComprobante.salario_hora,
-            subtotal_quincenal: datosComprobante.subtotal_quincenal,
-            dias_laborados: datosComprobante.dias_laborados,
-            horas_feriado: datosComprobante.horas_feriado,
-            total_feriado: datosComprobante.total_feriado,
-            horas_extra_feriado: datosComprobante.horas_extra_feriado,
-            total_extra_feriado: datosComprobante.total_extra_feriado,
-            horas_extras: datosComprobante.horas_extras,
-            monto_horas_extras: datosComprobante.monto_horas_extras,
-            subtotal_pagado: datosComprobante.subtotal_pagado,
-            salario_bruto: datosComprobante.salario_bruto,
-            ccss: datosComprobante.ccss,
-            ccss_porcentaje: datosComprobante.ccss_porcentaje,
-            impuesto_renta: datosComprobante.impuesto_renta,
-            rebajo_horas: datosComprobante.rebajo_horas,
-            otras_deducciones: datosComprobante.otras_deducciones,
-            total_deducciones: datosComprobante.total_deducciones,
-            salario_neto: datosComprobante.salario_neto,
-            observaciones: datosComprobante.observaciones.replace(/\n/g, '<br>'),
-            fecha_envio: datosComprobante.fecha_envio
-        };
-    }
-    
-    /**
-     * Prepara los datos del email optimizados (versión antigua - mantener por compatibilidad)
-     */
-    prepararDatosEmailOld(empleado, calculos, planilla) {
+    prepararDatosEmail(empleado, calculos, planilla) {
         // Calcular valores adicionales necesarios para la plantilla
         // Usar los mismos cálculos que el comprobante de pago
         const horasJornada = this.getHorasJornada(empleado.jornada);
-        const salarioDiario = parseFloat(empleado.salarioHora || 0) * horasJornada;
+        // Obtener salario horario correcto (directo del empleado o calculado)
+        const salarioHorarioEmpleado = parseFloat(empleado.salarioHorario);
+        const salarioHora = (!isNaN(salarioHorarioEmpleado) && salarioHorarioEmpleado > 0) 
+            ? salarioHorarioEmpleado 
+            : (empleado.salarioMensual && empleado.jornada 
+                ? Calculations.calcularSalarioHorario(empleado.salarioMensual, empleado.jornada, empleado.salarioHorario)
+                : 0);
+        const salarioDiario = salarioHora * horasJornada;
         
         // Calcular días totales del período (igual que en el comprobante)
         const contarDiasTotalesPeriodo = (fechaInicio, fechaFin) => {
@@ -562,19 +388,35 @@ class EmailServiceSimple {
             return isNaN(num) ? 0 : num;
         };
         const safeEmail = (value) => {
-            const email = safeString(value);
+            if (!value || value === null || value === undefined) return 'test@example.com';
+            
+            // Para correos, NO usar safeString que puede eliminar guiones
+            // Solo limpiar espacios y caracteres realmente inválidos
+            let email = String(value).trim();
+            
+            // Normalizar caracteres Unicode
+            email = email.normalize('NFC');
+            
+            // Permitir caracteres válidos en correos: letras, números, @, ., -, _, +
+            // El guion debe estar al final de la clase de caracteres para que se interprete literalmente
+            email = email.replace(/[^\w@.+_-]/g, '');
+            
+            // Eliminar espacios (no son válidos en correos)
+            email = email.replace(/\s/g, '');
+            
             return email.includes('@') ? email : 'test@example.com';
         };
         
         // Calcular valores de feriados igual que en el comprobante
-        const salarioHora = safeNumber(empleado.salarioHora);
-        const horasFeriado = safeNumber(calculos.horasFeriado || 0);
-        const montoFeriado = safeNumber(calculos.montoFeriado || 0);
+        // salarioHora ya fue calculado arriba
+        const horasFeriado = safeNumber(calculos.horasFeriado || (calculos.diasFeriadosTrabajados ? calculos.diasFeriadosTrabajados * 8 : 0));
+        const montoFeriado = safeNumber(calculos.pagoFeriados || calculos.montoFeriado || 0);
         // Si montoFeriado no está disponible, calcularlo (horasFeriado * salarioHora * 2)
         const totalFeriado = montoFeriado > 0 ? montoFeriado : (horasFeriado * salarioHora * 2);
         
-        const horasExtraFeriado = safeNumber(calculos.horasExtraFeriado || 0);
-        const montoExtraFeriado = safeNumber(calculos.montoExtraFeriado || 0);
+        // Horas extra en feriados - usar los mismos valores que el comprobante
+        const horasExtraFeriado = safeNumber(calculos.horasExtraFeriado || calculos.horasExtraFeriados || 0);
+        const montoExtraFeriado = safeNumber(calculos.totalExtraFeriado || calculos.montoExtraFeriado || calculos.pagoHorasExtraFeriados || 0);
         // Si montoExtraFeriado no está disponible, calcularlo (horasExtraFeriado * salarioHora * 3)
         const totalExtraFeriado = montoExtraFeriado > 0 ? montoExtraFeriado : (horasExtraFeriado * salarioHora * 3);
         
@@ -584,8 +426,11 @@ class EmailServiceSimple {
         // El subtotal pagado es igual que en el comprobante: salarioBase + feriados + horas extra
         const subtotalPagado = salarioBase + totalFeriado + totalExtraFeriado + montoHorasExtra;
         
+        // Obtener el correo del empleado (usar 'correo' o 'email' para compatibilidad)
+        const correoEmpleado = empleado.correo || empleado.email;
+        
         return {
-            to_email: safeEmail(empleado.email),
+            to_email: safeEmail(correoEmpleado),
             to_name: safeString(empleado.nombre),
             from_name: safeString(empleado.empresa || 'Sistema de Planillas'),
             subject: `Comprobante de Pago - ${safeString(planilla.periodo)}`,
@@ -605,7 +450,7 @@ class EmailServiceSimple {
             // Salarios
             salario_mensual: this.formatearMoneda(salarioMensual),
             salario_diario: this.formatearMoneda(salarioDiario),
-            salario_hora: this.formatearMoneda(safeNumber(empleado.salarioHora || empleado.salarioHorario)),
+            salario_hora: this.formatearMoneda(safeNumber(salarioHora)),
             subtotal_quincenal: this.formatearMoneda(subtotalQuincenal),
             salario_base: this.formatearMoneda(safeNumber(calculos.salarioBase || calculos.subtotalQuincenal)),
             salario_bruto: this.formatearMoneda(safeNumber(calculos.salarioBruto || 0)),
@@ -616,13 +461,11 @@ class EmailServiceSimple {
             ccss_porcentaje: '10.67',
             impuesto_renta: this.formatearMoneda(safeNumber(calculos.impuestoRenta || 0)),
             rebajo_horas: this.formatearMoneda(safeNumber(calculos.rebajoHoras || calculos.rebajosPorHoras?.total || 0)),
-            rebajo_horas_es_incapacidad: calculos.rebajosPorHoras?.esIncapacidadCCSS || false,
-            rebajo_horas_label: calculos.rebajosPorHoras?.esIncapacidadCCSS ? 'Incapacidad CCSS' : 'Rebajo por horas',
-            otras_deducciones: this.formatearMoneda(safeNumber(calculos.otrosDescuentos || calculos.rebajos || calculos.rebajosEmpleado || 0)),
+            otras_deducciones: this.formatearMoneda(safeNumber(calculos.rebajos || calculos.otrosDescuentos || 0)),
             total_deducciones: this.formatearMoneda(
                 safeNumber(calculos.ccss || calculos.descuentoCCSS || 0) + 
                 safeNumber(calculos.impuestoRenta || 0) + 
-                safeNumber(calculos.otrosDescuentos || calculos.rebajos || calculos.rebajosEmpleado || 0) + 
+                safeNumber(calculos.rebajos || calculos.otrosDescuentos || 0) + 
                 safeNumber(calculos.rebajoHoras || calculos.rebajosPorHoras?.total || 0)
             ),
             
@@ -630,9 +473,11 @@ class EmailServiceSimple {
             dias_laborados: safeNumber(calculos.diasLaborados || calculos.diasTrabajados || 0),
             horas_extras: safeNumber(calculos.horasExtra || 0),
             monto_horas_extras: this.formatearMoneda(montoHorasExtra),
-            horas_feriado: horasFeriado,
+            horas_adicionales: safeNumber(calculos.horasAdicionales || 0).toFixed(2),
+            monto_horas_adicionales: this.formatearMoneda(safeNumber(calculos.pagoHorasAdicionales || calculos.montoHorasAdicionales || 0)),
+            horas_feriado: horasFeriado.toFixed(2),
             total_feriado: this.formatearMoneda(totalFeriado),
-            horas_extra_feriado: horasExtraFeriado,
+            horas_extra_feriado: horasExtraFeriado.toFixed(2),
             total_extra_feriado: this.formatearMoneda(totalExtraFeriado),
             // El subtotal pagado es igual que en el comprobante: salarioBase + feriados + horas extra
             subtotal_pagado: this.formatearMoneda(subtotalPagado),
@@ -746,192 +591,475 @@ class EmailServiceSimple {
     }
 
     /**
-     * Envía felicitación de cumpleaños por email
+     * Envía un comprobante de aguinaldo por email usando EmailJS
      * @param {Object} empleado - Datos del empleado
-     * @returns {Promise<Object>} Resultado del envío
+     * @param {Object} datosAguinaldo - Datos del aguinaldo (periodos, totales, etc.)
+     * @param {number} año - Año del aguinaldo
+     * @param {Object} pdf - Objeto PDF de jsPDF
+     * @returns {Promise<Object>} - Resultado del envío
      */
-    async enviarCumpleanos(empleado) {
+    async enviarComprobanteAguinaldo(empleado, datosAguinaldo, año, pdf) {
         try {
             // Verificar configuración
             if (!this.verificarConfiguracion()) {
                 throw new Error('EmailJS no está configurado correctamente');
             }
 
-            // Obtener nombre de la empresa (usar la del empleado o una por defecto)
-            const nombreEmpresa = empleado.empresa || 'San Martin de Porres';
+            // Generar PDF y descargarlo localmente
+            const pdfBlob = pdf.output('blob');
+            const fileName = `Comprobante_Aguinaldo_${año}_${empleado.nombre.replace(/\s/g, '_')}.pdf`;
             
-            // Generar HTML del email de cumpleaños
-            const htmlCumpleanos = this.generarHTMLCumpleanos(empleado, nombreEmpresa);
+            // Descargar PDF localmente
+            this.descargarPDF(pdfBlob, fileName);
 
-            // Preparar parámetros para EmailJS
-            const templateParams = {
-                to_email: empleado.correo,
-                to_name: empleado.nombre,
-                from_name: 'Equipo de Recursos Humanos',
-                subject: `🎉 ¡Feliz cumpleaños, ${empleado.nombre}!`,
-                message_html: htmlCumpleanos,
-                empleado_nombre: empleado.nombre,
-                empresa: nombreEmpresa
-            };
+            // Preparar datos para el email usando la misma lógica que el generador
+            const templateParams = this.prepararDatosEmailAguinaldo(empleado, datosAguinaldo, año);
 
-            console.log('=== Enviando email de cumpleaños ===');
-            console.log('Parámetros:', {
-                to_email: templateParams.to_email,
-                to_name: templateParams.to_name,
-                empleado_nombre: templateParams.empleado_nombre,
-                empresa: templateParams.empresa
+            // Generar HTML del comprobante de aguinaldo
+            const comprobanteHTML = this.generarHTMLComprobanteAguinaldo(templateParams);
+            
+            // Agregar el HTML al templateParams
+            templateParams.comprobante_html = comprobanteHTML;
+
+            // Usar el template ID de aguinaldo si existe, sino usar el general
+            const templateId = window.EMAILJS_CONFIG.TEMPLATE_ID_AGUINALDO || window.EMAILJS_CONFIG.TEMPLATE_ID;
+
+            // Log de los parámetros para debugging
+            console.log('Enviando email de aguinaldo con parámetros:', {
+                serviceId: window.EMAILJS_CONFIG.SERVICE_ID,
+                templateId: templateId,
+                templateParams: { ...templateParams, comprobante_html: '(HTML contenido)' }
             });
 
-            // Inicializar EmailJS
-            emailjs.init(window.EMAILJS_CONFIG.USER_ID);
-
-            // Usar template específico para cumpleaños
-            const templateIdCumpleanos = window.EMAILJS_CONFIG.TEMPLATE_ID_CUMPLEANOS || window.EMAILJS_CONFIG.TEMPLATE_ID;
-            
+            // Enviar email
             const response = await emailjs.send(
                 window.EMAILJS_CONFIG.SERVICE_ID,
-                templateIdCumpleanos,
+                templateId,
                 templateParams
             );
 
             return {
                 success: response.status === 200,
-                messageId: response.text
+                messageId: response.text,
+                fileName: fileName
             };
 
         } catch (error) {
-            console.error('Error enviando felicitación de cumpleaños:', error);
-            return {
-                success: false,
-                error: error.message
-            };
+            console.error('Error enviando comprobante de aguinaldo:', error);
+            throw error;
         }
     }
 
     /**
-     * Genera el HTML del email de cumpleaños basado en cumple.html
+     * Prepara los datos del email para aguinaldo
      * @param {Object} empleado - Datos del empleado
-     * @param {string} nombreEmpresa - Nombre de la empresa/veterinaria
-     * @returns {string} HTML del email
+     * @param {Object} datosAguinaldo - Datos del aguinaldo
+     * @param {number} año - Año del aguinaldo
+     * @returns {Object} - Datos preparados para la plantilla
      */
-    generarHTMLCumpleanos(empleado, nombreEmpresa) {
-        const safeHTML = (val) => {
-            if (val === null || val === undefined) return '';
-            return String(val).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    prepararDatosEmailAguinaldo(empleado, datosAguinaldo, año) {
+        const periodos = datosAguinaldo.periodos || [];
+        const totalBruto = datosAguinaldo.totalBruto || 0;
+        const montoAguinaldo = datosAguinaldo.montoAguinaldo || 0;
+        
+        // Formatear los 12 meses del aguinaldo (Dic año-1 a Nov año)
+        const mesesLabels = [
+            `dic-${año - 1}`,
+            `ene-${año}`,
+            `feb-${año}`,
+            `mar-${año}`,
+            `abr-${año}`,
+            `may-${año}`,
+            `jun-${año}`,
+            `jul-${año}`,
+            `ago-${año}`,
+            `sept-${año}`,
+            `oct-${año}`,
+            `nov-${año}`
+        ];
+
+        // Crear array de salarios mensuales basados en los periodos
+        const salariosMensuales = mesesLabels.map((label, index) => {
+            const periodo = periodos[index] || {};
+            return {
+                label: label,
+                monto: periodo.total || 0
+            };
+        });
+
+        // Función helper para asegurar valores string
+        const safeString = (value) => {
+            if (value === null || value === undefined) return '';
+            let str = String(value);
+            str = str.normalize('NFC');
+            str = str.replace(/[^\w\s@.-áéíóúÁÉÍÓÚñÑüÜàèìòùÀÈÌÒÙâêîôûÂÊÎÔÛãõÃÕçÇ€£$]/g, '');
+            return str.trim();
         };
 
-        const nombreEmpleado = safeHTML(empleado.nombre);
-        const empresa = safeHTML(nombreEmpresa);
+        const safeEmail = (value) => {
+            if (!value || value === null || value === undefined) return 'test@example.com';
+            
+            // Para correos, NO usar safeString que puede eliminar guiones
+            // Solo limpiar espacios y caracteres realmente inválidos
+            let email = String(value).trim();
+            
+            // Normalizar caracteres Unicode
+            email = email.normalize('NFC');
+            
+            // Permitir caracteres válidos en correos: letras, números, @, ., -, _, +
+            // El guion debe estar al final de la clase de caracteres para que se interprete literalmente
+            email = email.replace(/[^\w@.+_-]/g, '');
+            
+            // Eliminar espacios (no son válidos en correos)
+            email = email.replace(/\s/g, '');
+            
+            return email.includes('@') ? email : 'test@example.com';
+        };
 
+        // Formatear salarios mensuales para la plantilla
+        const salario_dic = this.formatearMoneda(salariosMensuales[0]?.monto || 0);
+        const salario_ene = this.formatearMoneda(salariosMensuales[1]?.monto || 0);
+        const salario_feb = this.formatearMoneda(salariosMensuales[2]?.monto || 0);
+        const salario_mar = this.formatearMoneda(salariosMensuales[3]?.monto || 0);
+        const salario_abr = this.formatearMoneda(salariosMensuales[4]?.monto || 0);
+        const salario_may = this.formatearMoneda(salariosMensuales[5]?.monto || 0);
+        const salario_jun = this.formatearMoneda(salariosMensuales[6]?.monto || 0);
+        const salario_jul = this.formatearMoneda(salariosMensuales[7]?.monto || 0);
+        const salario_ago = this.formatearMoneda(salariosMensuales[8]?.monto || 0);
+        const salario_sept = this.formatearMoneda(salariosMensuales[9]?.monto || 0);
+        const salario_oct = this.formatearMoneda(salariosMensuales[10]?.monto || 0);
+        const salario_nov = this.formatearMoneda(salariosMensuales[11]?.monto || 0);
+
+        return {
+            to_email: safeEmail(empleado.correo || empleado.email),
+            to_name: safeString(empleado.nombre || empleado.nombreEmpleado),
+            from_name: safeString(empleado.empresa || 'Sistema de Planillas'),
+            subject: `Comprobante de Aguinaldo ${año} - ${safeString(empleado.nombre)}`,
+            
+            // Datos del empleado
+            empleado_nombre: safeString(empleado.nombre || empleado.nombreEmpleado),
+            empleado_cedula: Formatters.formatearCedula(empleado.cedula),
+            empleado_puesto: safeString(empleado.puesto || empleado.cargo),
+            empleado_departamento: safeString(empleado.departamento || 'Operativo'),
+            
+            // Datos del aguinaldo
+            año: año,
+            año_anterior: año - 1,
+            periodo_completo: `Dic. ${año - 1} a Nov. ${año}`,
+            
+            // Salarios mensuales (formateados)
+            salario_dic: salario_dic,
+            salario_ene: salario_ene,
+            salario_feb: salario_feb,
+            salario_mar: salario_mar,
+            salario_abr: salario_abr,
+            salario_may: salario_may,
+            salario_jun: salario_jun,
+            salario_jul: salario_jul,
+            salario_ago: salario_ago,
+            salario_sept: salario_sept,
+            salario_oct: salario_oct,
+            salario_nov: salario_nov,
+            
+            // Totales
+            total_salarios: this.formatearMoneda(totalBruto),
+            aguinaldo: this.formatearMoneda(montoAguinaldo),
+            
+            // Empresa
+            empresa: safeString(empleado.empresa || 'Veterinaria San Martín de Porres'),
+            
+            // Fecha
+            fecha_envio: new Date().toLocaleDateString('es-CR')
+        };
+    }
+
+    /**
+     * Genera el HTML del comprobante de aguinaldo para email
+     * @param {Object} datos - Datos preparados del comprobante
+     * @returns {string} HTML del comprobante
+     */
+    generarHTMLComprobanteAguinaldo(datos) {
+        // Función helper para formatear moneda (remover símbolo si ya está)
+        const formatearMoneda = (valor) => {
+            if (!valor || valor === '₡0.00' || valor === '0.00') return '₡0.00';
+            if (typeof valor === 'string' && valor.includes('₡')) {
+                return valor;
+            }
+            const num = typeof valor === 'string' ? parseFloat(valor.replace(/[₡,]/g, '')) : Number(valor);
+            if (isNaN(num) || num === 0) return '₡0.00';
+            return new Intl.NumberFormat('es-CR', {
+                style: 'currency',
+                currency: 'CRC',
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            }).format(num);
+        };
+
+        // Función helper para asegurar valores string
+        const safeString = (val, defaultVal = '') => {
+            if (val === null || val === undefined) return defaultVal;
+            return String(val);
+        };
+
+        // Extraer y formatear todos los valores
+        const empresa = safeString(datos.empresa || 'Veterinaria San Martín de Porres');
+        const empleadoNombre = safeString(datos.empleado_nombre || '');
+        const empleadoCedula = safeString(datos.empleado_cedula || '');
+        const año = safeString(datos.año || '');
+        const añoAnterior = safeString(datos.año_anterior || '');
+        const periodoCompleto = safeString(datos.periodo_completo || '');
+        const fechaEnvio = safeString(datos.fecha_envio || new Date().toLocaleDateString('es-CR'));
+
+        // Salarios mensuales (ya vienen formateados)
+        const salarioDic = formatearMoneda(datos.salario_dic || 0);
+        const salarioEne = formatearMoneda(datos.salario_ene || 0);
+        const salarioFeb = formatearMoneda(datos.salario_feb || 0);
+        const salarioMar = formatearMoneda(datos.salario_mar || 0);
+        const salarioAbr = formatearMoneda(datos.salario_abr || 0);
+        const salarioMay = formatearMoneda(datos.salario_may || 0);
+        const salarioJun = formatearMoneda(datos.salario_jun || 0);
+        const salarioJul = formatearMoneda(datos.salario_jul || 0);
+        const salarioAgo = formatearMoneda(datos.salario_ago || 0);
+        const salarioSept = formatearMoneda(datos.salario_sept || 0);
+        const salarioOct = formatearMoneda(datos.salario_oct || 0);
+        const salarioNov = formatearMoneda(datos.salario_nov || 0);
+
+        // Totales
+        const totalSalarios = formatearMoneda(datos.total_salarios || 0);
+        const aguinaldo = formatearMoneda(datos.aguinaldo || 0);
+
+        // Generar HTML OPTIMIZADO PARA HOTMAIL/OUTLOOK - Aguinaldo
         return `<!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <title>🎉 ¡Feliz cumpleaños!</title>
-  <style>
-    body {
-      margin: 0;
-      padding: 0;
-      background: #e0f7fa;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      color: #333;
-    }
-
-    .email-wrapper {
-      max-width: 650px;
-      margin: 30px auto;
-      background: #ffffff;
-      border-radius: 12px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-      overflow: hidden;
-    }
-
-    .header {
-      background-color: #b3e5fc;
-      padding: 30px 20px;
-      text-align: center;
-      color: #01579b;
-    }
-
-    .header h1 {
-      margin: 0;
-      font-size: 28px;
-      line-height: 1.2;
-    }
-
-    .confetti {
-      font-size: 36px;
-      margin-bottom: 10px;
-    }
-
-    .content {
-      padding: 30px 25px;
-    }
-
-    .content h2 {
-      color: #0277bd;
-    }
-
-    .content p {
-      font-size: 16px;
-      line-height: 1.6;
-      margin-bottom: 20px;
-    }
-
-    .quote {
-      background: #e1f5fe;
-      padding: 15px 20px;
-      border-left: 5px solid #03a9f4;
-      font-style: italic;
-      color: #444;
-      margin: 30px 0;
-      border-radius: 6px;
-    }
-
-    .footer {
-      background-color: #f1f9ff;
-      text-align: center;
-      padding: 20px;
-      font-size: 14px;
-      color: #666;
-    }
-
-    .footer strong {
-      color: #0288d1;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comprobante de Aguinaldo</title>
 </head>
-<body>
-  <div class="email-wrapper">
-    <div class="header">
-      <div class="confetti">🎉🐾🎂</div>
-      <h1>¡Feliz cumpleaños, ${nombreEmpleado}!</h1>
-      <p>Hoy celebramos a alguien muy especial del equipo 💙</p>
-    </div>
-    <div class="content">
-      <h2>Gracias por cuidar cada vida con tanto amor 🐶🐱</h2>
-
-      <p>En este día tan especial, todo el equipo de <strong>${empresa}</strong> quiere hacerte llegar un enorme abrazo lleno de gratitud y buenos deseos.</p>
-
-      <p>Tu dedicación diaria no solo mejora la vida de nuestros pacientes peludos, sino también de todos los que trabajamos a tu lado. ¡Sos parte esencial de nuestra manada!</p>
-
-      <div class="quote">
-        "Quienes cuidan con el corazón, merecen celebraciones con el alma."<br>
-        ¡Hoy te celebramos a vos!
-      </div>
-
-      <p>Que tengas un cumpleaños lleno de alegría, cariño, salud y muchos momentos felices humanos y peluditos por igual.</p>
-
-      <p>¡Disfrutá tu día, y gracias por ser parte de esta gran familia veterinaria! 🐾🎉</p>
-    </div>
-    <div class="footer">
-      Con cariño,<br>
-      <strong>Equipo de Recursos Humanos</strong><br>
-      ${empresa}
-    </div>
-  </div>
+<body style="margin: 0; padding: 0; background-color: #f4f4f4; font-family: Arial, sans-serif;">
+    <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #f4f4f4;">
+        <tr>
+            <td align="center" style="padding: 20px 10px;">
+                <table width="600" border="0" cellspacing="0" cellpadding="0" style="background-color: #ffffff; border: 1px solid #dddddd;">
+                    <!-- Header -->
+                    <tr>
+                        <td style="text-align: right; padding: 20px; border-bottom: 2px solid #1e3a8a;">
+                            <h2 style="margin: 0 0 8px 0; color: #1e3a8a; font-size: 18px;">${empresa}</h2>
+                            <p style="margin: 4px 0; color: #666666; font-size: 12px;">San Rafael Abajo de Desamparados</p>
+                            <p style="margin: 4px 0; color: #666666; font-size: 12px;">Tel: 4000-1365 | WhatsApp: 8839-2214</p>
+                        </td>
+                    </tr>
+                    
+                    <!-- Title -->
+                    <tr>
+                        <td style="padding: 15px 20px;">
+                            <table width="100%" border="0" cellspacing="0" cellpadding="0">
+                                <tr>
+                                    <td align="center" style="background-color: #1e3a8a; color: #ffffff; padding: 12px; font-size: 16px; font-weight: bold;">
+                                        Comprobante de Aguinaldo ${año}
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    
+                    <!-- Información del Colaborador -->
+                    <tr>
+                        <td style="padding: 10px 20px;">
+                            <table width="100%" border="1" cellspacing="0" cellpadding="6" style="border-collapse: collapse; border: 1px solid #1e3a8a;">
+                                <tr>
+                                    <td colspan="2" style="background-color: #1e3a8a; color: #ffffff; padding: 8px; font-weight: bold;">DATOS DEL COLABORADOR</td>
+                                </tr>
+                                <tr style="background-color: #f9f9f9;">
+                                    <td style="padding: 6px 8px; font-weight: bold; width: 40%;">Nombre:</td>
+                                    <td style="padding: 6px 8px;">${empleadoNombre}</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 6px 8px; font-weight: bold;">Identificacion:</td>
+                                    <td style="padding: 6px 8px;">${empleadoCedula}</td>
+                                </tr>
+                                <tr style="background-color: #f9f9f9;">
+                                    <td style="padding: 6px 8px; font-weight: bold;">Aguinaldo:</td>
+                                    <td style="padding: 6px 8px; color: #1e3a8a; font-weight: bold;">${año}</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 6px 8px; font-weight: bold;">Periodo:</td>
+                                    <td style="padding: 6px 8px;">${periodoCompleto}</td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    
+                    <!-- Sección de Aguinaldo -->
+                    <tr>
+                        <td style="padding: 10px 20px;">
+                            <table width="100%" border="0" cellspacing="0" cellpadding="0">
+                                <tr>
+                                    <td align="center" style="background-color: #1e3a8a; color: #ffffff; padding: 8px; font-weight: bold;">
+                                        Detalle de Salarios Mensuales
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    
+                    <!-- Tabla de Salarios Mensuales -->
+                    <tr>
+                        <td style="padding: 10px 20px;">
+                            <table width="100%" border="1" cellspacing="0" cellpadding="4" style="border-collapse: collapse; border: 1px solid #1e3a8a;">
+                                <tr style="background-color: #1e3a8a; color: #ffffff;">
+                                    <th style="text-align: left; padding: 6px;">Mes</th>
+                                    <th style="text-align: right; padding: 6px;">Salario</th>
+                                </tr>
+                                <tr><td style="padding: 4px 6px;">dic-${añoAnterior}</td><td style="padding: 4px 6px; text-align: right; color: #059669;">${salarioDic}</td></tr>
+                                <tr style="background-color: #f9f9f9;"><td style="padding: 4px 6px;">ene-${año}</td><td style="padding: 4px 6px; text-align: right; color: #059669;">${salarioEne}</td></tr>
+                                <tr><td style="padding: 4px 6px;">feb-${año}</td><td style="padding: 4px 6px; text-align: right; color: #059669;">${salarioFeb}</td></tr>
+                                <tr style="background-color: #f9f9f9;"><td style="padding: 4px 6px;">mar-${año}</td><td style="padding: 4px 6px; text-align: right; color: #059669;">${salarioMar}</td></tr>
+                                <tr><td style="padding: 4px 6px;">abr-${año}</td><td style="padding: 4px 6px; text-align: right; color: #059669;">${salarioAbr}</td></tr>
+                                <tr style="background-color: #f9f9f9;"><td style="padding: 4px 6px;">may-${año}</td><td style="padding: 4px 6px; text-align: right; color: #059669;">${salarioMay}</td></tr>
+                                <tr><td style="padding: 4px 6px;">jun-${año}</td><td style="padding: 4px 6px; text-align: right; color: #059669;">${salarioJun}</td></tr>
+                                <tr style="background-color: #f9f9f9;"><td style="padding: 4px 6px;">jul-${año}</td><td style="padding: 4px 6px; text-align: right; color: #059669;">${salarioJul}</td></tr>
+                                <tr><td style="padding: 4px 6px;">ago-${año}</td><td style="padding: 4px 6px; text-align: right; color: #059669;">${salarioAgo}</td></tr>
+                                <tr style="background-color: #f9f9f9;"><td style="padding: 4px 6px;">sep-${año}</td><td style="padding: 4px 6px; text-align: right; color: #059669;">${salarioSept}</td></tr>
+                                <tr><td style="padding: 4px 6px;">oct-${año}</td><td style="padding: 4px 6px; text-align: right; color: #059669;">${salarioOct}</td></tr>
+                                <tr style="background-color: #f9f9f9;"><td style="padding: 4px 6px;">nov-${año}</td><td style="padding: 4px 6px; text-align: right; color: #059669;">${salarioNov}</td></tr>
+                                <tr style="background-color: #e3f2fd; font-weight: bold;">
+                                    <td style="padding: 6px;">TOTAL SALARIOS</td>
+                                    <td style="padding: 6px; text-align: right; color: #059669;">${totalSalarios}</td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    
+                    <!-- Aguinaldo Final -->
+                    <tr>
+                        <td style="padding: 15px 20px;">
+                            <table width="100%" border="0" cellspacing="0" cellpadding="0">
+                                <tr>
+                                    <td align="center" style="background-color: #1e3a8a; color: #ffffff; padding: 15px; font-size: 18px; font-weight: bold;">
+                                        AGUINALDO ${año}: ${aguinaldo}
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    
+                    <!-- Felicitación -->
+                    <tr>
+                        <td style="padding: 20px; text-align: center;">
+                            <p style="margin: 10px 0; font-size: 22px; font-weight: bold; color: #dc2626; font-style: italic;">
+                                ¡Felices Fiestas!
+                            </p>
+                        </td>
+                    </tr>
+                    
+                    <!-- Mensaje Final -->
+                    <tr>
+                        <td style="padding: 10px 20px;">
+                            <table width="100%" border="0" cellspacing="0" cellpadding="10" style="background-color: #fef3c7; border-left: 4px solid #f59e0b;">
+                                <tr>
+                                    <td style="text-align: center; font-size: 12px; color: #78350f;">
+                                        <strong>${empresa}</strong> le da las gracias por su esfuerzo, compromiso y apoyo en este ${año}
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    
+                    <!-- Footer -->
+                    <tr>
+                        <td style="padding: 20px; text-align: center; border-top: 1px solid #dddddd; font-size: 11px; color: #666666;">
+                            <p style="margin: 5px 0;"><strong>${empresa}</strong></p>
+                            <p style="margin: 5px 0;">San Rafael Abajo de Desamparados</p>
+                            <p style="margin: 5px 0;">Tel: 4000-1365 | WhatsApp: 8839-2214</p>
+                            <p style="margin: 5px 0;">Fecha: ${fechaEnvio}</p>
+                            <p style="margin: 10px 0 5px 0; font-style: italic; font-size: 10px;">Mensaje automatico - No responder</p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
 </body>
 </html>`;
+    }
+
+    /**
+     * Verifica si un correo es de Hotmail/Outlook
+     * @param {string} email - Dirección de correo electrónico
+     * @returns {boolean} - True si es Hotmail/Outlook
+     */
+    esCorreoHotmail(email) {
+        if (!email || typeof email !== 'string') return false;
+        const dominiosHotmail = [
+            'hotmail.com', 'hotmail.es', 'hotmail.co.uk',
+            'outlook.com', 'outlook.es', 'outlook.co.uk',
+            'live.com', 'live.es', 'msn.com'
+        ];
+        const dominio = email.toLowerCase().split('@')[1];
+        return dominiosHotmail.includes(dominio);
+    }
+
+    /**
+     * Genera versión de texto plano del comprobante
+     * Importante para evitar filtros de spam de Hotmail
+     * @param {Object} datos - Datos del comprobante
+     * @returns {string} - Versión de texto plano
+     */
+    generarTextoPlano(datos) {
+        return `
+COMPROBANTE DE PAGO
+${datos.empresa || 'Sistema de Planillas'}
+San Rafael Abajo de Desamparados
+Tel: 4000-1365 | WhatsApp: 8839-2214
+
+=====================================
+DATOS DEL COLABORADOR
+=====================================
+Nombre: ${datos.empleado_nombre || ''}
+Identificacion: ${datos.empleado_cedula || ''}
+Departamento: ${datos.empleado_departamento || ''}
+Puesto: ${datos.empleado_puesto || ''}
+Periodo: ${datos.periodo || ''}
+Depositado en: ${datos.depositado_en || ''}
+
+=====================================
+DETALLE DE INGRESOS
+=====================================
+Salario Mensual: ${datos.salario_mensual || '₡0.00'}
+Salario Diario: ${datos.salario_diario || '₡0.00'}
+Dias laborados: ${datos.dias_laborados || 0}
+Subtotal quincenal: ${datos.subtotal_quincenal || '₡0.00'}
+Horas feriado: ${datos.horas_feriado || '0.00'}
+Total feriado: ${datos.total_feriado || '₡0.00'}
+Horas extras: ${datos.horas_extras || 0}
+Total horas extras: ${datos.monto_horas_extras || '₡0.00'}
+
+SALARIO BRUTO: ${datos.salario_bruto || '₡0.00'}
+
+=====================================
+DEDUCCIONES
+=====================================
+CCSS ${datos.ccss_porcentaje || '10.67'}%: ${datos.ccss || '₡0.00'}
+Impuesto Renta: ${datos.impuesto_renta || '₡0.00'}
+Rebajo horas: ${datos.rebajo_horas || '₡0.00'}
+Otras deducciones: ${datos.otras_deducciones || '₡0.00'}
+
+TOTAL DEDUCCIONES: ${datos.total_deducciones || '₡0.00'}
+
+=====================================
+SALARIO NETO: ${datos.salario_neto || '₡0.00'}
+=====================================
+
+Observaciones:
+${datos.observaciones || 'Sin observaciones especiales'}
+
+------------------------------------
+Fecha de envio: ${datos.fecha_envio || new Date().toLocaleDateString('es-CR')}
+Mensaje automatico - No responder a este correo
+${datos.empresa || 'Sistema de Planillas'}
+        `.trim();
     }
 
     /**
