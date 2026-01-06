@@ -201,17 +201,6 @@ const AutorizacionEmailModule = {
                                             <input type="radio" name="comprobantes" value="no_autorizo" class="w-4 h-4 text-blue-600">
                                         </td>
                                     </tr>
-                                    <tr class="bg-gray-50">
-                                        <td class="border border-gray-300 px-4 py-3 text-sm text-gray-700">
-                                            Envío de sanciones disciplinarias (llamadas de atención, apercibimientos, amonestaciones)
-                                        </td>
-                                        <td class="border border-gray-300 px-4 py-3 text-center">
-                                            <input type="radio" name="sanciones" value="autorizo" class="w-4 h-4 text-blue-600">
-                                        </td>
-                                        <td class="border border-gray-300 px-4 py-3 text-center">
-                                            <input type="radio" name="sanciones" value="no_autorizo" class="w-4 h-4 text-blue-600">
-                                        </td>
-                                    </tr>
                                     <tr>
                                         <td class="border border-gray-300 px-4 py-3 text-sm text-gray-700">
                                             Envío de comunicados internos (políticas, avisos generales, procedimientos)
@@ -539,12 +528,11 @@ const AutorizacionEmailModule = {
 
         // Validar autorizaciones
         const comprobantes = document.querySelector('input[name="comprobantes"]:checked');
-        const sanciones = document.querySelector('input[name="sanciones"]:checked');
         const comunicados = document.querySelector('input[name="comunicados"]:checked');
         const cumpleanos = document.querySelector('input[name="cumpleanos"]:checked');
         const aniversarios = document.querySelector('input[name="aniversarios"]:checked');
 
-        if (!comprobantes || !sanciones || !comunicados || !cumpleanos || !aniversarios) {
+        if (!comprobantes || !comunicados || !cumpleanos || !aniversarios) {
             Utils.showToast('Por favor, complete todas las autorizaciones', 'error');
             return;
         }
@@ -569,7 +557,6 @@ const AutorizacionEmailModule = {
                 correoPersonal,
                 autorizaciones: {
                     comprobantes: comprobantes.value,
-                    sanciones: sanciones.value,
                     comunicados: comunicados.value,
                     cumpleanos: cumpleanos.value,
                     aniversarios: aniversarios.value
@@ -763,7 +750,6 @@ const AutorizacionEmailModule = {
             
             const badges = [];
             if (autorizaciones.comprobantes === 'autorizo') badges.push('<span class="badge badge-success">Comprobantes</span>');
-            if (autorizaciones.sanciones === 'autorizo') badges.push('<span class="badge badge-warning">Sanciones</span>');
             if (autorizaciones.comunicados === 'autorizo') badges.push('<span class="badge badge-info">Comunicados</span>');
             if (autorizaciones.cumpleanos === 'autorizo') badges.push('<span class="badge badge-primary">Cumpleaños</span>');
             if (autorizaciones.aniversarios === 'autorizo') badges.push('<span class="badge badge-secondary">Aniversarios</span>');
@@ -895,12 +881,6 @@ const AutorizacionEmailModule = {
                                     <span class="text-gray-700">Envío de comprobantes de pago</span>
                                     <span class="px-3 py-1 rounded text-sm font-medium ${autorizaciones.comprobantes === 'autorizo' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
                                         ${autorizaciones.comprobantes === 'autorizo' ? 'Autorizado' : 'No Autorizado'}
-                                    </span>
-                                </div>
-                                <div class="flex items-center justify-between p-3 bg-gray-50 rounded">
-                                    <span class="text-gray-700">Envío de sanciones disciplinarias</span>
-                                    <span class="px-3 py-1 rounded text-sm font-medium ${autorizaciones.sanciones === 'autorizo' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
-                                        ${autorizaciones.sanciones === 'autorizo' ? 'Autorizado' : 'No Autorizado'}
                                     </span>
                                 </div>
                                 <div class="flex items-center justify-between p-3 bg-gray-50 rounded">
@@ -1078,7 +1058,6 @@ const AutorizacionEmailModule = {
             const autorizaciones = autorizacion.autorizaciones || {};
             const tiposComunicacion = [
                 { texto: 'Envío de comprobantes de pago (planilla, aguinaldo, etc.)', key: 'comprobantes' },
-                { texto: 'Envío de sanciones disciplinarias (llamadas de atención, apercibimientos, amonestaciones)', key: 'sanciones' },
                 { texto: 'Envío de comunicados internos (políticas, avisos generales, procedimientos)', key: 'comunicados' },
                 { texto: 'Envío de felicitaciones por cumpleaños', key: 'cumpleanos' },
                 { texto: 'Envío de felicitaciones por aniversarios laborales', key: 'aniversarios' }
