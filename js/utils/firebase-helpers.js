@@ -20,6 +20,37 @@ const FirebaseHelpers = {
     currentUserRole: null,
 
     /**
+     * Verifica la conexión a Firebase
+     * @returns {Promise<boolean>}
+     */
+    async verificarConexion() {
+        try {
+            console.log('Verificando conexión a Firebase...');
+            const connectedRef = this.db.ref('.info/connected');
+            
+            return new Promise((resolve, reject) => {
+                const timeout = setTimeout(() => {
+                    reject(new Error('Timeout al verificar conexión a Firebase'));
+                }, 10000); // 10 segundos timeout
+                
+                connectedRef.once('value', (snapshot) => {
+                    clearTimeout(timeout);
+                    const connected = snapshot.val();
+                    console.log('Estado de conexión Firebase:', connected ? 'Conectado' : 'Desconectado');
+                    resolve(connected === true);
+                }, (error) => {
+                    clearTimeout(timeout);
+                    console.error('Error al verificar conexión:', error);
+                    reject(error);
+                });
+            });
+        } catch (error) {
+            console.error('Error en verificarConexion:', error);
+            return false;
+        }
+    },
+
+    /**
      * Lee datos en tiempo real
      * @param {string} path - Ruta en la base de datos
      * @param {function} callback - Función callback con los datos
@@ -39,11 +70,27 @@ const FirebaseHelpers = {
      */
     async once(path) {
         try {
+            console.log(`Firebase: Leyendo datos de ${path}...`);
             const snapshot = await this.db.ref(path).once('value');
-            return snapshot.val();
+            const data = snapshot.val();
+            console.log(`Firebase: Datos leídos exitosamente de ${path}`, data ? 'con datos' : 'vacío');
+            return data;
         } catch (error) {
-            console.error('Error reading data:', error);
-            throw error;
+            console.error(`Error reading data from ${path}:`, error);
+            console.error('Error details:', {
+                code: error.code,
+                message: error.message,
+                stack: error.stack
+            });
+            
+            // Proporcionar mensajes de error más informativos
+            if (error.code === 'PERMISSION_DENIED') {
+                throw new Error(`Permiso denegado para acceder a ${path}. Verifique las reglas de seguridad de Firebase.`);
+            } else if (error.message && error.message.includes('network')) {
+                throw new Error('Error de conexión a Firebase. Verifique su conexión a internet.');
+            } else {
+                throw new Error(`Error al leer datos de Firebase: ${error.message}`);
+            }
         }
     },
 
@@ -164,14 +211,34 @@ const FirebaseHelpers = {
      * @returns {Promise<Array>}
      */
     async getEmpleados() {
-        const data = await this.once(CONFIG.DB_PATHS.EMPLEADOS);
-        const empleados = [];
-        if (data) {
-            Object.keys(data).forEach(key => {
-                empleados.push({ id: key, ...data[key] });
-            });
+        try {
+            console.log('=== Iniciando carga de empleados ===');
+            console.log('Usuario actual:', this.currentUser?.email || 'No autenticado');
+            console.log('Rol actual:', this.currentUserRole || 'Sin rol');
+            
+            // Verificar conexión primero
+            const conectado = await this.verificarConexion();
+            if (!conectado) {
+                console.warn('⚠️ Firebase no está conectado, intentando de todas formas...');
+            }
+            
+            const data = await this.once(CONFIG.DB_PATHS.EMPLEADOS);
+            const empleados = [];
+            
+            if (data) {
+                Object.keys(data).forEach(key => {
+                    empleados.push({ id: key, ...data[key] });
+                });
+                console.log(`✓ ${empleados.length} empleados cargados exitosamente`);
+            } else {
+                console.warn('⚠️ No se encontraron datos de empleados en Firebase');
+            }
+            
+            return empleados;
+        } catch (error) {
+            console.error('❌ Error al cargar empleados:', error);
+            throw error;
         }
-        return empleados;
     },
 
     /**
@@ -778,15 +845,20 @@ const FirebaseHelpers = {
         const hora = Formatters.formatearHora(ahora); // HH:mm
         const timestamp = ahora.getTime();
 
-        // Obtener registros del día
+        console.log('Registrando asistencia:', { empleadoId, tipo, fecha, hora });
+
+        // Obtener registros del día - FORZAR LECTURA DIRECTA DE FIREBASE
         const registrosDelDia = await this.obtenerRegistrosAsistenciaDia(empleadoId, fecha);
+        
+        console.log('Registros del día obtenidos:', registrosDelDia);
 
         // Validaciones
         if (tipo === 'entrada') {
             // Verificar si ya hay una entrada sin salida
-            // Buscar la última entrada y verificar si tiene salida después
             const entradas = registrosDelDia.filter(r => r.tipo === 'entrada');
             const salidas = registrosDelDia.filter(r => r.tipo === 'salida');
+
+            console.log('Validación entrada - Entradas:', entradas.length, 'Salidas:', salidas.length);
 
             if (entradas.length > salidas.length) {
                 throw new Error('Ya existe una entrada sin salida registrada');
@@ -796,8 +868,14 @@ const FirebaseHelpers = {
             const entradas = registrosDelDia.filter(r => r.tipo === 'entrada');
             const salidas = registrosDelDia.filter(r => r.tipo === 'salida');
 
-            if (entradas.length === 0 || entradas.length <= salidas.length) {
+            console.log('Validación salida - Entradas:', entradas.length, 'Salidas:', salidas.length);
+
+            if (entradas.length === 0) {
                 throw new Error('No hay una entrada registrada para marcar salida');
+            }
+            
+            if (entradas.length <= salidas.length) {
+                throw new Error('Ya existe una salida para la última entrada registrada');
             }
         }
 
@@ -811,13 +889,20 @@ const FirebaseHelpers = {
             fechaRegistro: firebase.database.ServerValue.TIMESTAMP
         };
 
-        // Guardar en Firebase
-        const registroId = await this.push(
-            `${CONFIG.DB_PATHS.CONTROL_ASISTENCIA}/${empleadoId}/${fecha}`,
-            nuevoRegistro
-        );
+        console.log('Guardando nuevo registro:', nuevoRegistro);
 
-        return { id: registroId, ...nuevoRegistro };
+        // Guardar en Firebase y esperar confirmación
+        const path = `${CONFIG.DB_PATHS.CONTROL_ASISTENCIA}/${empleadoId}/${fecha}`;
+        const registroId = await this.push(path, nuevoRegistro);
+
+        console.log('Registro guardado exitosamente con ID:', registroId);
+
+        // Retornar el registro con el ID
+        return { 
+            id: registroId, 
+            ...nuevoRegistro,
+            fechaRegistro: Date.now() // Usar timestamp local ya que ServerValue.TIMESTAMP se establece en servidor
+        };
     },
 
     /**
@@ -827,18 +912,25 @@ const FirebaseHelpers = {
      * @returns {Promise<Array>} Registros del día
      */
     async obtenerRegistrosAsistenciaDia(empleadoId, fecha) {
-        const data = await this.once(`${CONFIG.DB_PATHS.CONTROL_ASISTENCIA}/${empleadoId}/${fecha}`);
+        const path = `${CONFIG.DB_PATHS.CONTROL_ASISTENCIA}/${empleadoId}/${fecha}`;
+        console.log('Obteniendo registros del día desde:', path);
+        
+        const data = await this.once(path);
         const registros = [];
 
         if (data) {
+            console.log('Datos crudos obtenidos de Firebase:', data);
             Object.keys(data).forEach(key => {
                 registros.push({ id: key, ...data[key] });
             });
+        } else {
+            console.log('No se encontraron registros para esta fecha');
         }
 
         // Ordenar por timestamp
         registros.sort((a, b) => a.timestamp - b.timestamp);
 
+        console.log('Registros procesados y ordenados:', registros);
         return registros;
     },
 

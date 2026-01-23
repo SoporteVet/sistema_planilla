@@ -9,7 +9,7 @@ const PlanillasModule = {
     planillaActual: null,
 
     init() {
-        this.cargarDatos();
+        // No cargar datos aquí - se cargarán cuando se renderice la vista
     },
 
     async cargarDatos() {
@@ -21,6 +21,12 @@ const PlanillasModule = {
     },
 
     render() {
+        // Cargar datos si aún no se han cargado
+        if (this.empleados.length === 0) {
+            this.cargarDatos();
+            return; // Esperar a que se carguen los datos
+        }
+        
         const html = `
             <div class="space-y-6">
                 <div class="flex justify-between items-center">
@@ -560,7 +566,9 @@ const PlanillasModule = {
                         diasCCSSEmpresa,
                         pagoCCSSEmpresa: Calculations.calcularIncapacidadCCSS(empleado.salarioMensual, empleado.jornada, diasCCSSEmpresa),
                         diasINSEmpresa,
-                        pagoINSEmpresa: Calculations.calcularIncapacidadINS(empleado.salarioMensual, empleado.jornada, diasINSEmpresa),
+                        // pagoINSEmpresa: Solo informativo para comprobante (el INS se encarga según la póliza de Riesgos del Trabajo)
+                        // Usar el pagoINS del resultado del cálculo que está basado en horas reales
+                        pagoINSEmpresa: resultadoCalculo.pagoINS || Calculations.calcularIncapacidadINS(empleado.salarioMensual, empleado.jornada, diasINSEmpresa),
                         diasPermisoSinGoce: diasPermiso,
                         descuentoPermisos: Calculations.calcularDescuentoPermiso(empleado.salarioMensual, empleado.jornada, diasPermiso),
                         bonos: bonosEmpleado,
@@ -738,7 +746,12 @@ const PlanillasModule = {
                         <div class="flex justify-between pt-4 border-t">
                             <div>
                                 ${planilla.estado === 'generada' ? `
-                                    <button onclick="PlanillasModule.aprobar('${planilla.id}')" class="btn btn-secondary">
+                                    <button onclick="PlanillasModule.actualizarPlanilla('${planilla.id}')" 
+                                        class="btn btn-outline btn-sm" title="Recalcular planilla con las horas actuales del registro de asistencias">
+                                        🔄 Actualizar
+                                    </button>
+                                    <button onclick="PlanillasModule.aprobar('${planilla.id}')" 
+                                        class="btn btn-secondary ml-2">
                                         Aprobar Planilla
                                     </button>
                                 ` : ''}
@@ -1363,6 +1376,309 @@ const PlanillasModule = {
         } catch (error) {
             console.error('Error eliminando planilla:', error);
             Utils.showToast('Error al eliminar planilla: ' + error.message, 'error');
+            Utils.hideLoading();
+        }
+    },
+
+    /**
+     * Actualiza/recalcula una planilla existente con las asistencias actuales
+     */
+    async actualizarPlanilla(planillaId) {
+        const planilla = this.planillas.find(p => p.id === planillaId);
+        if (!planilla) {
+            Utils.showToast('Planilla no encontrada', 'error');
+            return;
+        }
+
+        // Validar que solo se puedan actualizar planillas generadas
+        if (planilla.estado !== 'generada') {
+            Utils.showToast('Solo se pueden actualizar planillas en estado "Generada"', 'warning');
+            return;
+        }
+
+        const mensaje = `¿Está seguro de actualizar esta planilla?\n\n` +
+            `Período: ${Formatters.formatearFecha(planilla.periodoInicio)} - ${Formatters.formatearFecha(planilla.periodoFin)}\n\n` +
+            `Se recalcularán todos los datos basándose en el registro de horas actual.`;
+
+        if (!confirm(mensaje)) {
+            return;
+        }
+
+        try {
+            Utils.showLoading('Actualizando planilla...');
+
+            // Obtener fechas de la planilla
+            const fechaInicio = new Date(planilla.periodoInicio);
+            const fechaFin = new Date(planilla.periodoFin);
+            const tipoPeriodo = planilla.tipoPeriodo;
+
+            // Convertir fechas a formato Firebase
+            const fechaInicioInput = Formatters.formatearFechaInput(fechaInicio);
+            const fechaFinInput = Formatters.formatearFechaInput(fechaFin);
+            const fechaInicioKey = fechaInicioInput.replace(/-/g, '');
+            const fechaFinKey = fechaFinInput.replace(/-/g, '');
+
+            // Obtener empleados activos (los mismos que estaban en la planilla)
+            const empleadosEnPlanilla = Object.keys(planilla.empleados || {});
+            const empleadosActivos = this.empleados.filter(e => 
+                empleadosEnPlanilla.includes(e.id) && e.estado === 'activo' && e.tipoEmpleado !== 'SP'
+            );
+
+            if (empleadosActivos.length === 0) {
+                Utils.showToast('No hay empleados para actualizar', 'warning');
+                Utils.hideLoading();
+                return;
+            }
+
+            console.log(`Actualizando planilla para ${empleadosActivos.length} empleados`);
+
+            // Obtener bonos y rebajos aprobados del período
+            const bonosRebajos = await FirebaseHelpers.once(CONFIG.DB_PATHS.BONOS_REBAJOS);
+            const bonosRebajosArray = bonosRebajos ? Object.keys(bonosRebajos).map(k => ({ id: k, ...bonosRebajos[k] })) : [];
+
+            const fechaInicioTimestamp = new Date(fechaInicio).getTime();
+            const fechaFinTimestamp = new Date(fechaFin).getTime();
+
+            const bonosRebajosAprobados = bonosRebajosArray.filter(br => {
+                if (br.estado !== 'aprobado') return false;
+
+                if (br.fechaAplicacion) {
+                    const fechaAplicacionTimestamp = typeof br.fechaAplicacion === 'number'
+                        ? br.fechaAplicacion
+                        : new Date(br.fechaAplicacion).getTime();
+                    return fechaAplicacionTimestamp >= fechaInicioTimestamp &&
+                        fechaAplicacionTimestamp <= fechaFinTimestamp;
+                }
+
+                if (br.periodoAplicacion) {
+                    return br.periodoAplicacion === tipoPeriodo;
+                }
+
+                return false;
+            });
+
+            // Procesar cada empleado
+            const empleadosPlanilla = {};
+
+            for (const empleado of empleadosActivos) {
+                try {
+                    console.log(`Procesando empleado: ${empleado.nombre} (${empleado.id})`);
+
+                    // Obtener asistencias del período
+                    const asistencias = await FirebaseHelpers.getAsistenciasPeriodo(
+                        empleado.id,
+                        fechaInicioKey,
+                        fechaFinKey,
+                        empleado.cedula
+                    );
+
+                    console.log(`Asistencias encontradas para ${empleado.nombre}:`, asistencias.length);
+
+                    // Verificar si hay un valor manual de días trabajados
+                    let diasTrabajadosManual = null;
+                    const asistenciaConDiasManual = asistencias.find(a => a.diasTrabajadosManual !== undefined && a.diasTrabajadosManual !== null);
+                    if (asistenciaConDiasManual) {
+                        diasTrabajadosManual = asistenciaConDiasManual.diasTrabajadosManual;
+                        console.log(`Días trabajados manual encontrados para ${empleado.nombre}: ${diasTrabajadosManual}`);
+                    }
+
+                    // Calcular datos de asistencia
+                    let diasTrabajados = 0;
+                    let horasExtra = 0;
+                    let horasExtraFeriado = 0;
+                    let horasAdicionales = 0;
+                    let diasFeriados = 0;
+                    let diasCCSSEmpresa = 0;
+                    let diasINSEmpresa = 0;
+                    let diasPermiso = 0;
+                    let diasLibresTrabajados = 0;
+                    let horasDiasLibres = 0;
+
+                    asistencias.forEach(asist => {
+                        if (diasTrabajadosManual === null || diasTrabajadosManual === undefined) {
+                            switch (asist.tipoDia) {
+                                case CONFIG.TIPOS_DIA.NORMAL:
+                                    diasTrabajados++;
+                                    break;
+                                case CONFIG.TIPOS_DIA.DIA_LIBRE:
+                                    diasTrabajados++;
+                                    break;
+                                case CONFIG.TIPOS_DIA.INCOMPLETO:
+                                    diasTrabajados++;
+                                    break;
+                            }
+                        }
+
+                        switch (asist.tipoDia) {
+                            case CONFIG.TIPOS_DIA.FERIADO_TRABAJADO:
+                                diasFeriados++;
+                                if (asist.horasExtra && asist.horasExtra > 0) {
+                                    horasExtraFeriado += asist.horasExtra;
+                                }
+                                break;
+                            case CONFIG.TIPOS_DIA.DIA_LIBRE_TRABAJADO:
+                                diasLibresTrabajados++;
+                                horasDiasLibres += asist.horasTrabajadas || 0;
+                                break;
+                            case CONFIG.TIPOS_DIA.INCAPACIDAD_CCSS:
+                                let diasCCSS = 0;
+                                if (asist.diasCCSSEmpresa !== undefined && asist.diasCCSSEmpresa !== null) {
+                                    diasCCSS = asist.diasCCSSEmpresa > 0 ? asist.diasCCSSEmpresa : 0;
+                                } else {
+                                    diasCCSS = 1;
+                                }
+                                if (diasCCSS > 0) {
+                                    diasCCSSEmpresa += diasCCSS;
+                                }
+                                break;
+                            case CONFIG.TIPOS_DIA.INCAPACIDAD_INS:
+                                diasINSEmpresa += asist.diasINSEmpresa || 0;
+                                break;
+                            case CONFIG.TIPOS_DIA.PERMISO_SIN_GOCE:
+                                diasPermiso++;
+                                break;
+                        }
+
+                        if (asist.tipoDia !== CONFIG.TIPOS_DIA.FERIADO_TRABAJADO) {
+                            horasExtra += asist.horasExtra || 0;
+                        }
+                        const horasAdicionalesDia = asist.horasAdicionales || 0;
+                        horasAdicionales += horasAdicionalesDia;
+                    });
+
+                    if (diasTrabajadosManual !== null && diasTrabajadosManual !== undefined) {
+                        diasTrabajados = diasTrabajadosManual;
+                        console.log(`Usando días trabajados manual para ${empleado.nombre}: ${diasTrabajados}`);
+                    }
+
+                    // Calcular bonos y rebajos del empleado
+                    const bonosEmpleado = bonosRebajosAprobados
+                        .filter(br => br.empleadoId === empleado.id && br.tipo === 'bono')
+                        .reduce((sum, br) => sum + br.monto, 0);
+
+                    const rebajosEmpleado = bonosRebajosAprobados
+                        .filter(br => br.empleadoId === empleado.id && br.tipo === 'rebajo')
+                        .reduce((sum, br) => sum + br.monto, 0);
+
+                    // Calcular salarios usando el módulo Calculations
+                    const datosCalculos = {
+                        salarioMensual: empleado.salarioMensual,
+                        salarioHorario: empleado.salarioHorario || null,
+                        codigoJornada: empleado.jornada,
+                        diasTrabajados,
+                        horasExtra,
+                        horasExtraFeriado,
+                        diasFeriados,
+                        diasLibresTrabajados,
+                        horasDiasLibres,
+                        diasCCSSEmpresa,
+                        diasINSEmpresa,
+                        diasPermiso,
+                        bonos: bonosEmpleado,
+                        rebajos: rebajosEmpleado,
+                        asistencias,
+                        cantidadHijos: empleado.hijos || 0,
+                        tieneConyuge: empleado.estadoCivil === 'casado',
+                        impuestoRentaManual: null,
+                        tipoPeriodo: tipoPeriodo
+                    };
+
+                    console.log(`Calculando salario para ${empleado.nombre}...`);
+                    const resultadoCalculo = Calculations.calcularSalarioNeto(datosCalculos);
+                    console.log(`Resultado del cálculo para ${empleado.nombre}:`, resultadoCalculo);
+
+                    const jornada = CONFIG.getJornadaByCodigo(empleado.jornada);
+                    const salarioDiario = Calculations.calcularSalarioDiario(empleado.salarioMensual, empleado.jornada);
+
+                    // Guardar datos del empleado en la planilla
+                    empleadosPlanilla[empleado.id] = {
+                        nombreEmpleado: empleado.nombre,
+                        cedula: empleado.cedula,
+                        cargo: empleado.cargo,
+                        departamento: empleado.departamento,
+                        jornada: empleado.jornada,
+                        horasNormalesMes: jornada.horasPorMes,
+                        horasNormalesQuincena: jornada.horasPorQuincena,
+                        horasDiaJornada: jornada.horasPorDia,
+                        salarioBaseMensual: empleado.salarioMensual,
+                        salarioDiario,
+                        diasTrabajados,
+                        horasExtra,
+                        pagoHorasExtra: Calculations.calcularHorasExtra(empleado.salarioMensual, empleado.jornada, horasExtra),
+                        horasExtraFeriado,
+                        pagoHorasExtraFeriado: Calculations.calcularHorasExtraFeriado(empleado.salarioMensual, empleado.jornada, horasExtraFeriado),
+                        horasAdicionales,
+                        pagoHorasAdicionales: Calculations.calcularHorasAdicionales(empleado.salarioMensual, empleado.jornada, horasAdicionales),
+                        diasFeriadosTrabajados: diasFeriados,
+                        horasFeriado: (() => {
+                            const asistenciasFeriados = asistencias.filter(a => a.tipoDia === CONFIG.TIPOS_DIA.FERIADO_TRABAJADO);
+                            if (asistenciasFeriados.length > 0) {
+                                return asistenciasFeriados.reduce((total, a) => {
+                                    return total + (a.horasTrabajadas || jornada.horasPorDia);
+                                }, 0);
+                            }
+                            return diasFeriados * jornada.horasPorDia;
+                        })(),
+                        pagoFeriados: Calculations.calcularFeriadosTrabajados(
+                            empleado.salarioMensual,
+                            empleado.jornada,
+                            diasFeriados,
+                            asistencias.filter(a => a.tipoDia === CONFIG.TIPOS_DIA.FERIADO_TRABAJADO)
+                        ),
+                        diasLibresTrabajados,
+                        horasDiasLibres,
+                        pagoDiasLibres: Calculations.calcularDiaLibreTrabajado(
+                            empleado.salarioMensual,
+                            empleado.jornada,
+                            horasDiasLibres
+                        ),
+                        diasCCSSEmpresa,
+                        pagoCCSSEmpresa: Calculations.calcularIncapacidadCCSS(empleado.salarioMensual, empleado.jornada, diasCCSSEmpresa),
+                        diasINSEmpresa,
+                        pagoINSEmpresa: resultadoCalculo.pagoINS || Calculations.calcularIncapacidadINS(empleado.salarioMensual, empleado.jornada, diasINSEmpresa),
+                        diasPermisoSinGoce: diasPermiso,
+                        descuentoPermisos: Calculations.calcularDescuentoPermiso(empleado.salarioMensual, empleado.jornada, diasPermiso),
+                        bonos: bonosEmpleado,
+                        rebajos: rebajosEmpleado,
+                        sumaAjustes: bonosEmpleado - rebajosEmpleado,
+                        salarioBruto: resultadoCalculo.salarioBruto,
+                        subtotalQuincenal: resultadoCalculo.subtotalQuincenal || (salarioDiario * diasTrabajados),
+                        rebajosPorHoras: resultadoCalculo.rebajosPorHoras || { total: 0, horasFaltantes: 0, detalles: [] },
+                        descuentoCCSS: resultadoCalculo.descuentoCCSS,
+                        impuestoRenta: resultadoCalculo.impuestoRenta,
+                        creditosRenta: resultadoCalculo.creditosRenta,
+                        otrosDescuentos: resultadoCalculo.otrosDescuentos,
+                        salarioNeto: resultadoCalculo.salarioNeto,
+                        metodoPago: 'transferencia',
+                        banco: empleado.banco || '',
+                        estado: 'generada',
+                        observaciones: ''
+                    };
+                } catch (error) {
+                    console.error(`Error procesando empleado ${empleado.nombre} (${empleado.id}):`, error);
+                    Utils.showToast(`Error procesando ${empleado.nombre}: ${error.message}`, 'warning');
+                    continue;
+                }
+            }
+
+            // Calcular totales
+            const totales = Calculations.calcularTotalesPlanilla(Object.values(empleadosPlanilla));
+
+            // Actualizar planilla en Firebase
+            await FirebaseHelpers.update(`${CONFIG.DB_PATHS.PLANILLAS}/${planillaId}`, {
+                empleados: empleadosPlanilla,
+                totales,
+                fechaActualizacion: firebase.database.ServerValue.TIMESTAMP,
+                actualizadaPor: FirebaseHelpers.currentUser?.uid || 'system'
+            });
+
+            Utils.showToast('Planilla actualizada exitosamente', 'success');
+            Utils.hideLoading();
+            this.cerrarModal();
+
+        } catch (error) {
+            console.error('Error actualizando planilla:', error);
+            Utils.showToast('Error al actualizar planilla: ' + error.message, 'error');
             Utils.hideLoading();
         }
     },

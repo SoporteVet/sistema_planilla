@@ -34,13 +34,33 @@ const Auth = {
      */
     async handleUserLoggedIn(user) {
         try {
+            console.log('=== Usuario autenticado ===');
+            console.log('Email:', user.email);
+            console.log('UID:', user.uid);
+            
             // Guardar usuario actual
             FirebaseHelpers.currentUser = user;
 
+            // Verificar conexión a Firebase Database
+            console.log('Verificando conexión a Firebase Database...');
+            try {
+                const conectado = await FirebaseHelpers.verificarConexion();
+                if (!conectado) {
+                    console.warn('⚠️ Advertencia: Firebase Database no está conectado');
+                } else {
+                    console.log('✓ Firebase Database conectado correctamente');
+                }
+            } catch (connError) {
+                console.error('Error verificando conexión:', connError);
+            }
+
             // Obtener perfil de usuario
+            console.log('Obteniendo perfil de usuario...');
             const userProfile = await FirebaseHelpers.getUserProfile(user.uid);
+            console.log('Perfil obtenido:', userProfile);
 
             if (!userProfile) {
+                console.log('No existe perfil, creando uno por defecto...');
                 // Si no existe perfil, crear uno por defecto
                 await FirebaseHelpers.setUserProfile(user.uid, {
                     nombre: user.email.split('@')[0],
@@ -53,44 +73,57 @@ const Auth = {
                 // Recargar perfil
                 const newProfile = await FirebaseHelpers.getUserProfile(user.uid);
                 FirebaseHelpers.currentUserRole = newProfile.rol;
+                console.log('Perfil creado con rol:', FirebaseHelpers.currentUserRole);
             } else {
                 FirebaseHelpers.currentUserRole = userProfile.rol;
+                console.log('Rol del usuario:', FirebaseHelpers.currentUserRole);
             }
 
             // Mostrar aplicación
+            console.log('Mostrando aplicación...');
             this.showApp();
 
             // Actualizar UI con datos de usuario
+            console.log('Actualizando UI...');
             this.updateUserUI(user, userProfile || { rol: CONFIG.ROLES.EMPLEADO });
 
             // Cargar módulo apropiado según el rol (con delay para evitar conflictos)
+            console.log('Navegando al módulo apropiado...');
             setTimeout(() => {
                 if (window.AppRouter) {
                     // Si es operador de asistencia, ir directo a control de asistencia
                     if (FirebaseHelpers.currentUserRole === 'operador_asistencia') {
+                        console.log('Navegando a control-asistencia (operador)...');
                         // Limpiar cualquier hash en la URL que pueda interferir
                         if (window.location.hash) {
                             window.location.hash = '';
                         }
                         window.AppRouter.navigate('control-asistencia');
                     } else {
+                        console.log(`Navegando a dashboard (rol: ${FirebaseHelpers.currentUserRole})...`);
                         window.AppRouter.navigate('dashboard');
                     }
                 } else {
+                    console.warn('AppRouter no disponible, reintentando...');
                     // Reintentar si AppRouter no está disponible
                     setTimeout(() => {
                         if (window.AppRouter && FirebaseHelpers.currentUserRole === 'operador_asistencia') {
+                            console.log('Navegando a control-asistencia (reintento)...');
                             window.AppRouter.navigate('control-asistencia');
                         } else if (window.AppRouter) {
+                            console.log('Navegando a dashboard (reintento)...');
                             window.AppRouter.navigate('dashboard');
+                        } else {
+                            console.error('AppRouter no está disponible después del reintento');
                         }
                     }, 200);
                 }
             }, 300); // Delay para asegurar que todos los módulos se hayan inicializado
 
         } catch (error) {
-            console.error('Error handling user login:', error);
-            this.showError('Error al cargar perfil de usuario');
+            console.error('❌ Error handling user login:', error);
+            console.error('Stack trace:', error.stack);
+            this.showError('Error al cargar perfil de usuario: ' + error.message);
         }
     },
 
@@ -108,11 +141,28 @@ const Auth = {
      */
     setupLoginForm() {
         const loginForm = document.getElementById('loginForm');
+        const togglePasswordBtn = document.getElementById('togglePassword');
+        const passwordInput = document.getElementById('loginPassword');
 
         if (loginForm) {
             loginForm.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 await this.handleLogin();
+            });
+        }
+
+        // Toggle password visibility
+        if (togglePasswordBtn && passwordInput) {
+            togglePasswordBtn.addEventListener('click', () => {
+                const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+                passwordInput.setAttribute('type', type);
+                
+                // Cambiar icono
+                const icon = type === 'password' 
+                    ? `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>`
+                    : `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"></path>`;
+                
+                togglePasswordBtn.querySelector('svg').innerHTML = icon;
             });
         }
     },
@@ -124,10 +174,13 @@ const Auth = {
         const email = document.getElementById('loginEmail').value;
         const password = document.getElementById('loginPassword').value;
         const errorDiv = document.getElementById('loginError');
+        const errorText = document.getElementById('loginErrorText');
 
         // Limpiar errores previos
         errorDiv.classList.add('hidden');
-        errorDiv.textContent = '';
+        if (errorText) {
+            errorText.textContent = '';
+        }
 
         try {
             // Mostrar loading
@@ -159,11 +212,18 @@ const Auth = {
                 case 'auth/too-many-requests':
                     errorMessage = 'Demasiados intentos. Intente más tarde';
                     break;
+                case 'auth/invalid-credential':
+                    errorMessage = 'Credenciales inválidas';
+                    break;
                 default:
                     errorMessage = error.message;
             }
 
-            errorDiv.textContent = errorMessage;
+            if (errorText) {
+                errorText.textContent = errorMessage;
+            } else {
+                errorDiv.textContent = errorMessage;
+            }
             errorDiv.classList.remove('hidden');
 
             this.hideLoading();
@@ -258,7 +318,6 @@ const Auth = {
      */
     updateNavigationVisibility(rol) {
         const permisos = CONFIG.PERMISOS[rol] || [];
-
         // Mapeo de vistas a permisos
         const viewPermissions = {
             'dashboard': '*', // Todos pueden ver dashboard excepto operador_asistencia
@@ -266,6 +325,8 @@ const Auth = {
             'asistencias': 'asistencias',
             'bonos': 'bonos',
             'planillas': 'planillas',
+            // Nuevo módulo de liquidaciones
+            'liquidaciones': 'liquidaciones',
             'servicios-profesionales': 'servicios_profesionales',
             'control-asistencia': 'control_asistencia',
             'aguinaldos': 'aguinaldos',
@@ -306,8 +367,14 @@ const Auth = {
      */
     showError(message) {
         const errorDiv = document.getElementById('loginError');
+        const errorText = document.getElementById('loginErrorText');
+        
         if (errorDiv) {
-            errorDiv.textContent = message;
+            if (errorText) {
+                errorText.textContent = message;
+            } else {
+                errorDiv.textContent = message;
+            }
             errorDiv.classList.remove('hidden');
         }
     },

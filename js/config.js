@@ -8,6 +8,7 @@
 const firebaseConfig = {
     apiKey: "AIzaSyBtnnoH8WdNdPso5VSvBdi_T3QUj6bKjdc",
     authDomain: "sistemaplanilla.firebaseapp.com",
+    databaseURL: "https://sistemaplanilla-default-rtdb.firebaseio.com", // CRÍTICO para Realtime Database
     projectId: "sistemaplanilla",
     storageBucket: "sistemaplanilla.firebasestorage.app",
     messagingSenderId: "491116295999",
@@ -15,10 +16,10 @@ const firebaseConfig = {
     measurementId: "G-QBB39HNE7R"
 };
 
-
-
 // Initialize Firebase
+console.log('Inicializando Firebase...');
 firebase.initializeApp(firebaseConfig);
+console.log('Firebase inicializado correctamente');
 
 // Firebase references
 const auth = firebase.auth();
@@ -38,7 +39,8 @@ const DB_PATHS = {
     AUDITORIA: 'auditoria',
     SERVICIOS_PROFESIONALES: 'servicios_profesionales',
     CONTROL_ASISTENCIA: 'control_asistencia',
-    AUTORIZACIONES_EMAIL: 'autorizaciones_email'
+    AUTORIZACIONES_EMAIL: 'autorizaciones_email',
+    LIQUIDACIONES: 'liquidaciones'
 };
 
 // Jornadas Laborales Costarricenses
@@ -270,10 +272,10 @@ const ROLES = {
 
 // Permisos por Rol
 const PERMISOS = {
-    admin: ['empleados', 'asistencias', 'bonos', 'planillas', 'aguinaldos', 'feriados', 'reportes', 'usuarios', 'jornadas', 'control_asistencia', 'servicios_profesionales', 'cumpleanos'],
-    gerente_rrhh: ['empleados', 'asistencias', 'bonos', 'planillas', 'reportes', 'servicios_profesionales'],
+    admin: ['empleados', 'asistencias', 'bonos', 'planillas', 'aguinaldos', 'liquidaciones', 'feriados', 'reportes', 'usuarios', 'jornadas', 'control_asistencia', 'servicios_profesionales', 'cumpleanos'],
+    gerente_rrhh: ['empleados', 'asistencias', 'bonos', 'planillas', 'liquidaciones', 'reportes', 'servicios_profesionales'],
     supervisor: ['asistencias'],
-    contador: ['planillas', 'reportes'],
+    contador: ['planillas', 'liquidaciones', 'reportes'],
     empleado: ['consulta_propia'],
     operador_asistencia: ['control_asistencia']
 };

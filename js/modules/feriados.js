@@ -6,7 +6,7 @@ const FeriadosModule = {
     feriados: [],
 
     init() {
-        this.cargarFeriados();
+        // No cargar datos aquí - se cargarán cuando se renderice la vista
     },
 
     async cargarFeriados() {
@@ -20,6 +20,11 @@ const FeriadosModule = {
     },
 
     render() {
+        // Cargar feriados si aún no se han cargado
+        if (this.feriados.length === 0) {
+            this.cargarFeriados();
+        }
+        
         const feriadosPorAño = this.agruparPorAño();
 
         const html = `

@@ -383,6 +383,9 @@ const Calculations = {
         let diasIncapacidadCCSS = 0; // Contador de días de incapacidad CCSS
         let horasIncapacidadCCSSTotal = 0; // Total de horas de incapacidad CCSS (todas, para restar del salario)
         let horasIncapacidadCCSSPrimeros3Dias = 0; // Horas de incapacidad CCSS solo de los primeros 3 días (para calcular el 50% que paga CCSS)
+        let diasIncapacidadINS = 0; // Contador de días de incapacidad INS
+        let horasIncapacidadINSTotal = 0; // Total de horas de incapacidad INS (todas, para restar del salario)
+        let horasIncapacidadINSPrimerDia = 0; // Horas de incapacidad INS solo del primer día (para calcular el 50% que paga la empresa)
         let pagoDiasLibresTrabajados = 0; // Días libres trabajados (pago extraordinario)
         
         if (asistencias && asistencias.length > 0) {
@@ -425,6 +428,18 @@ const Calculations = {
                     if (diasIncapacidadCCSS <= CONFIG.CCSS.DIAS_EMPRESA_MAX) {
                         horasIncapacidadCCSSPrimeros3Dias += horasIncapacidad;
                     }
+                } else if (asist.tipoDia === CONFIG.TIPOS_DIA.INCAPACIDAD_INS) {
+                    // Incapacidad INS: NO se suman a horasLaboradas
+                    // Las horas de incapacidad se deben RESTAR del salario (son horas faltantes)
+                    diasIncapacidadINS++;
+                    const horasIncapacidad = asist.horasTrabajadas || jornada.horasPorDia;
+                    horasIncapacidadINSTotal += horasIncapacidad; // Sumar todas las horas de incapacidad para restarlas
+                    
+                    // Solo el primer día tiene el 50% que paga la empresa
+                    // Del día 2 en adelante, es 100% INS (no se suma nada de la empresa)
+                    if (diasIncapacidadINS <= CONFIG.INS.DIAS_EMPRESA_MAX) {
+                        horasIncapacidadINSPrimerDia += horasIncapacidad;
+                    }
                 } else if (asist.tipoDia === CONFIG.TIPOS_DIA.PERMISO_SIN_GOCE) {
                     // Permisos sin goce: NO se suman horas (se restarán del salario base)
                     // No hacer nada aquí, se calculará la ausencia al final
@@ -436,14 +451,14 @@ const Calculations = {
         }
         
         // PASO 3: Calcular horas faltantes (diferencia entre esperadas y trabajadas)
-        // IMPORTANTE: Las horas de incapacidad CCSS también son horas faltantes que se deben restar
+        // IMPORTANTE: Las horas de incapacidad CCSS e INS también son horas faltantes que se deben restar
         let horasAusencia = 0;
-        const horasEsperadasMenosIncapacidad = horasEsperadasQuincenales - horasIncapacidadCCSSTotal;
+        const horasEsperadasMenosIncapacidad = horasEsperadasQuincenales - horasIncapacidadCCSSTotal - horasIncapacidadINSTotal;
         if (horasLaboradas < horasEsperadasMenosIncapacidad) {
             horasAusencia = horasEsperadasMenosIncapacidad - horasLaboradas;
         }
-        // Sumar las horas de incapacidad CCSS a las horas de ausencia para que se resten del salario
-        horasAusencia += horasIncapacidadCCSSTotal;
+        // Sumar las horas de incapacidad CCSS e INS a las horas de ausencia para que se resten del salario
+        horasAusencia += horasIncapacidadCCSSTotal + horasIncapacidadINSTotal;
         
         // PASO 4: Calcular salario ordinario = salario quincenal base - rebajo por horas faltantes
         const rebajoPorHoras = horasAusencia * salarioHorario;
@@ -490,21 +505,32 @@ const Calculations = {
         const asistenciasFeriados = asistencias.filter(a => a.tipoDia === CONFIG.TIPOS_DIA.FERIADO_TRABAJADO);
         const pagoFeriados = this.calcularFeriadosTrabajados(salarioMensual, codigoJornada, diasFeriados, asistenciasFeriados);
         
-        // Incapacidad INS
-        const pagoINS = this.calcularIncapacidadINS(salarioMensual, codigoJornada, diasINSEmpresa);
+        // Incapacidad INS - NO se suma al salario (el INS se encarga según la póliza)
+        // Solo se calcula para mostrarlo en el comprobante como información
+        // Las incapacidades del INS son por Riesgos del Trabajo (accidentes laborales)
+        let pagoINS = 0; // Solo informativo para el comprobante, no se suma al salario
+        if (horasIncapacidadINSPrimerDia > 0) {
+            // Calcular el 50% que paga la empresa para el primer día basado en horas reales (solo informativo)
+            const horasINSEmpresa = horasIncapacidadINSPrimerDia * CONFIG.INS.PORCENTAJE_INCAPACIDAD_EMPRESA;
+            pagoINS = horasINSEmpresa * salarioHorario;
+        } else if (diasINSEmpresa > 0) {
+            // Fallback: si no hay horas registradas pero hay días, usar el cálculo tradicional (solo informativo)
+            pagoINS = this.calcularIncapacidadINS(salarioMensual, codigoJornada, diasINSEmpresa);
+        }
         
         // Permisos sin goce (se restan del salario base)
         const descuentoPermisos = this.calcularDescuentoPermiso(salarioMensual, codigoJornada, diasPermiso);
         
         // Salario Bruto = Salario Ordinario + Horas Extras + Horas Extras Feriado + Horas Adicionales + otros conceptos
         // NOTA: Los rebajos (bonos/rebajos) NO se restan aquí, se restarán DESPUÉS de calcular CCSS
+        // NOTA: El pago INS NO se suma al salario (el INS se encarga según la póliza de Riesgos del Trabajo)
         const salarioBruto = salarioOrdinario
             + pagoHorasExtra
             + pagoHorasExtraFeriado // Agregar pago de horas extras en feriado (3x)
             + pagoHorasAdicionales
             + pagoFeriados
             + pagoDiasLibresTrabajados
-            + pagoINS
+            // pagoINS NO se suma aquí - el INS se encarga según la póliza
             - descuentoPermisos
             + bonos;
             // - rebajos; // Los rebajos se restarán DESPUÉS de CCSS
@@ -520,6 +546,7 @@ const Calculations = {
             horasExtraFeriado: horasExtraFeriado, // Total de horas extras en feriado
             pagoHorasAdicionales: pagoHorasAdicionales, // Pago por horas adicionales (1x)
             horasAdicionales: horasAdicionalesTotal, // Total de horas adicionales
+            pagoINS: pagoINS, // Pago INS (solo informativo para comprobante, NO se suma al salario)
             subtotalQuincenal: salarioQuincenalBase, // Salario quincenal base (antes de rebajos)
             rebajosPorHoras: {
                 total: rebajoPorHoras,
@@ -527,6 +554,9 @@ const Calculations = {
                 horasIncapacidadCCSS: horasIncapacidadCCSSTotal, // Horas de incapacidad CCSS
                 diasIncapacidadCCSS: diasIncapacidadCCSS, // Días de incapacidad CCSS
                 esIncapacidadCCSS: horasIncapacidadCCSSTotal > 0, // Indica si el rebajo es por incapacidad CCSS
+                horasIncapacidadINS: horasIncapacidadINSTotal, // Horas de incapacidad INS
+                diasIncapacidadINS: diasIncapacidadINS, // Días de incapacidad INS
+                esIncapacidadINS: horasIncapacidadINSTotal > 0, // Indica si el rebajo es por incapacidad INS
                 detalles: horasAusencia > 0 ? [`${horasAusencia.toFixed(2)} horas de ausencia`] : []
             },
             horasLaboradas: horasLaboradas,
@@ -561,6 +591,7 @@ const Calculations = {
         const salarioOrdinario = typeof resultadoBruto === 'object' ? resultadoBruto.salarioOrdinario : subtotalQuincenal;
         const horasAdicionales = typeof resultadoBruto === 'object' ? resultadoBruto.horasAdicionales : 0;
         const pagoHorasAdicionales = typeof resultadoBruto === 'object' ? resultadoBruto.pagoHorasAdicionales : 0;
+        const pagoINS = typeof resultadoBruto === 'object' ? resultadoBruto.pagoINS : 0; // Pago INS (solo informativo)
         const rebajosDelBruto = typeof resultadoBruto === 'object' ? resultadoBruto.rebajos : 0;
         // Los rebajos del bruto son los rebajos (bonos/rebajos) que se deben restar DESPUÉS de CCSS
         
@@ -616,6 +647,7 @@ const Calculations = {
             montoCCSSCCSS, // El 50% que paga CCSS (para mostrar en comprobante)
             pagoHorasAdicionales, // Pago por horas adicionales (1x)
             horasAdicionales, // Total de horas adicionales
+            pagoINS, // Pago INS (solo informativo para comprobante, NO se suma al salario)
             subtotalQuincenal, // Salario ordinario
             rebajosPorHoras,
             descuentoCCSS,

@@ -16,7 +16,7 @@ const EmpleadosModule = {
      * Inicializa el módulo
      */
     init() {
-        this.cargarEmpleados();
+        // No cargar datos aquí - se cargarán cuando se renderice la vista
     },
 
     /**
@@ -33,6 +33,11 @@ const EmpleadosModule = {
      * Renderiza la vista de empleados
      */
     render() {
+        // Cargar empleados si aún no se han cargado
+        if (this.empleados.length === 0) {
+            this.cargarEmpleados();
+        }
+        
         const empleadosEmpresa = this.empleados.filter(emp => !this.filtros.empresa || emp.empresa === this.filtros.empresa);
         const departamentosEmpresa = this.getDepartamentosUnicos(empleadosEmpresa);
         const totalEmpleadosEmpresa = empleadosEmpresa.length;

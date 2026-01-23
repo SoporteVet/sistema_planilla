@@ -13,8 +13,8 @@ const CumpleanosModule = {
      * Inicializa el módulo
      */
     init() {
-        this.cargarEmpleados();
-        this.verificarCumpleanosDiario();
+        // No cargar datos aquí - se cargarán cuando se renderice la vista
+        // La verificación diaria se hará en render
     },
 
     /**

@@ -144,6 +144,7 @@ const AppRouter = {
             'servicios-profesionales': 'servicios_profesionales',
             'control-asistencia': 'control_asistencia',
             'aguinaldos': 'aguinaldos',
+            'liquidaciones': 'liquidaciones',
             'feriados': 'feriados',
             'reportes': 'reportes',
             'cumpleanos': 'cumpleanos',
@@ -203,6 +204,9 @@ const AppRouter = {
             case 'aguinaldos':
                 AguinaldosModule.render();
                 break;
+            case 'liquidaciones':
+                LiquidacionesModule.render();
+                break;
             case 'feriados':
                 FeriadosModule.render();
                 break;
@@ -245,12 +249,28 @@ const AppRouter = {
             return;
         }
 
-        const empleados = await FirebaseHelpers.getEmpleados();
-        const empleadosActivos = empleados.filter(e => e.estado === 'activo');
-        const totalNomina = empleadosActivos.reduce((sum, e) => sum + (e.salarioMensual || 0), 0);
+        try {
+            console.log('Cargando datos del dashboard...');
+            
+            // Mostrar loading mientras se cargan los datos
+            document.getElementById('mainContent').innerHTML = `
+                <div class="flex items-center justify-center min-h-screen">
+                    <div class="text-center">
+                        <div class="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                        <p class="text-gray-600">Cargando datos...</p>
+                    </div>
+                </div>
+            `;
 
-        const planillas = await FirebaseHelpers.once(CONFIG.DB_PATHS.PLANILLAS);
-        const planillasArray = planillas ? Object.keys(planillas).length : 0;
+            const empleados = await FirebaseHelpers.getEmpleados();
+            console.log(`Empleados cargados: ${empleados.length}`);
+            
+            const empleadosActivos = empleados.filter(e => e.estado === 'activo');
+            const totalNomina = empleadosActivos.reduce((sum, e) => sum + (e.salarioMensual || 0), 0);
+
+            const planillas = await FirebaseHelpers.once(CONFIG.DB_PATHS.PLANILLAS);
+            const planillasArray = planillas ? Object.keys(planillas).length : 0;
+            console.log(`Planillas cargadas: ${planillasArray}`);
 
         const html = `
             <div class="space-y-6">
@@ -350,8 +370,41 @@ const AppRouter = {
 
         `;
 
-        document.getElementById('mainContent').innerHTML = html;
-        Utils.updateBreadcrumb(['Dashboard']);
+            document.getElementById('mainContent').innerHTML = html;
+            Utils.updateBreadcrumb(['Dashboard']);
+            console.log('Dashboard renderizado exitosamente');
+            
+        } catch (error) {
+            console.error('Error cargando dashboard:', error);
+            
+            // Mostrar error al usuario
+            document.getElementById('mainContent').innerHTML = `
+                <div class="flex items-center justify-center min-h-screen">
+                    <div class="max-w-md text-center">
+                        <div class="bg-red-50 border-2 border-red-200 rounded-lg p-6">
+                            <svg class="w-16 h-16 text-red-500 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            <h2 class="text-xl font-bold text-red-800 mb-2">Error al cargar datos</h2>
+                            <p class="text-red-600 mb-4">${error.message || 'No se pudieron cargar los datos del dashboard'}</p>
+                            <button onclick="location.reload()" class="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 transition">
+                                Reintentar
+                            </button>
+                        </div>
+                        <div class="mt-4 text-sm text-gray-600">
+                            <p>Si el problema persiste, verifique:</p>
+                            <ul class="list-disc list-inside mt-2 text-left">
+                                <li>Conexión a internet</li>
+                                <li>Configuración de Firebase</li>
+                                <li>Permisos de la base de datos</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            Utils.showToast('Error al cargar el dashboard', 'error');
+        }
     }
 };
 
@@ -379,6 +432,7 @@ document.addEventListener('DOMContentLoaded', () => {
     BonosRebajosModule.init();
     PlanillasModule.init();
     AguinaldosModule.init();
+    LiquidacionesModule.init();
     FeriadosModule.init();
     CumpleanosModule.init();
     ServiciosProfesionalesModule.init();

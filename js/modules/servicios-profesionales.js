@@ -20,8 +20,7 @@ const ServiciosProfesionalesModule = {
      * Inicializa el módulo
      */
     async init() {
-        await this.cargarEmpleadosSP();
-        await this.cargarRegistrosHoras();
+        // No cargar datos aquí - se cargarán cuando se renderice la vista
     },
 
     /**
@@ -154,6 +153,12 @@ const ServiciosProfesionalesModule = {
      * Renderiza la vista principal
      */
     async render() {
+        // Cargar datos si aún no se han cargado
+        if (this.empleadosSP.length === 0) {
+            await this.cargarEmpleadosSP();
+            await this.cargarRegistrosHoras();
+        }
+        
         await this.cargarEmpleadosSP();
         await this.cargarRegistrosHoras();
 
@@ -544,9 +549,10 @@ const ServiciosProfesionalesModule = {
                             </div>
 
                             <div class="form-group">
-                                <label class="form-label">Fin de Actividad <span class="text-red-500">*</span></label>
+                                <label class="form-label">Fin de Actividad</label>
                                 <input type="time" id="horaSalida" class="form-control" 
-                                    value="${registro?.horaSalida || ''}" required>
+                                    value="${registro?.horaSalida && registro?.horaSalida !== 'Pendiente' ? registro.horaSalida : ''}">
+                                <p class="text-xs text-gray-500 mt-1">Opcional: Deje vacío si aún no hay salida</p>
                             </div>
                         </div>
 
@@ -601,16 +607,24 @@ const ServiciosProfesionalesModule = {
             const entrada = horaEntrada.value;
             const salida = horaSalida.value;
 
-            if (empleadoId && entrada && salida) {
+            if (empleadoId && entrada) {
                 const empleado = this.empleadosSP.find(e => e.id === empleadoId);
                 if (empleado) {
-                    const horas = this.calcularHoras(entrada, salida);
                     const salarioHorario = this.obtenerSalarioHora(empleado);
-                    const total = horas * salarioHorario;
+                    
+                    if (salida) {
+                        const horas = this.calcularHoras(entrada, salida);
+                        const total = horas * salarioHorario;
 
-                    document.getElementById('previewHoras').textContent = `${horas.toFixed(2)} hrs`;
-                    document.getElementById('previewSalarioHora').textContent = Formatters.formatearMoneda(salarioHorario);
-                    document.getElementById('previewTotal').textContent = Formatters.formatearMoneda(total);
+                        document.getElementById('previewHoras').textContent = `${horas.toFixed(2)} hrs`;
+                        document.getElementById('previewSalarioHora').textContent = Formatters.formatearMoneda(salarioHorario);
+                        document.getElementById('previewTotal').textContent = Formatters.formatearMoneda(total);
+                    } else {
+                        // Si no hay salida, mostrar como pendiente
+                        document.getElementById('previewHoras').textContent = 'Pendiente';
+                        document.getElementById('previewSalarioHora').textContent = Formatters.formatearMoneda(salarioHorario);
+                        document.getElementById('previewTotal').textContent = 'Pendiente';
+                    }
                     previewDiv.classList.remove('hidden');
                 }
             } else {
@@ -767,14 +781,8 @@ const ServiciosProfesionalesModule = {
             const horaEntrada = document.getElementById('horaEntrada').value;
             const horaSalida = document.getElementById('horaSalida').value;
 
-            if (!empleadoId || !fecha || !horaEntrada || !horaSalida) {
-                Utils.showToast('Por favor complete todos los campos', 'error');
-                return;
-            }
-
-            const horasTrabajadas = this.calcularHoras(horaEntrada, horaSalida);
-            if (horasTrabajadas <= 0) {
-                Utils.showToast('La hora de salida debe ser posterior a la hora de entrada', 'error');
+            if (!empleadoId || !fecha || !horaEntrada) {
+                Utils.showToast('Por favor complete los campos requeridos (Profesional, Fecha e Inicio de Actividad)', 'error');
                 return;
             }
 
@@ -784,7 +792,27 @@ const ServiciosProfesionalesModule = {
                 Utils.showToast('El empleado seleccionado no tiene configurada una tarifa por hora.', 'error');
                 return;
             }
-            const totalPagar = horasTrabajadas * salarioHorario;
+
+            // Determinar si es un registro pendiente (sin salida)
+            const esPendiente = !horaSalida || horaSalida.trim() === '';
+            let horasTrabajadas = 0;
+            let totalPagar = 0;
+            let horaSalidaFinal = 'Pendiente';
+
+            if (esPendiente) {
+                // Registro pendiente: horas trabajadas = 0, total = 0
+                horasTrabajadas = 0;
+                totalPagar = 0;
+            } else {
+                // Validar que la salida sea posterior a la entrada
+                horasTrabajadas = this.calcularHoras(horaEntrada, horaSalida);
+                if (horasTrabajadas <= 0) {
+                    Utils.showToast('La hora de salida debe ser posterior a la hora de entrada', 'error');
+                    return;
+                }
+                totalPagar = horasTrabajadas * salarioHorario;
+                horaSalidaFinal = horaSalida;
+            }
 
             Utils.showLoading('Guardando registro...');
 
@@ -794,10 +822,11 @@ const ServiciosProfesionalesModule = {
                     empleadoId,
                     fecha,
                     horaEntrada,
-                    horaSalida,
+                    horaSalida: horaSalidaFinal,
                     horasTrabajadas,
                     salarioHorario,
                     totalPagar,
+                    pendiente: esPendiente,
                     fechaActualizacion: firebase.database.ServerValue.TIMESTAMP
                 };
                 await FirebaseHelpers.update(CONFIG.DB_PATHS.SERVICIOS_PROFESIONALES + '/' + registroId, datosActualizacion);
@@ -808,10 +837,11 @@ const ServiciosProfesionalesModule = {
                     empleadoId,
                     fecha,
                     horaEntrada,
-                    horaSalida,
+                    horaSalida: horaSalidaFinal,
                     horasTrabajadas,
                     salarioHorario,
                     totalPagar,
+                    pendiente: esPendiente,
                     fechaCreacion: firebase.database.ServerValue.TIMESTAMP,
                     fechaActualizacion: firebase.database.ServerValue.TIMESTAMP
                 };

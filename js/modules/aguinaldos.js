@@ -12,8 +12,8 @@ const AguinaldosModule = {
     aguinaldosRef: null,
 
     init() {
+        // No cargar datos aquí - se cargarán cuando se renderice la vista
         this.periodosConfig = this.getPeriodosConfig(this.añoActual);
-        this.cargarDatos();
     },
 
     async cargarDatos() {
@@ -201,6 +201,12 @@ const AguinaldosModule = {
     },
 
     render() {
+        // Cargar datos si aún no se han cargado
+        if (this.empleados.length === 0) {
+            this.cargarDatos();
+            return; // Esperar a que se carguen los datos
+        }
+        
         const container = document.getElementById('mainContent');
         if (!container) return;
 

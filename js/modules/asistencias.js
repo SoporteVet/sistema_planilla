@@ -15,7 +15,7 @@ const AsistenciasModule = {
      * Inicializa el módulo
      */
     async init() {
-        await this.cargarEmpleados();
+        // No cargar datos aquí - se cargarán cuando se renderice la vista
     },
 
     /**

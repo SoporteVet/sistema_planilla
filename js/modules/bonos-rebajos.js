@@ -20,7 +20,7 @@ const BonosRebajosModule = {
     },
 
     init() {
-        this.cargarDatos();
+        // No cargar datos aquí - se cargarán cuando se renderice la vista
     },
 
     async cargarDatos() {
@@ -32,6 +32,12 @@ const BonosRebajosModule = {
     },
 
     render() {
+        // Cargar datos si aún no se han cargado
+        if (this.empleados.length === 0) {
+            this.cargarDatos();
+            return; // Esperar a que se carguen los datos
+        }
+        
         const itemsFiltrados = this.aplicarFiltros();
         const mesesDisponibles = this.obtenerMesesDisponibles();
 

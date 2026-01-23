@@ -336,63 +336,9 @@ const PDFGenerator = {
      * Genera constancia salarial
      * @param {object} empleado - Datos del empleado
      */
-    async generarConstanciaSalarial(empleado) {
+    generarConstanciaSalarial(empleado) {
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF();
-
-        // Cargar y agregar logo en la parte superior derecha
-        try {
-            // Intentar diferentes rutas posibles
-            const rutasPosibles = ['img/vete.jpg', './img/vete.jpg', '/img/vete.jpg'];
-            let imgData = null;
-            let logoWidth = 0;
-            let logoHeight = 0;
-            
-            for (const ruta of rutasPosibles) {
-                try {
-                    const response = await fetch(ruta);
-                    if (response.ok) {
-                        const blob = await response.blob();
-                        imgData = await new Promise((resolve, reject) => {
-                            const reader = new FileReader();
-                            reader.onloadend = () => resolve(reader.result);
-                            reader.onerror = reject;
-                            reader.readAsDataURL(blob);
-                        });
-                        
-                        // Obtener dimensiones de la imagen
-                        const logoImg = new Image();
-                        await new Promise((resolve, reject) => {
-                            logoImg.onload = () => {
-                                // Tamaño del logo (ajustable)
-                                logoWidth = 30; // mm
-                                logoHeight = (logoImg.height * logoWidth) / logoImg.width;
-                                resolve();
-                            };
-                            logoImg.onerror = reject;
-                            logoImg.src = imgData;
-                        });
-                        break; // Si se cargó exitosamente, salir del loop
-                    }
-                } catch (error) {
-                    console.warn(`Error al cargar logo desde ${ruta}:`, error);
-                    continue; // Intentar siguiente ruta
-                }
-            }
-            
-            // Si se cargó exitosamente, agregarlo al PDF
-            if (imgData && logoWidth > 0) {
-                // Posición: parte superior derecha (margen de 10mm desde el borde derecho, 10mm desde arriba)
-                const x = doc.internal.pageSize.getWidth() - logoWidth - 10;
-                const y = 10;
-                doc.addImage(imgData, 'JPEG', x, y, logoWidth, logoHeight);
-                console.log('Logo agregado exitosamente');
-            } else {
-                console.warn('No se pudo cargar el logo desde ninguna ruta');
-            }
-        } catch (error) {
-            console.warn('Error al cargar logo:', error);
-        }
 
         // Función para formatear moneda como en el documento (¢460 000,00)
         const formatearMonedaConstancia = (monto) => {
@@ -586,7 +532,7 @@ const PDFGenerator = {
         doc.setFont(undefined, 'bold');
         doc.text('Dr. Randall Azofeifa', 55, textoInicio + 20, { align: 'center' });
         doc.setFont(undefined, 'normal');
-        doc.text('Director General', 55, textoInicio + 26, { align: 'center' });
+        doc.text('Gerente General', 55, textoInicio + 26, { align: 'center' });
 
         // Guardar PDF
         const filename = `Constancia_${empleado.cedula.replace(/[-\s]/g, '')}.pdf`;
