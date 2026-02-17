@@ -490,7 +490,7 @@ const PlanillasModule = {
 
                     // Calcular salarios usando el módulo Calculations
                     const datosCalculos = {
-                        salarioMensual: empleado.salarioMensual,
+                        salarioMensual: Math.round(empleado.salarioMensual),
                         salarioHorario: empleado.salarioHorario || null, // Salario horario directo si está disponible
                         codigoJornada: empleado.jornada,
                         diasTrabajados,
@@ -516,7 +516,8 @@ const PlanillasModule = {
                     console.log(`Resultado del cálculo para ${empleado.nombre}:`, resultadoCalculo);
 
                     const jornada = CONFIG.getJornadaByCodigo(empleado.jornada);
-                    const salarioDiario = Calculations.calcularSalarioDiario(empleado.salarioMensual, empleado.jornada);
+                    const salarioMensualRedondeado = Math.round(empleado.salarioMensual);
+                    const salarioDiario = Calculations.calcularSalarioDiario(salarioMensualRedondeado, empleado.jornada);
 
                     // Guardar datos del empleado en la planilla
                     console.log(`Guardando datos de ${empleado.nombre} en la planilla...`);
@@ -529,15 +530,15 @@ const PlanillasModule = {
                         horasNormalesMes: jornada.horasPorMes,
                         horasNormalesQuincena: jornada.horasPorQuincena,
                         horasDiaJornada: jornada.horasPorDia,
-                        salarioBaseMensual: empleado.salarioMensual,
+                        salarioBaseMensual: salarioMensualRedondeado,
                         salarioDiario,
                         diasTrabajados,
                         horasExtra,
-                        pagoHorasExtra: Calculations.calcularHorasExtra(empleado.salarioMensual, empleado.jornada, horasExtra),
+                        pagoHorasExtra: Calculations.calcularHorasExtra(salarioMensualRedondeado, empleado.jornada, horasExtra),
                         horasExtraFeriado, // Horas extras en feriado (separadas)
-                        pagoHorasExtraFeriado: Calculations.calcularHorasExtraFeriado(empleado.salarioMensual, empleado.jornada, horasExtraFeriado),
+                        pagoHorasExtraFeriado: Calculations.calcularHorasExtraFeriado(salarioMensualRedondeado, empleado.jornada, horasExtraFeriado),
                         horasAdicionales,
-                        pagoHorasAdicionales: Calculations.calcularHorasAdicionales(empleado.salarioMensual, empleado.jornada, horasAdicionales),
+                        pagoHorasAdicionales: Calculations.calcularHorasAdicionales(salarioMensualRedondeado, empleado.jornada, horasAdicionales),
                         diasFeriadosTrabajados: diasFeriados,
                         horasFeriado: (() => {
                             // Calcular horas en feriado desde asistencias (usando jornada específica del empleado)
@@ -551,7 +552,7 @@ const PlanillasModule = {
                             return diasFeriados * jornada.horasPorDia;
                         })(),
                         pagoFeriados: Calculations.calcularFeriadosTrabajados(
-                            empleado.salarioMensual,
+                            salarioMensualRedondeado,
                             empleado.jornada,
                             diasFeriados,
                             asistencias.filter(a => a.tipoDia === CONFIG.TIPOS_DIA.FERIADO_TRABAJADO)
@@ -559,18 +560,18 @@ const PlanillasModule = {
                         diasLibresTrabajados,
                         horasDiasLibres,
                         pagoDiasLibres: Calculations.calcularDiaLibreTrabajado(
-                            empleado.salarioMensual,
+                            salarioMensualRedondeado,
                             empleado.jornada,
                             horasDiasLibres
                         ),
                         diasCCSSEmpresa,
-                        pagoCCSSEmpresa: Calculations.calcularIncapacidadCCSS(empleado.salarioMensual, empleado.jornada, diasCCSSEmpresa),
+                        pagoCCSSEmpresa: Calculations.calcularIncapacidadCCSS(salarioMensualRedondeado, empleado.jornada, diasCCSSEmpresa),
                         diasINSEmpresa,
                         // pagoINSEmpresa: Solo informativo para comprobante (el INS se encarga según la póliza de Riesgos del Trabajo)
                         // Usar el pagoINS del resultado del cálculo que está basado en horas reales
-                        pagoINSEmpresa: resultadoCalculo.pagoINS || Calculations.calcularIncapacidadINS(empleado.salarioMensual, empleado.jornada, diasINSEmpresa),
+                        pagoINSEmpresa: resultadoCalculo.pagoINS || Calculations.calcularIncapacidadINS(salarioMensualRedondeado, empleado.jornada, diasINSEmpresa),
                         diasPermisoSinGoce: diasPermiso,
-                        descuentoPermisos: Calculations.calcularDescuentoPermiso(empleado.salarioMensual, empleado.jornada, diasPermiso),
+                        descuentoPermisos: Calculations.calcularDescuentoPermiso(salarioMensualRedondeado, empleado.jornada, diasPermiso),
                         bonos: bonosEmpleado,
                         rebajos: rebajosEmpleado,
                         sumaAjustes: bonosEmpleado - rebajosEmpleado,
@@ -850,8 +851,8 @@ const PlanillasModule = {
             const rebajosPorHoras = datosPlanilla.rebajosPorHoras || { total: 0, horasFaltantes: 0, detalles: [] };
 
             const calculos = {
-                salarioBaseMensual: datosPlanilla.salarioBaseMensual || empleado.salarioMensual,
-                salarioDiario: datosPlanilla.salarioDiario || Calculations.calcularSalarioDiario(empleado.salarioMensual, empleado.jornada),
+                salarioBaseMensual: datosPlanilla.salarioBaseMensual || Math.round(empleado.salarioMensual),
+                salarioDiario: datosPlanilla.salarioDiario || Calculations.calcularSalarioDiario(Math.round(empleado.salarioMensual), empleado.jornada),
                 diasTrabajados: datosPlanilla.diasTrabajados || 0,
                 salarioBase: datosPlanilla.salarioBruto || 0,
                 subtotalQuincenal: subtotalQuincenal,
@@ -1032,8 +1033,8 @@ const PlanillasModule = {
             const rebajosPorHoras = datosPlanilla.rebajosPorHoras || { total: 0, horasFaltantes: 0, detalles: [] };
 
             const calculos = {
-                salarioBaseMensual: datosPlanilla.salarioBaseMensual || empleadoEncontrado.salarioMensual,
-                salarioDiario: datosPlanilla.salarioDiario || Calculations.calcularSalarioDiario(empleadoEncontrado.salarioMensual, empleadoEncontrado.jornada),
+                salarioBaseMensual: datosPlanilla.salarioBaseMensual || Math.round(empleadoEncontrado.salarioMensual),
+                salarioDiario: datosPlanilla.salarioDiario || Calculations.calcularSalarioDiario(Math.round(empleadoEncontrado.salarioMensual), empleadoEncontrado.jornada),
                 diasTrabajados: datosPlanilla.diasTrabajados || 0,
                 salarioBase: salarioBase > 0 ? salarioBase : subtotalQuincenal,
                 subtotalQuincenal: subtotalQuincenal,
@@ -1219,8 +1220,8 @@ const PlanillasModule = {
                     const rebajosPorHoras = datosPlanilla.rebajosPorHoras || { total: 0, horasFaltantes: 0, detalles: [] };
 
                     const calculos = {
-                        salarioBaseMensual: datosPlanilla.salarioBaseMensual || empleadoCompleto.salarioMensual,
-                        salarioDiario: datosPlanilla.salarioDiario || Calculations.calcularSalarioDiario(empleadoCompleto.salarioMensual, empleadoCompleto.jornada),
+                        salarioBaseMensual: datosPlanilla.salarioBaseMensual || Math.round(empleadoCompleto.salarioMensual),
+                        salarioDiario: datosPlanilla.salarioDiario || Calculations.calcularSalarioDiario(Math.round(empleadoCompleto.salarioMensual), empleadoCompleto.jornada),
                         diasTrabajados: datosPlanilla.diasTrabajados || 0,
                         salarioBase: salarioBase > 0 ? salarioBase : subtotalQuincenal,
                         subtotalQuincenal: subtotalQuincenal,
@@ -1561,8 +1562,9 @@ const PlanillasModule = {
                         .reduce((sum, br) => sum + br.monto, 0);
 
                     // Calcular salarios usando el módulo Calculations
+                    const salarioMensualRedondeado = Math.round(empleado.salarioMensual);
                     const datosCalculos = {
-                        salarioMensual: empleado.salarioMensual,
+                        salarioMensual: salarioMensualRedondeado,
                         salarioHorario: empleado.salarioHorario || null,
                         codigoJornada: empleado.jornada,
                         diasTrabajados,
@@ -1588,7 +1590,7 @@ const PlanillasModule = {
                     console.log(`Resultado del cálculo para ${empleado.nombre}:`, resultadoCalculo);
 
                     const jornada = CONFIG.getJornadaByCodigo(empleado.jornada);
-                    const salarioDiario = Calculations.calcularSalarioDiario(empleado.salarioMensual, empleado.jornada);
+                    const salarioDiario = Calculations.calcularSalarioDiario(salarioMensualRedondeado, empleado.jornada);
 
                     // Guardar datos del empleado en la planilla
                     empleadosPlanilla[empleado.id] = {
@@ -1600,15 +1602,15 @@ const PlanillasModule = {
                         horasNormalesMes: jornada.horasPorMes,
                         horasNormalesQuincena: jornada.horasPorQuincena,
                         horasDiaJornada: jornada.horasPorDia,
-                        salarioBaseMensual: empleado.salarioMensual,
+                        salarioBaseMensual: salarioMensualRedondeado,
                         salarioDiario,
                         diasTrabajados,
                         horasExtra,
-                        pagoHorasExtra: Calculations.calcularHorasExtra(empleado.salarioMensual, empleado.jornada, horasExtra),
+                        pagoHorasExtra: Calculations.calcularHorasExtra(salarioMensualRedondeado, empleado.jornada, horasExtra),
                         horasExtraFeriado,
-                        pagoHorasExtraFeriado: Calculations.calcularHorasExtraFeriado(empleado.salarioMensual, empleado.jornada, horasExtraFeriado),
+                        pagoHorasExtraFeriado: Calculations.calcularHorasExtraFeriado(salarioMensualRedondeado, empleado.jornada, horasExtraFeriado),
                         horasAdicionales,
-                        pagoHorasAdicionales: Calculations.calcularHorasAdicionales(empleado.salarioMensual, empleado.jornada, horasAdicionales),
+                        pagoHorasAdicionales: Calculations.calcularHorasAdicionales(salarioMensualRedondeado, empleado.jornada, horasAdicionales),
                         diasFeriadosTrabajados: diasFeriados,
                         horasFeriado: (() => {
                             const asistenciasFeriados = asistencias.filter(a => a.tipoDia === CONFIG.TIPOS_DIA.FERIADO_TRABAJADO);
@@ -1620,7 +1622,7 @@ const PlanillasModule = {
                             return diasFeriados * jornada.horasPorDia;
                         })(),
                         pagoFeriados: Calculations.calcularFeriadosTrabajados(
-                            empleado.salarioMensual,
+                            salarioMensualRedondeado,
                             empleado.jornada,
                             diasFeriados,
                             asistencias.filter(a => a.tipoDia === CONFIG.TIPOS_DIA.FERIADO_TRABAJADO)
@@ -1628,16 +1630,16 @@ const PlanillasModule = {
                         diasLibresTrabajados,
                         horasDiasLibres,
                         pagoDiasLibres: Calculations.calcularDiaLibreTrabajado(
-                            empleado.salarioMensual,
+                            salarioMensualRedondeado,
                             empleado.jornada,
                             horasDiasLibres
                         ),
                         diasCCSSEmpresa,
-                        pagoCCSSEmpresa: Calculations.calcularIncapacidadCCSS(empleado.salarioMensual, empleado.jornada, diasCCSSEmpresa),
+                        pagoCCSSEmpresa: Calculations.calcularIncapacidadCCSS(salarioMensualRedondeado, empleado.jornada, diasCCSSEmpresa),
                         diasINSEmpresa,
-                        pagoINSEmpresa: resultadoCalculo.pagoINS || Calculations.calcularIncapacidadINS(empleado.salarioMensual, empleado.jornada, diasINSEmpresa),
+                        pagoINSEmpresa: resultadoCalculo.pagoINS || Calculations.calcularIncapacidadINS(salarioMensualRedondeado, empleado.jornada, diasINSEmpresa),
                         diasPermisoSinGoce: diasPermiso,
-                        descuentoPermisos: Calculations.calcularDescuentoPermiso(empleado.salarioMensual, empleado.jornada, diasPermiso),
+                        descuentoPermisos: Calculations.calcularDescuentoPermiso(salarioMensualRedondeado, empleado.jornada, diasPermiso),
                         bonos: bonosEmpleado,
                         rebajos: rebajosEmpleado,
                         sumaAjustes: bonosEmpleado - rebajosEmpleado,
@@ -1715,12 +1717,13 @@ const PlanillasModule = {
             let montoCCSSCCSS = 0;
             if (empleado.diasCCSSEmpresa > 0) {
                 const jornada = CONFIG.getJornadaByCodigo(empleado.jornada);
-                const salarioDiario = Calculations.calcularSalarioDiario(empleado.salarioBaseMensual || empleado.salarioMensual, empleado.jornada);
+                const salarioMensualRedondeado = Math.round(empleado.salarioBaseMensual || empleado.salarioMensual);
+                const salarioDiario = Calculations.calcularSalarioDiario(salarioMensualRedondeado, empleado.jornada);
                 const diasACubrir = Math.min(empleado.diasCCSSEmpresa, CONFIG.CCSS.DIAS_EMPRESA_MAX);
                 // 50% de las horas de incapacidad CCSS (3 horas de 6 horas = 50%)
                 const horasIncapacidadCCSS = jornada.horasPorDia * diasACubrir;
                 const horasCCSSCCSS = horasIncapacidadCCSS * CONFIG.CCSS.PORCENTAJE_INCAPACIDAD_EMPRESA;
-                const salarioHorario = (empleado.salarioBaseMensual || empleado.salarioMensual) / jornada.horasPorMes;
+                const salarioHorario = salarioMensualRedondeado / jornada.horasPorMes;
                 montoCCSSCCSS = horasCCSSCCSS * salarioHorario;
             }
             const salarioDespuesCCSSConIncapacidad = salarioDespuesCCSS + montoCCSSCCSS;

@@ -538,8 +538,8 @@ const EmpleadosModule = {
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div class="form-group" id="groupSalarioMensual">
                                     <label class="form-label">Salario Mensual (₡) <span class="text-red-500" id="label-salarioMensual-required">*</span></label>
-                                    <input type="number" id="salarioMensual" class="form-control" step="0.01" 
-                                        value="${empleado?.salarioMensual || ''}" required>
+                                    <input type="number" id="salarioMensual" class="form-control" step="1" 
+                                        value="${empleado?.salarioMensual ? Math.round(empleado.salarioMensual) : ''}" required>
                                     <div class="form-error hidden" id="error-salarioMensual"></div>
                                     <div class="form-help">El salario mensual ya contempla los días libres de la jornada</div>
                                     <div class="form-help text-xs text-gray-500 hidden" id="helpSalarioMensualSP">
@@ -807,9 +807,18 @@ const EmpleadosModule = {
                     if (salarioHorario && salarioHorario > 0 && jornadaCodigo) {
                         const jornada = CONFIG.getJornadaByCodigo(jornadaCodigo);
                         const salarioMensual = salarioHorario * jornada.horasPorMes;
-                        salarioMensualInput.value = salarioMensual.toFixed(2);
+                        salarioMensualInput.value = Math.round(salarioMensual);
                     }
                 };
+
+                // Redondear salario mensual a entero cuando el usuario ingresa un valor
+                salarioMensualInput.addEventListener('blur', () => {
+                    const valor = parseFloat(salarioMensualInput.value);
+                    if (!isNaN(valor)) {
+                        salarioMensualInput.value = Math.round(valor);
+                        calcularHorarioDesdeMensual();
+                    }
+                });
 
                 salarioMensualInput.addEventListener('input', calcularHorarioDesdeMensual);
                 jornadaSelect.addEventListener('change', () => {
@@ -842,10 +851,10 @@ const EmpleadosModule = {
             }
 
             // Si se ingresó salario horario y existe jornada, calcular mensual (tiene prioridad)
-            let salarioMensual = salarioMensualInput;
+            let salarioMensual = Math.round(salarioMensualInput);
             if (salarioHorarioInput && salarioHorarioInput > 0 && jornadaCodigo) {
                 const jornada = CONFIG.getJornadaByCodigo(jornadaCodigo);
-                salarioMensual = salarioHorarioInput * jornada.horasPorMes;
+                salarioMensual = Math.round(salarioHorarioInput * jornada.horasPorMes);
             }
 
             const fechaIngresoInput = document.getElementById('fechaIngreso').value;

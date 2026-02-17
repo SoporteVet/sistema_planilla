@@ -236,7 +236,7 @@ const ComprobanteGenerator = {
             subtotal_pagado: Formatters.formatearMoneda(calculos.subtotalPagado || calculos.salarioBase || 0),
             salario_bruto: Formatters.formatearMoneda(calculos.salarioBruto || 0),
             ccss: Formatters.formatearMoneda(calculos.descuentoCCSS || calculos.ccss || 0),
-            ccss_porcentaje: '10.67',
+            ccss_porcentaje: (CONFIG.CCSS.EMPLEADO * 100).toFixed(2),
             impuesto_renta: Formatters.formatearMoneda(calculos.impuestoRenta || 0),
             rebajo_horas: Formatters.formatearMoneda(calculos.rebajosPorHoras?.total || calculos.rebajoHoras || 0),
             rebajo_horas_es_incapacidad: calculos.rebajosPorHoras?.esIncapacidadCCSS || false,

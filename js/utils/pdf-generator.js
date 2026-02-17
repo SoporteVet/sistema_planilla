@@ -464,7 +464,7 @@ const PDFGenerator = {
         
         // Calcular salarios
         const salarioBruto = Math.round(empleado.salarioMensual || 0);
-        const descuentoCCSS = Math.round(salarioBruto * 0.1067);
+        const descuentoCCSS = Math.round(salarioBruto * 0.1083);
         let salarioDespuesCCSS = salarioBruto - descuentoCCSS;
         
         let impuestoRenta = 0;

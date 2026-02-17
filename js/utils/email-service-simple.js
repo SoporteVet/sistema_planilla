@@ -131,7 +131,7 @@ class EmailServiceSimple {
         const salarioHora = formatearMoneda(datos.salario_hora || datos.empleado?.salarioHora || 0);
         const subtotalQuincenal = formatearMoneda(datos.subtotal_quincenal || datos.calculos?.subtotalQuincenal || 0);
         const ccss = formatearMoneda(datos.ccss || datos.calculos?.descuentoCCSS || 0);
-        const ccssPorcentaje = safeString(datos.ccss_porcentaje || '10.67');
+        const ccssPorcentaje = safeString(datos.ccss_porcentaje || (CONFIG.CCSS.EMPLEADO * 100).toFixed(2));
         const impuestoRenta = formatearMoneda(datos.impuesto_renta || datos.calculos?.impuestoRenta || 0);
         const rebajoHoras = formatearMoneda(datos.rebajo_horas || datos.calculos?.rebajosPorHoras?.total || 0);
         const otrasDeducciones = formatearMoneda(datos.otras_deducciones || datos.calculos?.otrosDescuentos || 0);
@@ -458,7 +458,7 @@ class EmailServiceSimple {
             
             // Deducciones
             ccss: this.formatearMoneda(safeNumber(calculos.ccss || calculos.descuentoCCSS || 0)),
-            ccss_porcentaje: '10.67',
+            ccss_porcentaje: (CONFIG.CCSS.EMPLEADO * 100).toFixed(2),
             impuesto_renta: this.formatearMoneda(safeNumber(calculos.impuestoRenta || 0)),
             rebajo_horas: this.formatearMoneda(safeNumber(calculos.rebajoHoras || calculos.rebajosPorHoras?.total || 0)),
             otras_deducciones: this.formatearMoneda(safeNumber(calculos.rebajos || calculos.otrosDescuentos || 0)),
@@ -1041,7 +1041,7 @@ SALARIO BRUTO: ${datos.salario_bruto || '₡0.00'}
 =====================================
 DEDUCCIONES
 =====================================
-CCSS ${datos.ccss_porcentaje || '10.67'}%: ${datos.ccss || '₡0.00'}
+CCSS ${datos.ccss_porcentaje || (CONFIG.CCSS.EMPLEADO * 100).toFixed(2)}%: ${datos.ccss || '₡0.00'}
 Impuesto Renta: ${datos.impuesto_renta || '₡0.00'}
 Rebajo horas: ${datos.rebajo_horas || '₡0.00'}
 Otras deducciones: ${datos.otras_deducciones || '₡0.00'}
@@ -1060,6 +1060,204 @@ Fecha de envio: ${datos.fecha_envio || new Date().toLocaleDateString('es-CR')}
 Mensaje automatico - No responder a este correo
 ${datos.empresa || 'Sistema de Planillas'}
         `.trim();
+    }
+
+    /**
+     * Envía felicitación de cumpleaños por email usando EmailJS
+     * @param {Object} empleado - Datos del empleado
+     * @returns {Promise<Object>} - Resultado del envío
+     */
+    async enviarCumpleanos(empleado) {
+        try {
+            // Verificar configuración
+            if (!this.verificarConfiguracion()) {
+                throw new Error('EmailJS no está configurado correctamente');
+            }
+
+            // Preparar datos para el email
+            const templateParams = this.prepararDatosEmailCumpleanos(empleado);
+
+            // Generar HTML del email de cumpleaños
+            const cumpleanosHTML = this.generarHTMLCumpleanos(templateParams);
+            
+            // Agregar el HTML al templateParams
+            templateParams.cumpleanos_html = cumpleanosHTML;
+
+            // Usar el template ID de cumpleaños si existe, sino usar el general
+            const templateId = window.EMAILJS_CONFIG.TEMPLATE_ID_CUMPLEANOS || window.EMAILJS_CONFIG.TEMPLATE_ID;
+
+            // Log de los parámetros para debugging
+            console.log('Enviando email de cumpleaños con parámetros:', {
+                serviceId: window.EMAILJS_CONFIG.SERVICE_ID,
+                templateId: templateId,
+                destinatario: templateParams.to_email,
+                templateParams: { ...templateParams, cumpleanos_html: '(HTML contenido)' }
+            });
+
+            // Enviar email
+            const response = await emailjs.send(
+                window.EMAILJS_CONFIG.SERVICE_ID,
+                templateId,
+                templateParams
+            );
+
+            return {
+                success: response.status === 200,
+                messageId: response.text
+            };
+
+        } catch (error) {
+            console.error('Error enviando felicitación de cumpleaños:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Prepara los datos del email para cumpleaños
+     * @param {Object} empleado - Datos del empleado
+     * @returns {Object} - Datos preparados para la plantilla
+     */
+    prepararDatosEmailCumpleanos(empleado) {
+        // Función helper para asegurar valores string
+        const safeString = (value) => {
+            if (value === null || value === undefined) return '';
+            let str = String(value);
+            str = str.normalize('NFC');
+            str = str.replace(/[^\w\s@.-áéíóúÁÉÍÓÚñÑüÜàèìòùÀÈÌÒÙâêîôûÂÊÎÔÛãõÃÕçÇ€£$]/g, '');
+            return str.trim();
+        };
+
+        const safeEmail = (value) => {
+            if (!value || value === null || value === undefined) return 'test@example.com';
+            let email = String(value).trim();
+            email = email.normalize('NFC');
+            email = email.replace(/[^\w@.+_-]/g, '');
+            email = email.replace(/\s/g, '');
+            return email.includes('@') ? email : 'test@example.com';
+        };
+
+        // Calcular edad
+        const fechaNacimiento = new Date(empleado.fechaNacimiento);
+        const hoy = new Date();
+        let edad = hoy.getFullYear() - fechaNacimiento.getFullYear();
+        const mesCumpleaños = fechaNacimiento.getMonth();
+        const diaCumpleaños = fechaNacimiento.getDate();
+        
+        // Ajustar edad si el cumpleaños aún no ha llegado este año
+        if (hoy.getMonth() < mesCumpleaños || (hoy.getMonth() === mesCumpleaños && hoy.getDate() < diaCumpleaños)) {
+            edad = edad - 1;
+        }
+
+        const nombreEmpleado = safeString(empleado.nombre || empleado.nombreEmpleado);
+        const nombreEmpresa = safeString(empleado.empresa || 'Veterinaria San Martín de Porres');
+
+        return {
+            to_email: safeEmail(empleado.correo || empleado.email),
+            to_name: nombreEmpleado,
+            from_name: nombreEmpresa,
+            subject: `🎉 ¡Feliz Cumpleaños, ${nombreEmpleado}!`,
+            
+            // Datos del empleado
+            empleado_nombre: nombreEmpleado,
+            empleado_edad: edad,
+            
+            // Datos de la empresa
+            empresa: nombreEmpresa,
+            
+            // Fecha
+            fecha_envio: new Date().toLocaleDateString('es-CR')
+        };
+    }
+
+    /**
+     * Genera el HTML del email de cumpleaños
+     * @param {Object} datos - Datos preparados del email
+     * @returns {string} HTML del email
+     */
+    generarHTMLCumpleanos(datos) {
+        // Función helper para asegurar valores string
+        const safeString = (val, defaultVal = '') => {
+            if (val === null || val === undefined) return defaultVal;
+            return String(val);
+        };
+
+        const nombreEmpleado = safeString(datos.empleado_nombre || '');
+        const edad = safeString(datos.empleado_edad || '');
+        const empresa = safeString(datos.empresa || 'Veterinaria San Martín de Porres');
+        const fechaEnvio = safeString(datos.fecha_envio || new Date().toLocaleDateString('es-CR'));
+
+        // Generar HTML OPTIMIZADO PARA HOTMAIL/OUTLOOK
+        return `<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎉 ¡Feliz cumpleaños!</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #e0f7fa; font-family: Arial, sans-serif;">
+    <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #e0f7fa;">
+        <tr>
+            <td align="center" style="padding: 30px 10px;">
+                <table width="650" border="0" cellspacing="0" cellpadding="0" style="background-color: #ffffff; border: 1px solid #dddddd;">
+                    <!-- Header -->
+                    <tr>
+                        <td style="background-color: #b3e5fc; padding: 30px 20px; text-align: center; color: #01579b;">
+                            <div style="font-size: 36px; margin-bottom: 10px;">🎉🐾🎂</div>
+                            <h1 style="margin: 0; font-size: 28px; line-height: 1.2; color: #01579b;">¡Feliz cumpleaños, ${nombreEmpleado}!</h1>
+                            <p style="margin: 10px 0 0 0; font-size: 16px;">Hoy celebramos a alguien muy especial del equipo 💙</p>
+                        </td>
+                    </tr>
+                    
+                    <!-- Content -->
+                    <tr>
+                        <td style="padding: 30px 25px;">
+                            <h2 style="color: #0277bd; margin: 0 0 20px 0; font-size: 20px;">Gracias por cuidar cada vida con tanto amor 🐶🐱</h2>
+                            
+                            <p style="font-size: 16px; line-height: 1.6; margin-bottom: 20px; color: #333;">
+                                En este día tan especial, todo el equipo de <strong>${empresa}</strong> quiere hacerte llegar un enorme abrazo lleno de gratitud y buenos deseos.
+                            </p>
+                            
+                            <p style="font-size: 16px; line-height: 1.6; margin-bottom: 20px; color: #333;">
+                                Tu dedicación diaria no solo mejora la vida de nuestros pacientes peludos, sino también de todos los que trabajamos a tu lado. ¡Sos parte esencial de nuestra manada!
+                            </p>
+                            
+                            <!-- Quote -->
+                            <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #e1f5fe; border-left: 5px solid #03a9f4; margin: 30px 0;">
+                                <tr>
+                                    <td style="padding: 15px 20px; font-style: italic; color: #444; font-size: 15px;">
+                                        "Quienes cuidan con el corazón, merecen celebraciones con el alma."<br>
+                                        ¡Hoy te celebramos a vos!
+                                    </td>
+                                </tr>
+                            </table>
+                            
+                            <p style="font-size: 16px; line-height: 1.6; margin-bottom: 20px; color: #333;">
+                                Que tengas un cumpleaños lleno de alegría, cariño, salud y muchos momentos felices humanos y peluditos por igual.
+                            </p>
+                            
+                            <p style="font-size: 16px; line-height: 1.6; margin-bottom: 20px; color: #333;">
+                                ¡Disfrutá tu día, y gracias por ser parte de esta gran familia veterinaria! 🐾🎉
+                            </p>
+                        </td>
+                    </tr>
+                    
+                    <!-- Footer -->
+                    <tr>
+                        <td style="background-color: #f1f9ff; text-align: center; padding: 20px; font-size: 14px; color: #666; border-top: 1px solid #dddddd;">
+                            <p style="margin: 5px 0;">Con cariño,</p>
+                            <p style="margin: 5px 0;"><strong style="color: #0288d1;">Equipo de Recursos Humanos</strong></p>
+                            <p style="margin: 5px 0;">${empresa}</p>
+                            <p style="margin: 10px 0 5px 0; font-size: 11px; color: #999;">Fecha: ${fechaEnvio}</p>
+                            <p style="margin: 10px 0 5px 0; font-style: italic; font-size: 10px; color: #999;">Mensaje automático - No responder</p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>`;
     }
 
     /**

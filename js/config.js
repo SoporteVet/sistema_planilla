@@ -108,7 +108,7 @@ function getJornadaByCodigo(codigo) {
 
 // CCSS Constants (Costa Rica Social Security)
 const CCSS = {
-    EMPLEADO: 0.1067, // 10.67% descuento al empleado
+    EMPLEADO: 0.1083, // 10.83% descuento al empleado
     PATRONO: 0.2667,  // 26.67% cargo patronal (informativo)
     DIAS_EMPRESA_MAX: 3, // Primeros 3 días de incapacidad paga empresa al 50%
     PORCENTAJE_INCAPACIDAD_EMPRESA: 0.5 // 50% del salario diario

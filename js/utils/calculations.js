@@ -209,12 +209,17 @@ const Calculations = {
     },
 
     /**
-     * Calcula el descuento de CCSS del empleado (10.67%)
+     * Calcula el descuento de CCSS del empleado (10.83%)
      * @param {number} salarioBruto - Salario bruto
      * @returns {number} Monto de descuento CCSS
      */
     calcularDescuentoCCSS(salarioBruto) {
-        return salarioBruto * CONFIG.CCSS.EMPLEADO;
+        // Verificar que se está usando el porcentaje correcto (10.83%)
+        const porcentajeCCSS = CONFIG.CCSS.EMPLEADO;
+        if (porcentajeCCSS !== 0.1083) {
+            console.warn('⚠️ ADVERTENCIA: El porcentaje de CCSS no es 10.83%. Valor actual:', porcentajeCCSS);
+        }
+        return salarioBruto * porcentajeCCSS;
     },
 
     /**
@@ -595,7 +600,7 @@ const Calculations = {
         const rebajosDelBruto = typeof resultadoBruto === 'object' ? resultadoBruto.rebajos : 0;
         // Los rebajos del bruto son los rebajos (bonos/rebajos) que se deben restar DESPUÉS de CCSS
         
-        // PASO 3: Calcular CCSS (10.67%) sobre el salario bruto
+        // PASO 3: Calcular CCSS (10.83%) sobre el salario bruto
         let descuentoCCSS = this.calcularDescuentoCCSS(salarioBruto);
         
         // PASO 4: Restar CCSS del salario bruto
@@ -634,7 +639,7 @@ const Calculations = {
         // NOTA: Los rebajos (de bonos/rebajos) se deben restar DESPUÉS de calcular CCSS, no antes
         // Orden correcto:
         // 1. Salario Bruto = Salario Ordinario + Horas Extras + Horas Adicionales + bonos (SIN restar rebajos)
-        // 2. Restar CCSS (10.67%) del salario bruto
+        // 2. Restar CCSS (10.83%) del salario bruto
         // 3. Sumar 50% incapacidad CCSS (si aplica)
         // 4. Restar Impuesto de Renta (solo mensual)
         // 5. Restar Rebajos (bonos/rebajos) - DESPUÉS de CCSS

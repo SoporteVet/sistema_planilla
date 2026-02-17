@@ -184,7 +184,7 @@ Abrir navegador en `http://localhost:8000` (o el puerto correspondiente)
 
 ### Deducciones Legales
 
-- **CCSS Empleado**: 10.67% del salario bruto
+- **CCSS Empleado**: 10.83% del salario bruto
 - **CCSS Patrono**: 26.67% (informativo, no deducido al empleado)
 
 ### Impuesto de Renta 2025 (Tramos Progresivos)
