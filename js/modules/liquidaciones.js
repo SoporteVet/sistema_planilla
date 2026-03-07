@@ -360,62 +360,38 @@ const LiquidacionesModule = {
             : [];
 
         if (usarSalarios6Meses && salarios6.length > 0) {
-            // MÉTODO MTSS: Calcular promedio considerando meses de calendario
-            // El divisor depende de si el mes de salida cuenta como completo o parcial
+            // MÉTODO MTSS: Normalizar mes parcial a equivalente de 30 días, luego promediar entre 6
             const fechaSalidaDate = this.parsearFechaLocal(fechaSalida);
             const diaSalida = fechaSalidaDate.getDate();
             const diasEnMesSalida = new Date(fechaSalidaDate.getFullYear(), fechaSalidaDate.getMonth() + 1, 0).getDate();
-            
-            // MTSS usa 30 días como base para el cálculo
             const DIAS_MES_BASE = 30;
             
-            // Determinar si el mes de salida cuenta como completo o parcial
-            // Criterio MTSS: Si sale el día 15 o después, el mes cuenta como completo
-            // Si sale antes del día 15, el mes es parcial
-            // También cuenta como completo si sale el último día del mes
-            const esMesCompleto = diaSalida >= 15 || diaSalida >= diasEnMesSalida;
+            // El mes es completo solo si sale el último día del mes
+            const esMesCompleto = diaSalida >= diasEnMesSalida;
             
-            // Calcular el divisor (meses exactos)
-            let totalMesesExactos;
-            if (esMesCompleto) {
-                // Si el mes de salida es completo: 6 meses
-                totalMesesExactos = salarios6.length;
-            } else {
-                // Si el mes de salida es parcial: 5 meses + fracción
-                const fraccionMesSalida = diaSalida / DIAS_MES_BASE;
-                const mesesCompletos = salarios6.length - 1;
-                totalMesesExactos = mesesCompletos + fraccionMesSalida;
-            }
-            
-            // Calcular suma total de salarios
-            // Si el mes es completo, se suma completo. Si es parcial, se calcula proporcional
             let sumaTotal = 0;
-            
-            console.log('🔵 MÉTODO MTSS - Desglose:');
+            console.log('🔵 MÉTODO MTSS - Desglose (normalización a 30 días):');
             for (let i = 0; i < salarios6.length; i++) {
                 if (i === salarios6.length - 1 && !esMesCompleto) {
-                    // Último mes (mes de salida parcial): calcular proporcional
-                    const salarioProporcional = (salarios6[i] / DIAS_MES_BASE) * diaSalida;
-                    sumaTotal += salarioProporcional;
-                    console.log(`  Mes ${i + 1} (parcial ${diaSalida}/${DIAS_MES_BASE} días): ₡${salarios6[i].toLocaleString()} ÷ ${DIAS_MES_BASE} × ${diaSalida} = ₡${salarioProporcional.toLocaleString('es-CR', {maximumFractionDigits: 2})}`);
+                    // Mes parcial: normalizar al equivalente de 30 días (método MTSS)
+                    // salario_normalizado = salario_real × 30 / días_trabajados
+                    const salarioNormalizado = (salarios6[i] * DIAS_MES_BASE) / diaSalida;
+                    sumaTotal += salarioNormalizado;
+                    console.log(`  Mes ${i + 1} (parcial ${diaSalida} días → normalizado): ₡${salarios6[i].toLocaleString()} × 30 ÷ ${diaSalida} = ₡${salarioNormalizado.toLocaleString('es-CR', {maximumFractionDigits: 2})}`);
                 } else {
-                    // Meses completos (incluyendo mes de salida si es completo)
                     sumaTotal += salarios6[i];
-                    const estado = (i === salarios6.length - 1 && esMesCompleto) ? ' (completo)' : '';
-                    console.log(`  Mes ${i + 1}${estado}: ₡${salarios6[i].toLocaleString()}`);
+                    console.log(`  Mes ${i + 1}: ₡${salarios6[i].toLocaleString()}`);
                 }
             }
             
-            // Promedio = suma total / meses exactos (método MTSS)
-            salarioPromedio = sumaTotal / totalMesesExactos;
+            // Promedio = suma de los 6 salarios normalizados / 6 (método MTSS)
+            salarioPromedio = sumaTotal / salarios6.length;
             fuenteSalario = 'manual_6meses';
             
             console.log('  ─────────────────────────────');
-            console.log(`  Día de salida: ${diaSalida} de ${diasEnMesSalida} días del mes`);
-            console.log(`  Mes de salida: ${esMesCompleto ? 'COMPLETO' : 'PARCIAL'}`);
-            console.log(`  Suma total: ₡${sumaTotal.toLocaleString('es-CR', {maximumFractionDigits: 2})}`);
-            console.log(`  Divisor: ${totalMesesExactos.toFixed(4)} meses`);
-            console.log(`  Promedio mensual: ₡${sumaTotal.toLocaleString('es-CR', {maximumFractionDigits: 2})} ÷ ${totalMesesExactos.toFixed(4)} = ₡${salarioPromedio.toLocaleString('es-CR', {maximumFractionDigits: 2})}`);
+            console.log(`  Día de salida: ${diaSalida} de ${diasEnMesSalida} días del mes (${esMesCompleto ? 'MES COMPLETO' : 'MES PARCIAL - normalizado'})`);
+            console.log(`  Suma normalizada: ₡${sumaTotal.toLocaleString('es-CR', {maximumFractionDigits: 2})}`);
+            console.log(`  Promedio mensual: ₡${sumaTotal.toLocaleString('es-CR', {maximumFractionDigits: 2})} ÷ ${salarios6.length} = ₡${salarioPromedio.toLocaleString('es-CR', {maximumFractionDigits: 2})}`);
             console.log(`  Salario diario: ₡${salarioPromedio.toLocaleString('es-CR', {maximumFractionDigits: 2})} ÷ 30 = ₡${(salarioPromedio / 30).toLocaleString('es-CR', {maximumFractionDigits: 2})}`);
         } else if (usarSalarioManual && salarioManualNumero > 0) {
             // Opción 2: salario manual mensual fijo (NO MEZCLAR CON PLANILLAS)
@@ -472,9 +448,31 @@ const LiquidacionesModule = {
 
         // Calcular aguinaldo proporcional
         const datosAguinaldo = this.calcularAguinaldoProporcional(empleadoId, fechaSalida);
-        // Aguinaldo = (salario promedio mensual * meses trabajados) / 12
-        // El aguinaldo se calcula sobre el período del 1 dic al 30 nov
-        const montoAguinaldo = (salarioPromedio * datosAguinaldo.mesesTrabajados) / 12;
+        
+        // MÉTODO MTSS: Aguinaldo = suma de salarios reales del período (1 dic al 30 nov) / 12
+        // Esto coincide con lo que calcula la calculadora oficial del MTSS
+        let montoAguinaldo;
+        if (usarSalarios6Meses && salarios6.length > 0) {
+            const fechaSalidaDate = this.parsearFechaLocal(fechaSalida);
+            const mesSalida = fechaSalidaDate.getMonth(); // 0=Ene, 11=Dic
+            // Meses del período de aguinaldo (Dic 1 a fecha salida) que están en salarios6
+            // Si sale en Dic: 1 mes, si en Ene: 2 meses, si en Feb: 3 meses, etc.
+            const mesesEnPeriodoAguinaldo = (mesSalida === 11) ? 1 : mesSalida + 2;
+            
+            if (mesesEnPeriodoAguinaldo <= salarios6.length) {
+                // Sumar los salarios reales de los últimos N meses del array (período aguinaldo)
+                const salariosAguinaldo = salarios6.slice(salarios6.length - mesesEnPeriodoAguinaldo);
+                const sumaAguinaldo = salariosAguinaldo.reduce((sum, s) => sum + s, 0);
+                montoAguinaldo = sumaAguinaldo / 12;
+                console.log(`  - Aguinaldo MTSS: [${salariosAguinaldo.map(s => s.toLocaleString()).join(' + ')}] = ${sumaAguinaldo.toLocaleString()} ÷ 12 = ${montoAguinaldo.toFixed(2)}`);
+            } else {
+                // Fallback si el período de aguinaldo supera los 6 meses disponibles
+                montoAguinaldo = (salarioPromedio * datosAguinaldo.mesesTrabajados) / 12;
+                console.log(`  - Aguinaldo (fallback): ${datosAguinaldo.mesesTrabajados} meses = ${montoAguinaldo}`);
+            }
+        } else {
+            montoAguinaldo = (salarioPromedio * datosAguinaldo.mesesTrabajados) / 12;
+        }
         console.log('  - Aguinaldo:', datosAguinaldo.mesesTrabajados, 'meses =', montoAguinaldo);
         console.log('  - Vacaciones:', vacaciones.diasPendientes, 'días =', montoVacaciones);
 

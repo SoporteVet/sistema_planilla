@@ -314,6 +314,10 @@ const AutorizacionEmailModule = {
 
                     <!-- Botones de acción -->
                     <div class="flex justify-end space-x-4 pt-4 border-t border-gray-200">
+                        <button type="button" onclick="AutorizacionEmailModule.generarPDFEnBlanco()" 
+                            class="px-6 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50">
+                            Generar PDF (en blanco)
+                        </button>
                         <button type="button" onclick="AutorizacionEmailModule.limpiarFormulario()" 
                             class="px-6 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50">
                             Limpiar Formulario
@@ -956,10 +960,28 @@ const AutorizacionEmailModule = {
     },
 
     /**
-     * Genera un PDF del consentimiento completo
+     * Genera un PDF del formulario en blanco (sin necesidad de llenar datos)
+     */
+    async generarPDFEnBlanco() {
+        const autorizacionVacia = {
+            nombreCompleto: '',
+            numeroCedula: '',
+            puesto: '',
+            correoPersonal: '',
+            autorizaciones: {},
+            nombreFirma: '',
+            fechaFirma: new Date().toISOString().split('T')[0],
+            firmaDigital: null
+        };
+        const filename = `Autorizacion_Email_Formulario_En_Blanco_${new Date().toISOString().split('T')[0]}.pdf`;
+        await this._generarPDFConDatos(autorizacionVacia, filename);
+    },
+
+    /**
+     * Genera un PDF del consentimiento completo (desde lista, con datos guardados)
      */
     async generarPDF(cedula) {
-        // Solo administradores pueden generar PDFs
+        // Solo administradores pueden generar PDFs desde la lista
         if (!Auth.isAdmin()) {
             Utils.showToast('No tiene permisos para generar PDFs', 'error');
             return;
@@ -971,6 +993,16 @@ const AutorizacionEmailModule = {
             return;
         }
 
+        const filename = `Autorizacion_Email_${autorizacion.numeroCedula || 'N/A'}_${new Date().toISOString().split('T')[0]}.pdf`;
+        await this._generarPDFConDatos(autorizacion, filename);
+    },
+
+    /**
+     * Genera el PDF con los datos de una autorización (completa o en blanco)
+     * @param {Object} autorizacion - Objeto con datos de la autorización (puede tener campos vacíos)
+     * @param {string} filename - Nombre del archivo a descargar
+     */
+    async _generarPDFConDatos(autorizacion, filename) {
         try {
             Utils.showLoading('Generando PDF...');
 
@@ -1038,10 +1070,11 @@ const AutorizacionEmailModule = {
 
             doc.setFontSize(10);
             doc.setFont(undefined, 'normal');
-            doc.text(`Nombre completo: ${autorizacion.nombreCompleto || 'N/A'}`, marginLeft + 2, yPos + 6);
-            doc.text(`Número de cédula: ${autorizacion.numeroCedula || 'N/A'}`, marginLeft + 2, yPos + 11);
-            doc.text(`Puesto: ${autorizacion.puesto || 'N/A'}`, marginLeft + 2, yPos + 16);
-            doc.text(`Correo electrónico personal: ${autorizacion.correoPersonal || 'N/A'}`, marginLeft + 2, yPos + 21);
+            const vacio = (v) => (v === undefined || v === null || String(v).trim() === '') ? '_________________________' : v;
+            doc.text(`Nombre completo: ${vacio(autorizacion.nombreCompleto)}`, marginLeft + 2, yPos + 6);
+            doc.text(`Número de cédula: ${vacio(autorizacion.numeroCedula)}`, marginLeft + 2, yPos + 11);
+            doc.text(`Puesto: ${vacio(autorizacion.puesto)}`, marginLeft + 2, yPos + 16);
+            doc.text(`Correo electrónico personal: ${vacio(autorizacion.correoPersonal)}`, marginLeft + 2, yPos + 21);
             yPos += 32;
 
             // ========== SECCIÓN 2: FINALIDAD DEL USO ==========
@@ -1069,7 +1102,9 @@ const AutorizacionEmailModule = {
                     yPos = 20;
                 }
 
-                const autorizado = autorizaciones[tipo.key] === 'autorizo';
+                const valor = autorizaciones[tipo.key];
+                const autorizado = valor === 'autorizo';
+                const noAutorizado = valor === 'no_autorizo';
                 doc.setFontSize(10);
                 
                 // Dibujar checkboxes
@@ -1078,12 +1113,12 @@ const AutorizacionEmailModule = {
                 doc.rect(marginLeft, yPos - 3, 3, 3, 'S'); // Primer checkbox
                 doc.rect(marginLeft + 50, yPos - 3, 3, 3, 'S'); // Segundo checkbox
                 
-                // Marcar con X
+                // Marcar con X solo si hay valor (en blanco no se marca ninguno)
                 if (autorizado) {
                     doc.setFontSize(8);
                     doc.setFont(undefined, 'bold');
                     doc.text('X', marginLeft + 0.5, yPos - 0.5);
-                } else {
+                } else if (noAutorizado) {
                     doc.setFontSize(8);
                     doc.setFont(undefined, 'bold');
                     doc.text('X', marginLeft + 50.5, yPos - 0.5);
@@ -1171,7 +1206,7 @@ const AutorizacionEmailModule = {
 
             doc.setFontSize(10);
             doc.setFont(undefined, 'normal');
-            doc.text(`Nombre del colaborador: ${autorizacion.nombreFirma || 'N/A'}`, marginLeft, yPos);
+            doc.text(`Nombre del colaborador: ${vacio(autorizacion.nombreFirma)}`, marginLeft, yPos);
             yPos += 8;
 
             // Firma digital
@@ -1200,27 +1235,29 @@ const AutorizacionEmailModule = {
                             resolve();
                         };
                         img.onerror = () => {
-                            doc.text('Firma no disponible', marginLeft, yPos);
+                            doc.text('(Espacio para firma)', marginLeft, yPos);
                             yPos += 5;
                             resolve();
                         };
                     });
                 } catch (error) {
                     console.error('Error cargando firma:', error);
-                    doc.text('Firma no disponible', marginLeft, yPos);
+                    doc.text('(Espacio para firma)', marginLeft, yPos);
                     yPos += 5;
                 }
             } else {
-                doc.text('Firma no disponible', marginLeft, yPos);
-                yPos += 5;
+                doc.setDrawColor(200, 200, 200);
+                doc.setLineWidth(0.5);
+                doc.rect(marginLeft, yPos, 80, 25, 'S');
+                doc.text('(Espacio para firma)', marginLeft + 2, yPos + 12);
+                yPos += 30;
             }
 
             yPos += 5;
             
-            // Formatear fecha y hora sin problemas de zona horaria
-            let fechaFirmaTexto = 'N/A';
+            // Formatear fecha
+            let fechaFirmaTexto = '_________________________';
             if (autorizacion.fechaFirma) {
-                // Usar fechaCreacion o timestamp si está disponible para obtener la hora
                 let fechaConHora = null;
                 if (autorizacion.fechaCreacion) {
                     fechaConHora = new Date(autorizacion.fechaCreacion);
@@ -1228,7 +1265,6 @@ const AutorizacionEmailModule = {
                     fechaConHora = new Date(autorizacion.timestamp);
                 }
                 
-                // Si tenemos fecha con hora, usarla; si no, usar solo fechaFirma
                 if (fechaConHora && !isNaN(fechaConHora.getTime())) {
                     fechaFirmaTexto = fechaConHora.toLocaleDateString('es-CR', {
                         year: 'numeric',
@@ -1238,35 +1274,29 @@ const AutorizacionEmailModule = {
                         hour: '2-digit',
                         minute: '2-digit'
                     });
+                } else if (typeof autorizacion.fechaFirma === 'string' && autorizacion.fechaFirma.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                    const partes = autorizacion.fechaFirma.split('-');
+                    const año = parseInt(partes[0], 10);
+                    const mes = parseInt(partes[1], 10) - 1;
+                    const dia = parseInt(partes[2], 10);
+                    const fecha = new Date(año, mes, dia);
+                    fechaFirmaTexto = fecha.toLocaleDateString('es-CR', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                    });
                 } else {
-                    // Si es una cadena YYYY-MM-DD, parsearla correctamente
-                    if (typeof autorizacion.fechaFirma === 'string' && autorizacion.fechaFirma.match(/^\d{4}-\d{2}-\d{2}$/)) {
-                        const partes = autorizacion.fechaFirma.split('-');
-                        const año = parseInt(partes[0], 10);
-                        const mes = parseInt(partes[1], 10) - 1; // Mes es 0-indexed
-                        const dia = parseInt(partes[2], 10);
-                        const fecha = new Date(año, mes, dia);
-                        fechaFirmaTexto = fecha.toLocaleDateString('es-CR', {
-                            year: 'numeric',
-                            month: 'long',
-                            day: 'numeric'
-                        });
-                    } else {
-                        // Si es un timestamp o otra forma, usar directamente
-                        const fecha = new Date(autorizacion.fechaFirma);
-                        fechaFirmaTexto = fecha.toLocaleDateString('es-CR', {
-                            year: 'numeric',
-                            month: 'long',
-                            day: 'numeric'
-                        });
-                    }
+                    const fecha = new Date(autorizacion.fechaFirma);
+                    fechaFirmaTexto = fecha.toLocaleDateString('es-CR', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                    });
                 }
             }
             
             doc.text(`Fecha: ${fechaFirmaTexto}`, marginLeft, yPos);
 
-            // Guardar PDF
-            const filename = `Autorizacion_Email_${autorizacion.numeroCedula || 'N/A'}_${new Date().toISOString().split('T')[0]}.pdf`;
             doc.save(filename);
 
             Utils.hideLoading();

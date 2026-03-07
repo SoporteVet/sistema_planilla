@@ -336,38 +336,10 @@ class EmailServiceSimple {
      * Prepara los datos del email optimizados
      */
     prepararDatosEmail(empleado, calculos, planilla) {
-        // Calcular valores adicionales necesarios para la plantilla
-        // Usar los mismos cálculos que el comprobante de pago
-        const horasJornada = this.getHorasJornada(empleado.jornada);
-        // Obtener salario horario correcto (directo del empleado o calculado)
-        const salarioHorarioEmpleado = parseFloat(empleado.salarioHorario);
-        const salarioHora = (!isNaN(salarioHorarioEmpleado) && salarioHorarioEmpleado > 0) 
-            ? salarioHorarioEmpleado 
-            : (empleado.salarioMensual && empleado.jornada 
-                ? Calculations.calcularSalarioHorario(empleado.salarioMensual, empleado.jornada, empleado.salarioHorario)
-                : 0);
-        const salarioDiario = salarioHora * horasJornada;
-        
-        // Calcular días totales del período (igual que en el comprobante)
-        const contarDiasTotalesPeriodo = (fechaInicio, fechaFin) => {
-            const inicio = new Date(fechaInicio + 'T00:00:00');
-            const fin = new Date(fechaFin + 'T00:00:00');
-            let diasTotal = 0;
-            for (let fecha = new Date(inicio); fecha <= fin; fecha.setDate(fecha.getDate() + 1)) {
-                diasTotal++;
-            }
-            return diasTotal;
+        const safeNumber = (value) => {
+            const num = parseFloat(value || 0);
+            return isNaN(num) ? 0 : num;
         };
-        
-        const diasTotalesPeriodo = planilla.fechaInicio && planilla.fechaFin 
-            ? contarDiasTotalesPeriodo(planilla.fechaInicio, planilla.fechaFin)
-            : 15; // Valor por defecto si no hay fechas
-        
-        // Calcular igual que en el comprobante
-        const subtotalQuincenal = salarioDiario * diasTotalesPeriodo;
-        const salarioMensual = subtotalQuincenal * 2;
-        
-        // Asegurar que todos los valores sean strings válidos
         const safeString = (value) => {
             if (value === null || value === undefined) return '';
             
@@ -382,10 +354,6 @@ class EmailServiceSimple {
             str = str.replace(/[^\w\s@.-áéíóúÁÉÍÓÚñÑüÜàèìòùÀÈÌÒÙâêîôûÂÊÎÔÛãõÃÕçÇ€£$]/g, '');
             
             return str.trim();
-        };
-        const safeNumber = (value) => {
-            const num = parseFloat(value || 0);
-            return isNaN(num) ? 0 : num;
         };
         const safeEmail = (value) => {
             if (!value || value === null || value === undefined) return 'test@example.com';
@@ -406,9 +374,18 @@ class EmailServiceSimple {
             
             return email.includes('@') ? email : 'test@example.com';
         };
+
+        // Usar la misma fuente que el PDF/comprobante: calculos y empleado (no recalcular salario mensual)
+        const salarioBaseMensualNum = safeNumber(calculos.salarioBaseMensual) || safeNumber(empleado.salarioMensual) || 0;
+        const salarioDiarioNum = safeNumber(calculos.salarioDiario) || (empleado.jornada && salarioBaseMensualNum
+            ? Calculations.calcularSalarioDiario(salarioBaseMensualNum, empleado.jornada)
+            : 0);
+        const salarioHora = safeNumber(empleado.salarioHorario) || safeNumber(empleado.salarioHora) || (empleado.jornada && salarioBaseMensualNum
+            ? Calculations.calcularSalarioHorario(salarioBaseMensualNum, empleado.jornada, empleado.salarioHorario)
+            : 0);
+        const subtotalQuincenalNum = safeNumber(calculos.subtotalQuincenal) || 0;
         
         // Calcular valores de feriados igual que en el comprobante
-        // salarioHora ya fue calculado arriba
         const horasFeriado = safeNumber(calculos.horasFeriado || (calculos.diasFeriadosTrabajados ? calculos.diasFeriadosTrabajados * 8 : 0));
         const montoFeriado = safeNumber(calculos.pagoFeriados || calculos.montoFeriado || 0);
         // Si montoFeriado no está disponible, calcularlo (horasFeriado * salarioHora * 2)
@@ -447,11 +424,11 @@ class EmailServiceSimple {
             fecha_inicio: safeString(planilla.fechaInicio),
             fecha_fin: safeString(planilla.fechaFin),
             
-            // Salarios
-            salario_mensual: this.formatearMoneda(salarioMensual),
-            salario_diario: this.formatearMoneda(salarioDiario),
-            salario_hora: this.formatearMoneda(safeNumber(salarioHora)),
-            subtotal_quincenal: this.formatearMoneda(subtotalQuincenal),
+            // Salarios (misma fuente que el PDF: calculos.salarioBaseMensual || empleado.salarioMensual)
+            salario_mensual: this.formatearMoneda(salarioBaseMensualNum),
+            salario_diario: this.formatearMoneda(salarioDiarioNum),
+            salario_hora: this.formatearMoneda(salarioHora),
+            subtotal_quincenal: this.formatearMoneda(subtotalQuincenalNum),
             salario_base: this.formatearMoneda(safeNumber(calculos.salarioBase || calculos.subtotalQuincenal)),
             salario_bruto: this.formatearMoneda(safeNumber(calculos.salarioBruto || 0)),
             salario_neto: this.formatearMoneda(safeNumber(calculos.salarioNeto || 0)),
