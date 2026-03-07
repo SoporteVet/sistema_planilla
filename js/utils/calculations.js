@@ -371,7 +371,9 @@ const Calculations = {
             diasPermiso = 0,
             bonos = 0,
             rebajos = 0,
-            asistencias = []
+            asistencias = [],
+            tipoPeriodo = 'quincenal',
+            diasNaturalesEnPeriodo = null // Febrero/meses cortos: días reales del período para no rebajar "días restantes"
         } = datos;
 
         const jornada = CONFIG.getJornadaByCodigo(codigoJornada);
@@ -379,9 +381,10 @@ const Calculations = {
         const salarioHorarioDirecto = datos.salarioHorario || null;
         const salarioHorario = this.calcularSalarioHorario(salarioMensual, codigoJornada, salarioHorarioDirecto);
         
-        // PASO 1: Calcular salario quincenal base basado en las horas esperadas de la jornada
+        // PASO 1: Calcular salario quincenal/mensual base (siempre pago completo: 15 días quincena o 30 días mes)
         const horasEsperadasQuincenales = jornada.horasPorQuincena; // Ej: 105 para mixta, 90 para nocturna, etc.
-        const salarioQuincenalBase = (salarioMensual / jornada.horasPorMes) * horasEsperadasQuincenales;
+        const horasEsperadasParaPago = tipoPeriodo === 'mensual' ? jornada.horasPorMes : horasEsperadasQuincenales;
+        const salarioQuincenalBase = (salarioMensual / jornada.horasPorMes) * horasEsperadasParaPago;
         
         // PASO 2: Sumar las horas realmente trabajadas de las asistencias
         let horasLaboradas = 0; // Total de horas realmente trabajadas
@@ -451,14 +454,23 @@ const Calculations = {
                 }
             });
         } else {
-            // Si no hay asistencias detalladas, asumir que trabajó todas las horas esperadas
-            horasLaboradas = horasEsperadasQuincenales;
+            // Si no hay asistencias detalladas, asumir que trabajó todas las horas esperadas del período
+            horasLaboradas = tipoPeriodo === 'mensual' ? jornada.horasPorMes : horasEsperadasQuincenales;
         }
         
         // PASO 3: Calcular horas faltantes (diferencia entre esperadas y trabajadas)
-        // IMPORTANTE: Las horas de incapacidad CCSS e INS también son horas faltantes que se deben restar
+        // Si hay diasNaturalesEnPeriodo (febrero o segunda quincena corta), solo esperamos las horas de esos días;
+        // así no se rebajan "días restantes" que no existen en el mes (se pagan completos).
+        let horasEsperadasParaRebajo = tipoPeriodo === 'mensual' ? jornada.horasPorMes : horasEsperadasQuincenales;
+        if (diasNaturalesEnPeriodo != null && diasNaturalesEnPeriodo > 0) {
+            if (tipoPeriodo === 'mensual') {
+                horasEsperadasParaRebajo = (diasNaturalesEnPeriodo / 30) * jornada.horasPorMes;
+            } else {
+                horasEsperadasParaRebajo = diasNaturalesEnPeriodo * jornada.horasPorDia;
+            }
+        }
+        const horasEsperadasMenosIncapacidad = horasEsperadasParaRebajo - horasIncapacidadCCSSTotal - horasIncapacidadINSTotal;
         let horasAusencia = 0;
-        const horasEsperadasMenosIncapacidad = horasEsperadasQuincenales - horasIncapacidadCCSSTotal - horasIncapacidadINSTotal;
         if (horasLaboradas < horasEsperadasMenosIncapacidad) {
             horasAusencia = horasEsperadasMenosIncapacidad - horasLaboradas;
         }

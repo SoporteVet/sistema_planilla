@@ -193,7 +193,7 @@ const PlanillasModule = {
                             <strong>Nota:</strong> Las fechas se calculan automáticamente:
                             <ul class="list-disc list-inside mt-1 space-y-1">
                                 <li><strong>Primera quincena:</strong> Del día 1 al 15 del mes seleccionado</li>
-                                <li><strong>Segunda quincena:</strong> Del día 16 al 30 del mes seleccionado</li>
+                                <li><strong>Segunda quincena:</strong> Del día 16 al último día del mes (en febrero, 16 al 28 o 29). El pago se calcula como 15 días completos.</li>
                             </ul>
                         </div>
                         <div class="bg-blue-50 border border-blue-200 rounded p-4 text-sm text-blue-800">
@@ -246,12 +246,11 @@ const PlanillasModule = {
                     fechaInicio.value = `${ano}-${String(mes).padStart(2, '0')}-01`;
                     fechaFin.value = `${ano}-${String(mes).padStart(2, '0')}-15`;
                 } else if (quincena.value === 'segunda') {
-                    // Segunda quincena: 16-30 (15 días)
-                    // Para meses con menos de 30 días (ej. febrero), usar el último día real del mes
-                    const ultimoDiaMes = new Date(ano, mesIndex + 1, 0).getDate();
-                    const diaFin = Math.min(30, ultimoDiaMes);
+                    // Segunda quincena: 16 al último día del mes (para febrero 28/29, resto 30 o 31)
+                    // Febrero se trata como si tuviera 30 días para pago, pero las fechas del período son reales
                     fechaInicio.value = `${ano}-${String(mes).padStart(2, '0')}-16`;
-                    fechaFin.value = `${ano}-${String(mes).padStart(2, '0')}-${String(diaFin).padStart(2, '0')}`;
+                    const ultimoDiaSegunda = new Date(ano, mesIndex + 1, 0).getDate();
+                    fechaFin.value = `${ano}-${String(mes).padStart(2, '0')}-${String(ultimoDiaSegunda).padStart(2, '0')}`;
                 }
             } else {
                 // Mensual: del 1 al último día del mes
@@ -336,6 +335,21 @@ const PlanillasModule = {
             const [anoFin, mesFin, diaFin] = fechaFinInput.split('-').map(Number);
             const fechaInicio = new Date(anoInicio, mesInicio - 1, diaInicio);
             const fechaFin = new Date(anoFin, mesFin - 1, diaFin);
+
+            // Días naturales del período (para febrero y meses cortos: no rebajar "días restantes")
+            // En febrero se paga como 30 días / 15 días quincena; solo se rebaja por días realmente no trabajados en el período
+            const ultimoDiaMes = new Date(anoInicio, mesInicio, 0).getDate();
+            let diasNaturalesEnPeriodo = null;
+            if (tipoPeriodo === 'quincenal') {
+                if (diaInicio >= 16) {
+                    // Segunda quincena: del 16 al último día del mes (ej. febrero 16-28 = 13 días)
+                    diasNaturalesEnPeriodo = ultimoDiaMes - 15;
+                }
+                // Primera quincena siempre 15 días, no hace falta pasar
+            } else if (tipoPeriodo === 'mensual' && ultimoDiaMes < 30) {
+                // Mes con menos de 30 días (febrero 28 o 29): pagar como 30 días, rebajar solo por días naturales
+                diasNaturalesEnPeriodo = ultimoDiaMes;
+            }
 
             // Obtener bonos y rebajos aprobados
             const bonosRebajos = await FirebaseHelpers.once(CONFIG.DB_PATHS.BONOS_REBAJOS);
@@ -473,6 +487,15 @@ const PlanillasModule = {
                         }
                     });
 
+                    // Si el período tiene menos días naturales que la quincena estándar (ej. febrero 16-28 = 13 días),
+                    // el registro repartió el total en 15 días; al cargar solo 13 días la suma queda corta.
+                    // Escalar para recuperar el total que el usuario ingresó.
+                    if (tipoPeriodo === 'quincenal' && diasNaturalesEnPeriodo != null && diasNaturalesEnPeriodo > 0 && diasNaturalesEnPeriodo < 15) {
+                        const factor = 15 / diasNaturalesEnPeriodo;
+                        horasExtra = Math.round(horasExtra * factor * 100) / 100;
+                        horasAdicionales = Math.round(horasAdicionales * factor * 100) / 100;
+                    }
+
                     // Si hay días trabajados manual, usarlo en lugar del cálculo automático
                     if (diasTrabajadosManual !== null && diasTrabajadosManual !== undefined) {
                         diasTrabajados = diasTrabajadosManual;
@@ -510,7 +533,8 @@ const PlanillasModule = {
                         cantidadHijos: empleado.hijos || 0,
                         tieneConyuge: empleado.estadoCivil === 'casado',
                         impuestoRentaManual: null, // Se puede editar después
-                        tipoPeriodo: tipoPeriodo // Pasar el tipo de período para aplicar impuesto de renta solo en mensuales
+                        tipoPeriodo: tipoPeriodo, // Pasar el tipo de período para aplicar impuesto de renta solo en mensuales
+                        diasNaturalesEnPeriodo: diasNaturalesEnPeriodo // Febrero/meses cortos: no rebajar días que no existen (pagarlos completos)
                     };
 
                     console.log(`Calculando salario para ${empleado.nombre}...`);
@@ -1421,6 +1445,16 @@ const PlanillasModule = {
             const fechaInicioKey = fechaInicioInput.replace(/-/g, '');
             const fechaFinKey = fechaFinInput.replace(/-/g, '');
 
+            // Días naturales del período (febrero / meses cortos: no rebajar días restantes)
+            const anoInicio = fechaInicio.getFullYear(), mesInicio = fechaInicio.getMonth() + 1;
+            const ultimoDiaMes = new Date(anoInicio, mesInicio, 0).getDate();
+            let diasNaturalesEnPeriodo = null;
+            if (tipoPeriodo === 'quincenal' && fechaInicio.getDate() >= 16) {
+                diasNaturalesEnPeriodo = ultimoDiaMes - 15;
+            } else if (tipoPeriodo === 'mensual' && ultimoDiaMes < 30) {
+                diasNaturalesEnPeriodo = ultimoDiaMes;
+            }
+
             // Obtener empleados activos (los mismos que estaban en la planilla)
             const empleadosEnPlanilla = Object.keys(planilla.empleados || {});
             const empleadosActivos = this.empleados.filter(e => 
@@ -1549,6 +1583,13 @@ const PlanillasModule = {
                         horasAdicionales += horasAdicionalesDia;
                     });
 
+                    // Escalar horas extra y adicionales cuando el período tiene menos de 15 días (ej. febrero 2ª quincena)
+                    if (tipoPeriodo === 'quincenal' && diasNaturalesEnPeriodo != null && diasNaturalesEnPeriodo > 0 && diasNaturalesEnPeriodo < 15) {
+                        const factor = 15 / diasNaturalesEnPeriodo;
+                        horasExtra = Math.round(horasExtra * factor * 100) / 100;
+                        horasAdicionales = Math.round(horasAdicionales * factor * 100) / 100;
+                    }
+
                     if (diasTrabajadosManual !== null && diasTrabajadosManual !== undefined) {
                         diasTrabajados = diasTrabajadosManual;
                         console.log(`Usando días trabajados manual para ${empleado.nombre}: ${diasTrabajados}`);
@@ -1584,7 +1625,8 @@ const PlanillasModule = {
                         cantidadHijos: empleado.hijos || 0,
                         tieneConyuge: empleado.estadoCivil === 'casado',
                         impuestoRentaManual: null,
-                        tipoPeriodo: tipoPeriodo
+                        tipoPeriodo: tipoPeriodo,
+                        diasNaturalesEnPeriodo: diasNaturalesEnPeriodo
                     };
 
                     console.log(`Calculando salario para ${empleado.nombre}...`);

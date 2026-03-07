@@ -8,7 +8,7 @@ class EmailServiceSimple {
      * Envía un comprobante por email usando EmailJS de forma simplificada
      * OPTIMIZADO PARA HOTMAIL/OUTLOOK
      */
-    async enviarComprobante(empleado, calculos, planilla, pdf) {
+    async enviarComprobante(empleado, calculos, planilla, pdf, asistencias = []) {
         try {
             // Verificar configuración
             if (!this.verificarConfiguracion()) {
@@ -22,8 +22,8 @@ class EmailServiceSimple {
             // Descargar PDF localmente
             this.descargarPDF(pdfBlob, fileName);
 
-            // Preparar datos optimizados para el email
-            const templateParams = this.prepararDatosEmail(empleado, calculos, planilla);
+            // Preparar datos optimizados para el email (con registro de horas para observaciones correctas)
+            const templateParams = this.prepararDatosEmail(empleado, calculos, planilla, asistencias);
 
             // Generar HTML del comprobante (optimizado para Hotmail)
             const comprobanteHTML = this.generarHTMLComprobante(templateParams);
@@ -333,9 +333,54 @@ class EmailServiceSimple {
     }
 
     /**
+     * Obtiene el texto de observaciones a partir del registro de horas (asistencias)
+     * para que el comprobante por correo coincida con el PDF y la información registrada.
+     */
+    obtenerObservacionesDesdeAsistencias(asistencias, calculos) {
+        const safeString = (value) => {
+            if (value === null || value === undefined) return '';
+            return String(value).trim();
+        };
+        const observacionesArray = [];
+        if (asistencias && asistencias.length > 0) {
+            let diasIncapacidadCCSS = 0;
+            let horasIncapacidadCCSS = 0;
+            asistencias.forEach(a => {
+                if (a.tipoDia === CONFIG.TIPOS_DIA.INCAPACIDAD_CCSS) {
+                    diasIncapacidadCCSS++;
+                    horasIncapacidadCCSS += a.horasTrabajadas || 0;
+                }
+            });
+            if (diasIncapacidadCCSS > 0) {
+                observacionesArray.push(`Incapacidad CCSS: ${diasIncapacidadCCSS} día${diasIncapacidadCCSS > 1 ? 's' : ''} (${horasIncapacidadCCSS.toFixed(2)} horas)`);
+            }
+            const otrasObservaciones = asistencias
+                .filter(a => a.observaciones && a.observaciones.trim() !== '' && !a.observaciones.includes('Registro quincenal'))
+                .map(a => {
+                    let fecha = '';
+                    if (a.fecha && typeof a.fecha === 'string' && /^\d{8}$/.test(a.fecha)) {
+                        const ano = parseInt(a.fecha.substring(0, 4));
+                        const mes = parseInt(a.fecha.substring(4, 6)) - 1;
+                        const dia = parseInt(a.fecha.substring(6, 8));
+                        const fechaObj = new Date(ano, mes, dia);
+                        if (!isNaN(fechaObj.getTime())) {
+                            fecha = fechaObj.toLocaleDateString('es-CR');
+                        }
+                    }
+                    return fecha ? `${fecha}: ${a.observaciones}` : a.observaciones;
+                });
+            observacionesArray.push(...otrasObservaciones);
+        }
+        if (observacionesArray.length > 0) {
+            return observacionesArray.join('\n');
+        }
+        return safeString(calculos?.observaciones || 'Sin observaciones especiales');
+    }
+
+    /**
      * Prepara los datos del email optimizados
      */
-    prepararDatosEmail(empleado, calculos, planilla) {
+    prepararDatosEmail(empleado, calculos, planilla, asistencias = []) {
         const safeNumber = (value) => {
             const num = parseFloat(value || 0);
             return isNaN(num) ? 0 : num;
@@ -467,8 +512,8 @@ class EmailServiceSimple {
             // Bonificaciones
             bonificaciones: this.formatearMoneda(safeNumber(calculos.bonificaciones)),
             
-            // Observaciones
-            observaciones: safeString(calculos.observaciones || 'Sin observaciones especiales'),
+            // Observaciones (priorizar datos del registro de horas para coincidir con el comprobante PDF)
+            observaciones: this.obtenerObservacionesDesdeAsistencias(asistencias, calculos),
             
             // Enlace de descarga - mensaje informativo
             download_link: 'El comprobante se ha descargado automáticamente en su dispositivo. Si no se descargó, revise su carpeta de descargas.',
