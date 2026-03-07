@@ -139,10 +139,11 @@ const AsistenciasModule = {
             `;
         }
 
-        // Calcular fechas de la quincena
+        // Calcular fechas de la quincena (segunda: 16 al último día del mes; febrero 16-28 o 16-29)
         const [ano, mes] = mesAno.split('-').map(Number);
+        const ultimoDiaMes = new Date(ano, mes, 0).getDate();
         const fechaInicio = quincena === 'primera' ? new Date(ano, mes - 1, 1) : new Date(ano, mes - 1, 16);
-        const fechaFin = quincena === 'primera' ? new Date(ano, mes - 1, 15) : new Date(ano, mes - 1, 30);
+        const fechaFin = quincena === 'primera' ? new Date(ano, mes - 1, 15) : new Date(ano, mes - 1, ultimoDiaMes);
 
         return `
             <div class="card">
@@ -213,10 +214,11 @@ const AsistenciasModule = {
             return;
         }
 
-        // Calcular fechas de la quincena
+        // Calcular fechas de la quincena (segunda: 16 al último día del mes; febrero 16-28 o 16-29)
         const [ano, mes] = mesAno.split('-').map(Number);
+        const ultimoDiaMes = new Date(ano, mes, 0).getDate();
         const fechaInicio = quincena === 'primera' ? new Date(ano, mes - 1, 1) : new Date(ano, mes - 1, 16);
-        const fechaFin = quincena === 'primera' ? new Date(ano, mes - 1, 15) : new Date(ano, mes - 1, 30);
+        const fechaFin = quincena === 'primera' ? new Date(ano, mes - 1, 15) : new Date(ano, mes - 1, ultimoDiaMes);
 
         const jornada = CONFIG.getJornadaByCodigo(this.empleadoSeleccionado.jornada);
 
@@ -451,21 +453,17 @@ const AsistenciasModule = {
                 return;
             }
 
-            // Validar que no exceda días disponibles
-            const diasEnQuincena = 15;
+            // Días reales del período (febrero 2ª quincena = 13 o 14; resto 15 o 16)
+            const diasEnQuincena = Math.round((fechaFin.getTime() - fechaInicio.getTime()) / (24 * 60 * 60 * 1000)) + 1;
             const diasEspeciales = diasCCSS + diasINS + diasPermiso + diasFeriados;
             if (diasEspeciales > diasEnQuincena) {
-                Utils.showToast(`Los días especiales (${diasEspeciales}) no pueden exceder los días de la quincena (${diasEnQuincena})`, 'warning');
+                Utils.showToast(`Los días especiales (${diasEspeciales}) no pueden exceder los días del período (${diasEnQuincena})`, 'warning');
                 return;
             }
 
             Utils.showLoading('Guardando horas quincenales...');
 
-            // Calcular horas para días normales
-            // Las incapacidades CCSS e INS no cuentan como horas trabajadas (pero se usan para cálculo del 50%)
-            // Los permisos sin goce no cuentan como horas trabajadas
-            // Los feriados trabajados SÍ cuentan como horas trabajadas (con pago doble)
-            // Usar las horas en feriado especificadas, o calcular automáticamente si no se especificaron
+            // Calcular horas para días normales (repartir sobre los días reales del período para que la suma coincida)
             const horasParaFeriados = horasFeriados > 0 ? horasFeriados : (diasFeriados * (jornada.horasPorDia || 7));
             const horasParaDiasNormales = horasTrabajadas - horasParaFeriados;
             const diasNormales = diasEnQuincena - diasCCSS - diasINS - diasPermiso - diasFeriados;

@@ -458,21 +458,28 @@ const Calculations = {
             horasLaboradas = tipoPeriodo === 'mensual' ? jornada.horasPorMes : horasEsperadasQuincenales;
         }
         
+        // En febrero 2ª quincena solo se guardan 13 días; las horas se repartieron en 15, así que la suma guardada = 13/15 del total.
+        // Escalar horasLaboradas a equivalente de 15 días para que el rebajo por ausencias sea correcto.
+        let horasLaboradasParaRebajo = horasLaboradas;
+        if (tipoPeriodo === 'quincenal' && diasNaturalesEnPeriodo != null && diasNaturalesEnPeriodo > 0 && diasNaturalesEnPeriodo < 15) {
+            horasLaboradasParaRebajo = horasLaboradas * (15 / diasNaturalesEnPeriodo);
+        }
+        
         // PASO 3: Calcular horas faltantes (diferencia entre esperadas y trabajadas)
-        // Si hay diasNaturalesEnPeriodo (febrero o segunda quincena corta), solo esperamos las horas de esos días;
-        // así no se rebajan "días restantes" que no existen en el mes (se pagan completos).
+        // Período corto (febrero): se paga como 15 días pero solo se rebaja por lo realmente no trabajado (escalado a 15 días).
         let horasEsperadasParaRebajo = tipoPeriodo === 'mensual' ? jornada.horasPorMes : horasEsperadasQuincenales;
         if (diasNaturalesEnPeriodo != null && diasNaturalesEnPeriodo > 0) {
             if (tipoPeriodo === 'mensual') {
                 horasEsperadasParaRebajo = (diasNaturalesEnPeriodo / 30) * jornada.horasPorMes;
             } else {
-                horasEsperadasParaRebajo = diasNaturalesEnPeriodo * jornada.horasPorDia;
+                // Quincenal corta: esperamos 15 días completos para el rebajo (equivalente al total ingresado)
+                horasEsperadasParaRebajo = horasEsperadasQuincenales; // 15 días
             }
         }
         const horasEsperadasMenosIncapacidad = horasEsperadasParaRebajo - horasIncapacidadCCSSTotal - horasIncapacidadINSTotal;
         let horasAusencia = 0;
-        if (horasLaboradas < horasEsperadasMenosIncapacidad) {
-            horasAusencia = horasEsperadasMenosIncapacidad - horasLaboradas;
+        if (horasLaboradasParaRebajo < horasEsperadasMenosIncapacidad) {
+            horasAusencia = horasEsperadasMenosIncapacidad - horasLaboradasParaRebajo;
         }
         // Sumar las horas de incapacidad CCSS e INS a las horas de ausencia para que se resten del salario
         horasAusencia += horasIncapacidadCCSSTotal + horasIncapacidadINSTotal;

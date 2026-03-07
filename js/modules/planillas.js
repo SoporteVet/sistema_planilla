@@ -193,7 +193,7 @@ const PlanillasModule = {
                             <strong>Nota:</strong> Las fechas se calculan automáticamente:
                             <ul class="list-disc list-inside mt-1 space-y-1">
                                 <li><strong>Primera quincena:</strong> Del día 1 al 15 del mes seleccionado</li>
-                                <li><strong>Segunda quincena:</strong> Del día 16 al último día del mes (en febrero, 16 al 28 o 29). El pago se calcula como 15 días completos.</li>
+                                <li><strong>Segunda quincena:</strong> Del día 16 al último día del mes. En febrero el período es del 16 al 28 (o 29); internamente se utiliza como 16 al 30 (15 días) para cálculos y pagos.</li>
                             </ul>
                         </div>
                         <div class="bg-blue-50 border border-blue-200 rounded p-4 text-sm text-blue-800">
@@ -246,8 +246,8 @@ const PlanillasModule = {
                     fechaInicio.value = `${ano}-${String(mes).padStart(2, '0')}-01`;
                     fechaFin.value = `${ano}-${String(mes).padStart(2, '0')}-15`;
                 } else if (quincena.value === 'segunda') {
-                    // Segunda quincena: 16 al último día del mes (para febrero 28/29, resto 30 o 31)
-                    // Febrero se trata como si tuviera 30 días para pago, pero las fechas del período son reales
+                    // Segunda quincena: período real 16 al último día del mes (febrero 16-28/29)
+                    // Internamente se trata como 16 al 30 (15 días) para pagos y horas extra
                     fechaInicio.value = `${ano}-${String(mes).padStart(2, '0')}-16`;
                     const ultimoDiaSegunda = new Date(ano, mesIndex + 1, 0).getDate();
                     fechaFin.value = `${ano}-${String(mes).padStart(2, '0')}-${String(ultimoDiaSegunda).padStart(2, '0')}`;
@@ -336,13 +336,12 @@ const PlanillasModule = {
             const fechaInicio = new Date(anoInicio, mesInicio - 1, diaInicio);
             const fechaFin = new Date(anoFin, mesFin - 1, diaFin);
 
-            // Días naturales del período (para febrero y meses cortos: no rebajar "días restantes")
-            // En febrero se paga como 30 días / 15 días quincena; solo se rebaja por días realmente no trabajados en el período
+            // Días naturales del período. Período mostrado: 16 al 28 en febrero; internamente se usa como 16 al 30 (15 días)
             const ultimoDiaMes = new Date(anoInicio, mesInicio, 0).getDate();
             let diasNaturalesEnPeriodo = null;
             if (tipoPeriodo === 'quincenal') {
                 if (diaInicio >= 16) {
-                    // Segunda quincena: del 16 al último día del mes (ej. febrero 16-28 = 13 días)
+                    // Segunda quincena: período real 16-ultimoDia (febrero 16-28); internamente 15 días para pago y rebajos
                     diasNaturalesEnPeriodo = ultimoDiaMes - 15;
                 }
                 // Primera quincena siempre 15 días, no hace falta pasar
