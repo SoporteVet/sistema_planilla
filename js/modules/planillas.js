@@ -247,9 +247,11 @@ const PlanillasModule = {
                     fechaFin.value = `${ano}-${String(mes).padStart(2, '0')}-15`;
                 } else if (quincena.value === 'segunda') {
                     // Segunda quincena: 16-30 (15 días)
-                    // Siempre termina el día 30, independientemente de si el mes tiene 31 días
+                    // Para meses con menos de 30 días (ej. febrero), usar el último día real del mes
+                    const ultimoDiaMes = new Date(ano, mesIndex + 1, 0).getDate();
+                    const diaFin = Math.min(30, ultimoDiaMes);
                     fechaInicio.value = `${ano}-${String(mes).padStart(2, '0')}-16`;
-                    fechaFin.value = `${ano}-${String(mes).padStart(2, '0')}-30`;
+                    fechaFin.value = `${ano}-${String(mes).padStart(2, '0')}-${String(diaFin).padStart(2, '0')}`;
                 }
             } else {
                 // Mensual: del 1 al último día del mes
