@@ -378,6 +378,45 @@ const Formatters = {
     },
 
     /**
+     * Parsea una hora en formato 24h (HH:mm o HH:mm:ss) o 12h con AM/PM.
+     * Acepta: "08:30", "08:30:00", "8:30 AM", "2:30 PM", "14:30".
+     * @param {string} texto - Cadena con la hora
+     * @returns {{ horas: number, minutos: number, minutosDesdeMedianoche: number }|null} Objeto con horas (0-23), minutos (0-59) y minutos desde medianoche, o null si no se pudo parsear
+     */
+    parsearHoraReloj(texto) {
+        if (!texto || typeof texto !== 'string') return null;
+        const t = texto.trim();
+        if (!t) return null;
+
+        // Formato 24h: HH:mm o HH:mm:ss
+        const match24 = t.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*$/);
+        if (match24) {
+            let h = parseInt(match24[1], 10);
+            const m = parseInt(match24[2], 10);
+            if (h >= 0 && h <= 23 && m >= 0 && m <= 59) {
+                return { horas: h, minutos: m, minutosDesdeMedianoche: h * 60 + m };
+            }
+        }
+
+        // Formato 12h con AM/PM (ej: "8:30 AM", "2:00 PM", "12:30 PM", "12:00 AM")
+        const match12 = t.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM|am|pm|a\.m\.|p\.m\.|A\.M\.|P\.M\.)\s*$/);
+        if (match12) {
+            let h = parseInt(match12[1], 10);
+            const m = parseInt(match12[2], 10);
+            const ampm = match12[4].toUpperCase().replace(/\./g, '');
+            if (h < 1 || h > 12 || m < 0 || m > 59) return null;
+            if (ampm === 'AM') {
+                if (h === 12) h = 0;
+            } else {
+                if (h !== 12) h += 12;
+            }
+            return { horas: h, minutos: m, minutosDesdeMedianoche: h * 60 + m };
+        }
+
+        return null;
+    },
+
+    /**
      * Formatea hora en formato HH:mm
      * @param {Date|string|number} fecha - Fecha/hora a formatear
      * @returns {string} Hora en formato HH:mm

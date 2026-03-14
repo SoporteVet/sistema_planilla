@@ -3,6 +3,10 @@
  * Gestión completa de empleados (CRUD)
  */
 
+// Días de la semana para horario por día (getDay: 0=domingo, 1=lunes, ..., 6=sábado)
+const DIAS_SEMANA_KEYS = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
+const DIAS_SEMANA_LABELS = { domingo: 'Domingo', lunes: 'Lunes', martes: 'Martes', miercoles: 'Miércoles', jueves: 'Jueves', viernes: 'Viernes', sabado: 'Sábado' };
+
 const EmpleadosModule = {
     empleados: [],
     empleadosFiltrados: [],
@@ -596,6 +600,33 @@ const EmpleadosModule = {
                                         Opcional para empleados de Servicios Profesionales.
                                     </div>
                                 </div>
+
+                                <!-- Horario por día para análisis de tardías (solo empleados en planilla) -->
+                                <div class="form-group md:col-span-2" id="groupHorarioPorDia">
+                                    <label class="form-label block mb-2">Horario por día (análisis de tardías)</label>
+                                    <p class="text-xs text-gray-500 mb-2">Solo empleados en planilla. Defina entrada y salida por cada día; puede variar según el día. <strong>Dejar un día en blanco = día libre</strong> (no se exige hora de entrada ni se cuenta tardía ese día). Si no define ningún día, se usará la jornada o el valor por defecto al importar el Excel.</p>
+                                    <div class="border border-gray-200 rounded-lg overflow-hidden">
+                                        <table class="w-full text-sm">
+                                            <thead class="bg-gray-50">
+                                                <tr>
+                                                    <th class="px-3 py-2 text-left font-medium text-gray-700">Día</th>
+                                                    <th class="px-3 py-2 text-left font-medium text-gray-700">Entrada</th>
+                                                    <th class="px-3 py-2 text-left font-medium text-gray-700">Salida</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody class="divide-y divide-gray-200">
+                                                ${DIAS_SEMANA_KEYS.map(dia => {
+                                                    const h = empleado?.horarioPorDia?.[dia];
+                                                    return `<tr>
+                                                        <td class="px-3 py-2 text-gray-700">${DIAS_SEMANA_LABELS[dia]}</td>
+                                                        <td class="px-3 py-2"><input type="time" id="horario_${dia}_entrada" class="form-control w-28" value="${h?.entrada || ''}" placeholder="08:00"></td>
+                                                        <td class="px-3 py-2"><input type="time" id="horario_${dia}_salida" class="form-control w-28" value="${h?.salida || ''}" placeholder="17:00"></td>
+                                                    </tr>`;
+                                                }).join('')}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
@@ -612,6 +643,18 @@ const EmpleadosModule = {
                                         ).join('')}
                                     </select>
                                     <div class="form-help">Información bancaria para depósito de salarios</div>
+                                </div>
+
+                                <!-- ID Reloj Marcador -->
+                                <div class="form-group">
+                                    <label class="form-label">ID en el Reloj Marcador</label>
+                                    <input type="text" id="idUsuarioReloj" class="form-control"
+                                        value="${empleado?.idUsuarioReloj || ''}"
+                                        placeholder="Ej: 12, EMP001, ...">
+                                    <div class="form-help">
+                                        Número o código que identifica a este empleado en el reloj marcador.
+                                        Se usa para encontrarlo al importar el Excel de tardías.
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -681,8 +724,10 @@ const EmpleadosModule = {
 
         const toggleCamposSP = () => {
             const esSP = tipoEmpleadoSelect.value === 'SP';
+            const groupHorarioPorDia = document.getElementById('groupHorarioPorDia');
 
             if (esSP) {
+                groupHorarioPorDia?.classList.add('hidden');
                 // Remover required de campos no obligatorios para SP
                 fechaIngresoInput?.removeAttribute('required');
                 fechaIngresoHelp?.classList.remove('hidden');
@@ -720,6 +765,7 @@ const EmpleadosModule = {
                 document.getElementById('helpSalarioHorarioNormal')?.classList.add('hidden');
                 salarioHoraHelp?.classList.remove('hidden');
             } else {
+                groupHorarioPorDia?.classList.remove('hidden');
                 // Restaurar required para empleados normales
                 fechaIngresoInput?.setAttribute('required', 'required');
                 fechaIngresoHelp?.classList.add('hidden');
@@ -879,6 +925,17 @@ const EmpleadosModule = {
             const empresaValue = document.getElementById('empresa').value;
             const estadoValue = document.getElementById('estado').value;
 
+            let horarioPorDia = null;
+            if (tipoEmpleado === 'planilla') {
+                horarioPorDia = {};
+                DIAS_SEMANA_KEYS.forEach(dia => {
+                    const entrada = document.getElementById('horario_' + dia + '_entrada')?.value?.trim() || '';
+                    const salida = document.getElementById('horario_' + dia + '_salida')?.value?.trim() || '';
+                    if (entrada || salida) horarioPorDia[dia] = { entrada: entrada || null, salida: salida || null };
+                });
+                if (Object.keys(horarioPorDia).length === 0) horarioPorDia = null;
+            }
+
             const datosEmpleado = {
                 nombre: document.getElementById('nombre').value.trim(),
                 cedula: tipoEmpleado === 'SP' ? (cedulaValue || '') : cedulaValue,
@@ -887,7 +944,7 @@ const EmpleadosModule = {
                 fechaIngreso: fechaIngreso,
                 fechaNacimiento: fechaNacimiento,
                 salarioMensual: tipoEmpleado === 'SP' ? (salarioMensual || 0) : salarioMensual,
-                salarioHorario: salarioHorarioInput || null, // Guardar como referencia
+                salarioHorario: salarioHorarioInput || null,
                 jornada: jornadaCodigo || null,
                 cargo: document.getElementById('cargo').value.trim(),
                 departamento: document.getElementById('departamento').value.trim(),
@@ -896,7 +953,9 @@ const EmpleadosModule = {
                 estado: tipoEmpleado === 'SP' ? (estadoValue || 'activo') : estadoValue,
                 tipoEmpleado,
                 hijos: parseInt(document.getElementById('hijos').value) || 0,
-                estadoCivil: document.getElementById('estadoCivil').value
+                estadoCivil: document.getElementById('estadoCivil').value,
+                horarioPorDia: horarioPorDia,
+                idUsuarioReloj: document.getElementById('idUsuarioReloj')?.value?.trim() || null
             };
 
             // Validar
@@ -1008,6 +1067,7 @@ const EmpleadosModule = {
                                 <div><span class="font-medium">Ingreso:</span> ${Formatters.formatearFechaLarga(empleado.fechaIngreso)}</div>
                                 <div><span class="font-medium">Nacimiento:</span> ${empleado.fechaNacimiento ? Formatters.formatearFechaLarga(empleado.fechaNacimiento) : 'No registrada'}</div>
                                 <div><span class="font-medium">Estado:</span> ${Formatters.formatearEstadoBadge(empleado.estado)}</div>
+                                ${empleado.idUsuarioReloj ? `<div><span class="font-medium">ID Reloj Marcador:</span> <span class="font-mono bg-gray-100 px-2 py-0.5 rounded text-sm">${empleado.idUsuarioReloj}</span></div>` : ''}
                             </div>
                         </div>
 
@@ -1020,6 +1080,21 @@ const EmpleadosModule = {
                                 <div><span class="font-medium">Empresa:</span> ${empleado.empresa || 'No especificada'}</div>
                                 <div><span class="font-medium">Jornada:</span> ${jornada.nombre}</div>
                                 <div><span class="font-medium">Horas/Mes:</span> ${jornada.horasPorMes} horas</div>
+                                ${empleado.horarioPorDia && Object.keys(empleado.horarioPorDia).length > 0 ? `
+                                <div class="col-span-2">
+                                    <span class="font-medium block mb-2">Horario por día (tardías):</span>
+                                    <table class="w-full text-sm border border-gray-200 rounded overflow-hidden">
+                                        <thead class="bg-gray-50"><tr><th class="px-2 py-1 text-left">Día</th><th class="px-2 py-1 text-left">Entrada</th><th class="px-2 py-1 text-left">Salida</th></tr></thead>
+                                        <tbody class="divide-y divide-gray-200">
+                                            ${DIAS_SEMANA_KEYS.map(dia => {
+                                                const h = empleado.horarioPorDia[dia];
+                                                if (!h) return null;
+                                                return `<tr><td class="px-2 py-1">${DIAS_SEMANA_LABELS[dia]}</td><td class="px-2 py-1">${h.entrada || '-'}</td><td class="px-2 py-1">${h.salida || '-'}</td></tr>`;
+                                            }).filter(Boolean).join('')}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                ` : ''}
                             </div>
                         </div>
 
