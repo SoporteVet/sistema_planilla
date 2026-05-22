@@ -834,6 +834,39 @@ const FirebaseHelpers = {
     // ==================== CONTROL DE ASISTENCIA ====================
 
     /**
+     * Indica si hay al menos una entrada sin salida en los registros del día
+     * @param {Array} registros - Registros de entrada/salida
+     * @returns {boolean}
+     */
+    tieneEntradaPendiente(registros) {
+        const entradas = registros.filter(r => r.tipo === 'entrada').length;
+        const salidas = registros.filter(r => r.tipo === 'salida').length;
+        return entradas > salidas;
+    },
+
+    /**
+     * Busca una entrada pendiente (sin salida) en el día actual o el anterior.
+     * Cubre el caso de entrada antes de medianoche y salida después de medianoche.
+     * @param {string} empleadoId - ID del empleado
+     * @returns {Promise<{fecha: string, registros: Array}|null>}
+     */
+    async buscarEntradaPendiente(empleadoId) {
+        const hoy = new Date();
+        const ayer = new Date(hoy);
+        ayer.setDate(ayer.getDate() - 1);
+
+        for (const fechaRef of [hoy, ayer]) {
+            const fecha = Formatters.formatearFechaKey(fechaRef);
+            const registros = await this.obtenerRegistrosAsistenciaDia(empleadoId, fecha);
+            if (this.tieneEntradaPendiente(registros)) {
+                return { fecha, registros };
+            }
+        }
+
+        return null;
+    },
+
+    /**
      * Registra entrada o salida de un empleado
      * @param {string} empleadoId - ID del empleado
      * @param {string} tipo - 'entrada' o 'salida'
@@ -841,34 +874,44 @@ const FirebaseHelpers = {
      */
     async registrarControlAsistencia(empleadoId, tipo) {
         const ahora = new Date();
-        const fecha = Formatters.formatearFechaKey(ahora); // YYYYMMDD
+        const fechaHoy = Formatters.formatearFechaKey(ahora); // YYYYMMDD
         const hora = Formatters.formatearHora(ahora); // HH:mm
         const timestamp = ahora.getTime();
 
-        console.log('Registrando asistencia:', { empleadoId, tipo, fecha, hora });
+        console.log('Registrando asistencia:', { empleadoId, tipo, fecha: fechaHoy, hora });
 
         // Obtener registros del día - FORZAR LECTURA DIRECTA DE FIREBASE
-        const registrosDelDia = await this.obtenerRegistrosAsistenciaDia(empleadoId, fecha);
+        let fechaRegistro = fechaHoy;
+        let registrosDelDia = await this.obtenerRegistrosAsistenciaDia(empleadoId, fechaHoy);
         
         console.log('Registros del día obtenidos:', registrosDelDia);
 
         // Validaciones
         if (tipo === 'entrada') {
-            // Verificar si ya hay una entrada sin salida
-            const entradas = registrosDelDia.filter(r => r.tipo === 'entrada');
-            const salidas = registrosDelDia.filter(r => r.tipo === 'salida');
-
-            console.log('Validación entrada - Entradas:', entradas.length, 'Salidas:', salidas.length);
-
-            if (entradas.length > salidas.length) {
+            const pendiente = await this.buscarEntradaPendiente(empleadoId);
+            if (pendiente) {
                 throw new Error('Ya existe una entrada sin salida registrada');
             }
         } else if (tipo === 'salida') {
-            // Verificar si hay una entrada sin salida
+            // Si no hay entrada pendiente hoy, buscar en el día anterior
+            // (entrada antes de medianoche, salida después de medianoche)
+            if (!this.tieneEntradaPendiente(registrosDelDia)) {
+                const ayer = new Date(ahora);
+                ayer.setDate(ayer.getDate() - 1);
+                const fechaAyer = Formatters.formatearFechaKey(ayer);
+                const registrosAyer = await this.obtenerRegistrosAsistenciaDia(empleadoId, fechaAyer);
+
+                if (this.tieneEntradaPendiente(registrosAyer)) {
+                    fechaRegistro = fechaAyer;
+                    registrosDelDia = registrosAyer;
+                    console.log('Salida vinculada a entrada del día anterior:', fechaAyer);
+                }
+            }
+
             const entradas = registrosDelDia.filter(r => r.tipo === 'entrada');
             const salidas = registrosDelDia.filter(r => r.tipo === 'salida');
 
-            console.log('Validación salida - Entradas:', entradas.length, 'Salidas:', salidas.length);
+            console.log('Validación salida - Entradas:', entradas.length, 'Salidas:', salidas.length, 'Fecha registro:', fechaRegistro);
 
             if (entradas.length === 0) {
                 throw new Error('No hay una entrada registrada para marcar salida');
@@ -881,7 +924,7 @@ const FirebaseHelpers = {
 
         const nuevoRegistro = {
             empleadoId,
-            fecha,
+            fecha: fechaRegistro,
             tipo,
             hora,
             timestamp,
@@ -892,7 +935,7 @@ const FirebaseHelpers = {
         console.log('Guardando nuevo registro:', nuevoRegistro);
 
         // Guardar en Firebase y esperar confirmación
-        const path = `${CONFIG.DB_PATHS.CONTROL_ASISTENCIA}/${empleadoId}/${fecha}`;
+        const path = `${CONFIG.DB_PATHS.CONTROL_ASISTENCIA}/${empleadoId}/${fechaRegistro}`;
         const registroId = await this.push(path, nuevoRegistro);
 
         console.log('Registro guardado exitosamente con ID:', registroId);
