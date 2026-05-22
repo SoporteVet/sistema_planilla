@@ -6,6 +6,7 @@
 const ControlAsistenciaModule = {
     empleadosSP: [],
     registrosHoy: [],
+    entradaPendienteAyer: false,
     empleadoSeleccionado: null,
 
     /**
@@ -32,6 +33,7 @@ const ControlAsistenciaModule = {
     async cargarRegistrosHoy() {
         if (!this.empleadoSeleccionado) {
             this.registrosHoy = [];
+            this.entradaPendienteAyer = false;
             return;
         }
 
@@ -40,6 +42,21 @@ const ControlAsistenciaModule = {
             this.empleadoSeleccionado,
             fecha
         );
+
+        // Detectar entrada pendiente del día anterior (antes de medianoche)
+        this.entradaPendienteAyer = false;
+        const entradasHoy = this.registrosHoy.filter(r => r.tipo === 'entrada').length;
+        const salidasHoy = this.registrosHoy.filter(r => r.tipo === 'salida').length;
+
+        if (entradasHoy <= salidasHoy) {
+            const ayer = new Date();
+            ayer.setDate(ayer.getDate() - 1);
+            const registrosAyer = await FirebaseHelpers.obtenerRegistrosAsistenciaDia(
+                this.empleadoSeleccionado,
+                Formatters.formatearFechaKey(ayer)
+            );
+            this.entradaPendienteAyer = FirebaseHelpers.tieneEntradaPendiente(registrosAyer);
+        }
     },
 
     /**
@@ -187,6 +204,7 @@ const ControlAsistenciaModule = {
     resetearSeleccion() {
         this.empleadoSeleccionado = null;
         this.registrosHoy = [];
+        this.entradaPendienteAyer = false;
         
         const empleadoSelect = document.getElementById('empleadoSelect');
         if (empleadoSelect) {
@@ -212,14 +230,17 @@ const ControlAsistenciaModule = {
         // Determinar estado actual
         const entradas = this.registrosHoy.filter(r => r.tipo === 'entrada');
         const salidas = this.registrosHoy.filter(r => r.tipo === 'salida');
+        const hayPendienteHoy = entradas.length > salidas.length;
+        const hayEntradaPendiente = hayPendienteHoy || this.entradaPendienteAyer;
         
         const estadoTextoEl = document.getElementById('estadoTexto');
         const btnEntrada = document.getElementById('btnEntrada');
         const btnSalida = document.getElementById('btnSalida');
 
-        if (entradas.length > salidas.length) {
-            // Hay una entrada sin salida
-            estadoTextoEl.textContent = 'En el edificio';
+        if (hayEntradaPendiente) {
+            estadoTextoEl.textContent = this.entradaPendienteAyer && !hayPendienteHoy
+                ? 'En el edificio (entrada de ayer)'
+                : 'En el edificio';
             estadoTextoEl.className = 'text-lg font-semibold text-green-600';
             btnEntrada.disabled = true;
             btnSalida.disabled = false;
