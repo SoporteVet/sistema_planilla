@@ -278,6 +278,18 @@ const Formatters = {
     },
 
     /**
+     * Redondea horas a 2 decimales (evita errores de punto flotante)
+     * @param {number} horas
+     * @param {number} decimales
+     * @returns {number}
+     */
+    redondearHoras(horas, decimales = 2) {
+        if (horas === null || horas === undefined || isNaN(horas)) return 0;
+        const factor = Math.pow(10, decimales);
+        return Math.round(Number(horas) * factor) / factor;
+    },
+
+    /**
      * Formatea horas con singular/plural
      * @param {number} horas - Cantidad de horas
      * @returns {string} Horas formateadas
@@ -287,7 +299,7 @@ const Formatters = {
             return '0 horas';
         }
 
-        const horasRedondeadas = Math.round(horas * 100) / 100;
+        const horasRedondeadas = this.redondearHoras(horas);
         return `${horasRedondeadas} ${horasRedondeadas === 1 ? 'hora' : 'horas'}`;
     },
 

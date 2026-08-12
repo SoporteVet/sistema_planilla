@@ -1,0 +1,12 @@
+{
+  "name": "planify-ai-proxy",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Proxy gratuito hacia OpenRouter — alternativa sin plan Blaze de Firebase",
+  "scripts": {
+    "dev": "vercel dev"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.7.0"
+  }
+}

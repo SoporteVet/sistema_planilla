@@ -147,6 +147,7 @@ const AppRouter = {
             'liquidaciones': 'liquidaciones',
             'feriados': 'feriados',
             'reportes': 'reportes',
+            'asistente-ia': 'reportes',
             'cumpleanos': 'cumpleanos',
             'usuarios': 'usuarios',
             'autorizacion-email': '*' // Todos pueden acceder
@@ -212,6 +213,9 @@ const AppRouter = {
                 break;
             case 'reportes':
                 ReportesModule.render();
+                break;
+            case 'asistente-ia':
+                await AsistenteIAModule.render();
                 break;
             case 'usuarios':
                 UsuariosModule.init();

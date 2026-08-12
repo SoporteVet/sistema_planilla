@@ -332,6 +332,7 @@ const Auth = {
             'aguinaldos': 'aguinaldos',
             'feriados': 'feriados',
             'reportes': 'reportes',
+            'asistente-ia': 'reportes',
             'cumpleanos': 'cumpleanos',
             'usuarios': 'usuarios',
             'autorizacion-email': '*' // Todos pueden acceder

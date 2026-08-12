@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+functions/node_modules/
+proxy/node_modules/
+
+# Secrets and local env
+.env
+.env.*
+!.env.example
+proxy/.env
+proxy/.env.local
+proxy/service-account.json
+
+# Firebase / Vercel
+.firebase/
+firebase-debug.log
+firebase-debug.*.log
+proxy/.vercel/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.log
+.cursor/
+
+# Local credentials (never commit)
+**/service-account.json
+
+.vercel

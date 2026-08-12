@@ -475,7 +475,6 @@ const PlanillasModule = {
                         }
 
                         // Calcular horas extra y adicionales (siempre se calculan)
-                        // Solo sumar horas extras si NO es un feriado (las de feriado ya se sumaron arriba)
                         if (asist.tipoDia !== CONFIG.TIPOS_DIA.FERIADO_TRABAJADO) {
                             horasExtra += asist.horasExtra || 0;
                         }
@@ -486,10 +485,14 @@ const PlanillasModule = {
                         }
                     });
 
+                    const horasExtraPeriodo = Calculations.obtenerHorasExtraDesdeAsistencias(asistencias);
+                    horasExtra = horasExtraPeriodo.horasExtra;
+                    horasExtraFeriado = Formatters.redondearHoras(horasExtraPeriodo.horasExtraFeriado);
+
                     // Si el período tiene menos días naturales que la quincena estándar (ej. febrero 16-28 = 13 días),
                     // el registro repartió el total en 15 días; al cargar solo 13 días la suma queda corta.
-                    // Escalar para recuperar el total que el usuario ingresó.
-                    if (tipoPeriodo === 'quincenal' && diasNaturalesEnPeriodo != null && diasNaturalesEnPeriodo > 0 && diasNaturalesEnPeriodo < 15) {
+                    // Escalar para recuperar el total que el usuario ingresó (solo registros distribuidos antiguos).
+                    if (!horasExtraPeriodo.usaManual && tipoPeriodo === 'quincenal' && diasNaturalesEnPeriodo != null && diasNaturalesEnPeriodo > 0 && diasNaturalesEnPeriodo < 15) {
                         const factor = 15 / diasNaturalesEnPeriodo;
                         horasExtra = Math.round(horasExtra * factor * 100) / 100;
                         horasAdicionales = Math.round(horasAdicionales * factor * 100) / 100;
@@ -747,7 +750,7 @@ const PlanillasModule = {
                                             </td>
                                             <td>${Formatters.formatearJornada(emp.jornada)}</td>
                                             <td>${emp.diasTrabajados}</td>
-                                            <td>${emp.horasExtra || 0}</td>
+                                            <td>${Formatters.redondearHoras(emp.horasExtra || 0)}</td>
                                             <td class="font-semibold text-green-600">${Formatters.formatearMoneda(emp.salarioBruto)}</td>
                                             <td class="text-red-600">${Formatters.formatearMoneda(emp.descuentoCCSS)}</td>
                                             <td class="text-red-600">
@@ -1582,8 +1585,12 @@ const PlanillasModule = {
                         horasAdicionales += horasAdicionalesDia;
                     });
 
+                    const horasExtraPeriodo = Calculations.obtenerHorasExtraDesdeAsistencias(asistencias);
+                    horasExtra = horasExtraPeriodo.horasExtra;
+                    horasExtraFeriado = Formatters.redondearHoras(horasExtraPeriodo.horasExtraFeriado);
+
                     // Escalar horas extra y adicionales cuando el período tiene menos de 15 días (ej. febrero 2ª quincena)
-                    if (tipoPeriodo === 'quincenal' && diasNaturalesEnPeriodo != null && diasNaturalesEnPeriodo > 0 && diasNaturalesEnPeriodo < 15) {
+                    if (!horasExtraPeriodo.usaManual && tipoPeriodo === 'quincenal' && diasNaturalesEnPeriodo != null && diasNaturalesEnPeriodo > 0 && diasNaturalesEnPeriodo < 15) {
                         const factor = 15 / diasNaturalesEnPeriodo;
                         horasExtra = Math.round(horasExtra * factor * 100) / 100;
                         horasAdicionales = Math.round(horasAdicionales * factor * 100) / 100;

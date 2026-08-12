@@ -244,9 +244,29 @@ const AsistenciasModule = {
         let horasFeriadosExistentes = 0;
         let horasExtraFeriadosExistentes = 0;
 
+        const manualExtra = asistenciasExistentes.find(a =>
+            a.horasExtraQuincenaManual !== undefined && a.horasExtraQuincenaManual !== null
+        );
+        const manualTrabajadas = asistenciasExistentes.find(a =>
+            a.horasTrabajadasQuincenaManual !== undefined && a.horasTrabajadasQuincenaManual !== null
+        );
+        if (manualExtra) {
+            horasExtraExistentes = Formatters.redondearHoras(manualExtra.horasExtraQuincenaManual || 0);
+            horasExtraFeriadosExistentes = Formatters.redondearHoras(manualExtra.horasExtraFeriadosQuincenaManual || 0);
+        }
+        if (manualTrabajadas) {
+            horasTrabajadasExistentes = Formatters.redondearHoras(manualTrabajadas.horasTrabajadasQuincenaManual);
+        }
+
         asistenciasExistentes.forEach(a => {
-            horasTrabajadasExistentes += a.horasTrabajadas || 0;
-            horasExtraExistentes += a.horasExtra || 0;
+            if (!manualTrabajadas) {
+                horasTrabajadasExistentes += a.horasTrabajadas || 0;
+            }
+            if (!manualExtra) {
+                if (a.tipoDia !== CONFIG.TIPOS_DIA.FERIADO_TRABAJADO) {
+                    horasExtraExistentes += a.horasExtra || 0;
+                }
+            }
             horasAdicionalesExistentes += a.horasAdicionales || 0;
             if (a.tipoDia === CONFIG.TIPOS_DIA.INCAPACIDAD_CCSS) {
                 diasCCSSExistentes += a.diasCCSSEmpresa || 1;
@@ -260,9 +280,18 @@ const AsistenciasModule = {
             if (a.tipoDia === CONFIG.TIPOS_DIA.FERIADO_TRABAJADO) {
                 diasFeriadosExistentes += 1;
                 horasFeriadosExistentes += a.horasTrabajadas || 0;
-                horasExtraFeriadosExistentes += a.horasExtra || 0;
+                if (!manualExtra) {
+                    horasExtraFeriadosExistentes += a.horasExtra || 0;
+                }
             }
         });
+
+        if (!manualTrabajadas) {
+            horasTrabajadasExistentes = Formatters.redondearHoras(horasTrabajadasExistentes);
+        }
+        if (!manualExtra) {
+            horasExtraExistentes = Formatters.redondearHoras(horasExtraExistentes);
+        }
 
         // Calcular días trabajados automáticamente
         // Si hay un valor manual existente, usarlo; si no, usar 15 días por defecto (total de días en una quincena)
@@ -434,9 +463,9 @@ const AsistenciasModule = {
      */
     async guardarHorasQuincenales(fechaInicio, fechaFin, jornada) {
         try {
-            const horasTrabajadas = parseFloat(document.getElementById('horasTrabajadasQuincena').value) || 0;
-            const horasExtra = parseFloat(document.getElementById('horasExtraQuincena').value) || 0;
-            const horasAdicionales = parseFloat(document.getElementById('horasAdicionalesQuincena').value) || 0;
+            const horasTrabajadas = Formatters.redondearHoras(parseFloat(document.getElementById('horasTrabajadasQuincena').value) || 0);
+            const horasExtra = Formatters.redondearHoras(parseFloat(document.getElementById('horasExtraQuincena').value) || 0);
+            const horasAdicionales = Formatters.redondearHoras(parseFloat(document.getElementById('horasAdicionalesQuincena').value) || 0);
             const diasCCSS = parseFloat(document.getElementById('diasCCSSQuincena').value) || 0;
             const horasCCSS = parseFloat(document.getElementById('horasCCSSQuincena').value) || 0;
             const diasINS = parseFloat(document.getElementById('diasINSQuincena').value) || 0;
@@ -444,7 +473,7 @@ const AsistenciasModule = {
             const diasPermiso = parseFloat(document.getElementById('diasPermisoQuincena').value) || 0;
             const diasFeriados = parseFloat(document.getElementById('diasFeriadosQuincena').value) || 0;
             const horasFeriados = parseFloat(document.getElementById('horasFeriadosQuincena').value) || 0;
-            const horasExtraFeriados = parseFloat(document.getElementById('horasExtraFeriadosQuincena').value) || 0;
+            const horasExtraFeriados = Formatters.redondearHoras(parseFloat(document.getElementById('horasExtraFeriadosQuincena').value) || 0);
             const diasTrabajadosManual = document.getElementById('diasTrabajadosQuincena').value ? parseFloat(document.getElementById('diasTrabajadosQuincena').value) : null;
             const observaciones = document.getElementById('observacionesQuincena').value || '';
 
@@ -469,12 +498,12 @@ const AsistenciasModule = {
             const diasNormales = diasEnQuincena - diasCCSS - diasINS - diasPermiso - diasFeriados;
             const horasPorDiaNormal = diasNormales > 0 ? horasParaDiasNormales / diasNormales : 0;
 
-            // Distribuir horas extra solo en días normales (excluyendo horas extra feriados)
-            const horasExtraNormales = horasExtra - horasExtraFeriados;
-            const horasExtraPorDia = (diasNormales > 0 && horasExtraNormales > 0) ? horasExtraNormales / diasNormales : 0;
-            
-            // Distribuir horas extra feriados entre los días feriados
-            const horasExtraFeriadosPorDia = (diasFeriados > 0 && horasExtraFeriados > 0) ? horasExtraFeriados / diasFeriados : 0;
+            const totalesQuincena = {
+                horasTrabajadasQuincenaManual: horasTrabajadas,
+                horasExtraQuincenaManual: horasExtra,
+                horasExtraFeriadosQuincenaManual: horasExtraFeriados,
+                horasAdicionalesQuincenaManual: horasAdicionales
+            };
 
             // Distribuir horas adicionales solo en días normales
             const horasAdicionalesPorDia = (diasNormales > 0 && horasAdicionales > 0) ? horasAdicionales / diasNormales : 0;
@@ -500,7 +529,6 @@ const AsistenciasModule = {
                 const fechaKey = Formatters.formatearFechaFirebase(fechaActual);
                 let tipoDia = CONFIG.TIPOS_DIA.NORMAL;
                 let horasDia = 0;
-                let horasExtraDia = 0;
                 let diasCCSSEmpresa = 0;
                 let diasINSEmpresa = 0;
 
@@ -528,20 +556,18 @@ const AsistenciasModule = {
                     // Usar las horas en feriado especificadas, distribuidas proporcionalmente
                     const horasFeriadosPorDia = (diasFeriados > 0 && horasParaFeriados > 0) ? horasParaFeriados / diasFeriados : (jornada.horasPorDia || 7);
                     horasDia = horasFeriadosPorDia; // Cuenta como horas trabajadas (con pago doble)
-                    horasExtraDia = horasExtraFeriadosPorDia; // Horas extra en feriado
                     contadorFeriados++;
                 } else {
                     // Día normal
                     tipoDia = CONFIG.TIPOS_DIA.NORMAL;
                     horasDia = horasPorDiaNormal;
-                    horasExtraDia = horasExtraPorDia;
                 }
 
                 asistenciasAGuardar.push({
                     fechaKey,
                     tipoDia,
                     horasTrabajadas: horasDia,
-                    horasExtra: horasExtraDia,
+                    horasExtra: 0,
                     horasAdicionales: tipoDia === CONFIG.TIPOS_DIA.NORMAL ? horasAdicionalesPorDia : 0,
                     diasCCSSEmpresa,
                     diasINSEmpresa,
@@ -585,10 +611,10 @@ const AsistenciasModule = {
                         diasINSEmpresa: asistencia.diasINSEmpresa,
                         observaciones: asistencia.observaciones,
                         jornadaEmpleado: this.empleadoSeleccionado.jornada,
-                        horasNormalesEsperadas: jornada.horasPorDia
+                        horasNormalesEsperadas: jornada.horasPorDia,
+                        ...totalesQuincena
                     };
 
-                    // Agregar días trabajados manual solo en la primera asistencia
                     if (i === 0 && diasTrabajadosManual !== null && diasTrabajadosManual !== undefined) {
                         datosAsistencia.diasTrabajadosManual = diasTrabajadosManual;
                     }

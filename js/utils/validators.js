@@ -298,9 +298,6 @@ const Validators = {
             if (!this.validarHoras(asistencia.horasExtra)) {
                 errores.horasExtra = 'Horas extra debe estar entre 0 y 24';
             }
-            if (asistencia.horasExtra > CONFIG.HORAS_EXTRA.MAX_DIARIAS) {
-                errores.horasExtra = `Máximo ${CONFIG.HORAS_EXTRA.MAX_DIARIAS} horas extra por día (informativo)`;
-            }
         }
         
         if (asistencia.diasCCSSEmpresa > CONFIG.CCSS.DIAS_EMPRESA_MAX) {

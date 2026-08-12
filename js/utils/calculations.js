@@ -684,6 +684,41 @@ const Calculations = {
     },
 
     /**
+     * Obtiene horas extra del período (totales quincenales manuales o suma diaria)
+     * @param {array} asistencias - Registros de asistencia del período
+     * @returns {{ horasExtra: number, horasExtraFeriado: number, usaManual: boolean }}
+     */
+    obtenerHorasExtraDesdeAsistencias(asistencias) {
+        const manual = asistencias.find(a =>
+            a.horasExtraQuincenaManual !== undefined && a.horasExtraQuincenaManual !== null
+        );
+        if (manual) {
+            return {
+                horasExtra: Formatters.redondearHoras(manual.horasExtraQuincenaManual || 0),
+                horasExtraFeriado: Formatters.redondearHoras(manual.horasExtraFeriadosQuincenaManual || 0),
+                usaManual: true
+            };
+        }
+
+        let horasExtra = 0;
+        let horasExtraFeriado = 0;
+        asistencias.forEach(asist => {
+            if (asist.tipoDia === CONFIG.TIPOS_DIA.FERIADO_TRABAJADO) {
+                if (asist.horasExtra && asist.horasExtra > 0) {
+                    horasExtraFeriado += asist.horasExtra;
+                }
+            } else {
+                horasExtra += asist.horasExtra || 0;
+            }
+        });
+        return {
+            horasExtra: Formatters.redondearHoras(horasExtra),
+            horasExtraFeriado: Formatters.redondearHoras(horasExtraFeriado),
+            usaManual: false
+        };
+    },
+
+    /**
      * Calcula estadísticas de un período de planilla
      * @param {array} empleados - Array de objetos de empleados con sus cálculos
      * @returns {object} Totales y estadísticas
