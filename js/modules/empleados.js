@@ -653,7 +653,7 @@ const EmpleadosModule = {
                                         placeholder="Ej: 12, EMP001, ...">
                                     <div class="form-help">
                                         Número o código que identifica a este empleado en el reloj marcador.
-                                        Se usa para encontrarlo al importar el Excel de tardías.
+                                        Al importar el Excel, el sistema lo busca solo por este ID, no por el nombre.
                                     </div>
                                 </div>
                             </div>
