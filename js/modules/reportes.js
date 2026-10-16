@@ -86,11 +86,12 @@ const ReportesModule = {
                     <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
                         <h3 class="font-semibold text-blue-900 mb-2 text-sm">Formato esperado del Excel:</h3>
                         <ul class="text-sm text-blue-800 space-y-1">
-                            <li><strong>Columna 1:</strong> ID de Usuario</li>
-                            <li><strong>Columna 2:</strong> Nombre del empleado</li>
+                            <li><strong>Columna 1:</strong> ID de usuario del reloj. Es la única clave para identificar al empleado.</li>
+                            <li><strong>Columna 2:</strong> Nombre del empleado (solo informativo; no se usa para buscarlo)</li>
                             <li><strong>Columna 3:</strong> Fecha y hora (DD-MM-YYYY HH:MM:SS, con a.m./p.m. o tipo fecha de Excel)</li>
                             <li><strong>Columna 4:</strong> Estado (0 = entrada, 1 = salida)</li>
                         </ul>
+                        <p class="text-sm text-blue-800 mt-2">El ID de la columna 1 debe coincidir con el <strong>ID en el Reloj Marcador</strong> de la ficha del empleado.</p>
                     </div>
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -163,66 +164,42 @@ const ReportesModule = {
         }
     },
 
-    // Construye un map de empleados del Excel → empleado del sistema + horario
-    _construirMatchings(data, empleados) {
-        const normalizarNombre = (str) => {
-            if (!str || typeof str !== 'string') return '';
-            return str.trim().toLowerCase()
-                .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-                .replace(/\s+/g, ' ');
-        };
+    /**
+     * Normaliza el ID del reloj para comparar el Excel con la ficha del empleado.
+     * Ignora espacios, mayúsculas y el ".0" que Excel agrega a los números.
+     * Los IDs solo numéricos se comparan sin ceros a la izquierda (7 = 007 = 7.0).
+     */
+    normalizarIdReloj(valor) {
+        if (valor == null) return '';
+        let s = String(valor).trim();
+        if (!s || s === 'undefined' || s === 'null') return '';
+        if (/^\d+\.0+$/.test(s)) s = s.replace(/\.0+$/, '');
+        s = s.replace(/[\s,]/g, '');
+        if (/^\d+$/.test(s)) s = String(parseInt(s, 10));
+        return s.toLowerCase();
+    },
 
+    _indiceEmpleadosPorIdReloj(empleados) {
+        const indice = new Map();
+        (empleados || []).forEach(emp => {
+            const id = this.normalizarIdReloj(emp && emp.idUsuarioReloj);
+            if (id && !indice.has(id)) indice.set(id, emp);
+        });
+        return indice;
+    },
+
+    // Construye un map de empleados del Excel → empleado del sistema + horario.
+    // La identificación es únicamente por ID de reloj (columna 1), nunca por nombre.
+    _construirMatchings(data, empleados) {
         const diasSemanaLabels = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
         const diasSemanaKeys  = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
 
-        // Construir mapa de empleados del sistema
-        const empMap = {};
-        const agregarAlMapa = (key, emp) => {
-            if (!key) return;
-            const k = normalizarNombre(String(key));
-            if (k && !empMap[k]) empMap[k] = emp;
-        };
-        empleados.forEach(emp => {
-            const cedula = (emp.cedula || '').toString().replace(/[-\s]/g, '');
-            const nombre = (emp.nombre || '').toString().trim();
-            if (cedula) empMap[cedula] = emp;
-            agregarAlMapa(nombre, emp);
-            if (nombre) {
-                empMap[nombre.toLowerCase()] = emp;
-                const partes = nombre.split(/\s+/).filter(Boolean);
-                if (partes.length >= 2) {
-                    const ultima = partes[partes.length - 1];
-                    const resto = partes.slice(0, -1).join(' ');
-                    agregarAlMapa(ultima + ' ' + resto, emp);
-                    agregarAlMapa(resto + ' ' + ultima, emp);
-                }
-            }
-            if (emp.idUsuarioReloj != null) empMap[String(emp.idUsuarioReloj).trim()] = emp;
-        });
+        const indicePorId = this._indiceEmpleadosPorIdReloj(empleados);
 
-        const buscarEmpleado = (nombreExcel, idExcel) => {
-            const n = (nombreExcel || '').toString().trim();
-            const id = idExcel != null ? String(idExcel).trim() : '';
-            let emp = empMap[normalizarNombre(n)] || empMap[n.toLowerCase()];
-            if (emp) return emp;
-            if (id) { emp = empMap[id] || empMap[id.replace(/[-\s]/g, '')]; if (emp) return emp; }
-            if (n.includes(',')) {
-                const [ap, no] = n.split(',').map(s => s.trim());
-                if (ap && no) { emp = empMap[normalizarNombre(no + ' ' + ap)] || empMap[normalizarNombre(ap + ' ' + no)]; if (emp) return emp; }
-            }
-            const partes = n.split(/\s+/).filter(Boolean);
-            if (partes.length >= 2) {
-                const ul = partes[partes.length - 1], re = partes.slice(0, -1).join(' ');
-                emp = empMap[normalizarNombre(ul + ' ' + re)] || empMap[normalizarNombre(re + ' ' + ul)];
-                if (emp) return emp;
-            }
-            const nNorm = normalizarNombre(n);
-            for (const e of empleados) {
-                const ns = normalizarNombre((e.nombre || '').toString());
-                if (!ns) continue;
-                if (ns === nNorm || ns.includes(nNorm) || nNorm.includes(ns)) return e;
-            }
-            return null;
+        const buscarEmpleadoPorId = (idExcel) => {
+            const id = this.normalizarIdReloj(idExcel);
+            if (!id) return null;
+            return indicePorId.get(id) || null;
         };
 
         const horaFallback = (CONFIG.getJornadaByCodigo && CONFIG.getJornadaByCodigo('diurna')?.horarioEntrada) || '08:00';
@@ -258,17 +235,18 @@ const ReportesModule = {
         let filasSaltadas = 0;
         const registros = data.slice(1);
         registros.forEach(row => {
-            if (!row || row.length < 2) { filasSaltadas++; return; }
-            const idUsuario = row[0] != null ? String(row[0]).trim() : '';
+            if (!row || !row.length) { filasSaltadas++; return; }
+            const idUsuario = this.normalizarIdReloj(row[0]);
             const nombre = row[1] != null ? String(row[1]).trim() : '';
-            if (!nombre) { filasSaltadas++; return; }
+            if (!idUsuario && !nombre) { filasSaltadas++; return; }
             const claveExcel = idUsuario || nombre;
             if (!personasExcel[claveExcel]) personasExcel[claveExcel] = { idUsuario, nombre, registros: 0 };
             personasExcel[claveExcel].registros++;
+            if (nombre && !personasExcel[claveExcel].nombre) personasExcel[claveExcel].nombre = nombre;
         });
 
         const matchings = Object.values(personasExcel).map(p => {
-            const emp = buscarEmpleado(p.nombre, p.idUsuario);
+            const emp = buscarEmpleadoPorId(p.idUsuario);
             return {
                 idExcel: p.idUsuario,
                 nombreExcel: p.nombre,
@@ -308,7 +286,7 @@ const ReportesModule = {
                 : '<svg class="w-4 h-4 text-yellow-500 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>';
             return `
                 <tr class="${rowBg}">
-                    <td class="px-3 py-2 text-sm">${icon} ${m.nombreExcel}</td>
+                    <td class="px-3 py-2 text-sm">${icon} ${m.nombreExcel || '—'}</td>
                     <td class="px-3 py-2 text-sm text-gray-500">${m.idExcel || '—'}</td>
                     <td class="px-3 py-2 text-sm">${m.empleadoSistema ? m.empleadoSistema.nombre : '<span class="text-yellow-600">No encontrado</span>'}</td>
                     <td class="px-3 py-2 text-sm">${badgeFuente(m.horario)}</td>
@@ -329,8 +307,8 @@ const ReportesModule = {
 
                 ${noEncontrados > 0 ? `
                 <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4 text-sm text-yellow-800">
-                    Los empleados marcados en amarillo no fueron encontrados en el sistema. Se usará horario fallback (${(CONFIG.getJornadaByCodigo && CONFIG.getJornadaByCodigo('diurna')?.horarioEntrada) || '08:00'}).
-                    Verifique que el nombre en el Excel coincida con el nombre en el módulo de Empleados, o asigne un <strong>ID de reloj</strong> al empleado.
+                    Los empleados marcados en amarillo no se identificaron por su ID de reloj. Se usará horario fallback (${(CONFIG.getJornadaByCodigo && CONFIG.getJornadaByCodigo('diurna')?.horarioEntrada) || '08:00'}).
+                    El nombre del Excel no se usa para buscar. Asigne en Empleados el <strong>ID en el Reloj Marcador</strong> igual al ID de la columna 1.
                 </div>` : ''}
 
                 <div class="overflow-x-auto rounded-lg border border-gray-200">
@@ -419,16 +397,9 @@ const ReportesModule = {
     async analizarTardias(data, horaEsperadaPorDefecto, toleranciaMinutos, empleadosCargados, matchingsPrevios) {
         if (!data || data.length < 2) throw new Error('El archivo Excel no contiene datos válidos');
 
-        const normalizarNombre = (str) => {
-            if (!str || typeof str !== 'string') return '';
-            return str.trim().toLowerCase()
-                .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-                .replace(/\s+/g, ' ');
-        };
-
         const empleados = empleadosCargados || await FirebaseHelpers.getEmpleados();
 
-        // Mapa rápido por claveExcel → empleado del sistema (reutiliza matchings previos si existen)
+        // Mapa rápido por ID de reloj → empleado del sistema (reutiliza matchings previos si existen)
         const claveExcelAEmpleado = {};
         if (matchingsPrevios) {
             matchingsPrevios.forEach(m => {
@@ -436,49 +407,15 @@ const ReportesModule = {
                 claveExcelAEmpleado[clave] = m.empleadoSistema || null;
             });
         } else {
-            // Construir mapa completo de búsqueda
-            const empMap = {};
-            const agregarAlMapa = (key, emp) => {
-                if (!key) return;
-                const k = normalizarNombre(String(key));
-                if (k && !empMap[k]) empMap[k] = emp;
-            };
-            empleados.forEach(emp => {
-                const cedula = (emp.cedula || '').toString().replace(/[-\s]/g, '');
-                const nombre = (emp.nombre || '').toString().trim();
-                if (cedula) empMap[cedula] = emp;
-                agregarAlMapa(nombre, emp);
-                if (nombre) {
-                    empMap[nombre.toLowerCase()] = emp;
-                    const partes = nombre.split(/\s+/).filter(Boolean);
-                    if (partes.length >= 2) {
-                        const ul = partes[partes.length - 1], re = partes.slice(0, -1).join(' ');
-                        agregarAlMapa(ul + ' ' + re, emp);
-                        agregarAlMapa(re + ' ' + ul, emp);
-                    }
-                }
-                if (emp.idUsuarioReloj != null) empMap[String(emp.idUsuarioReloj).trim()] = emp;
-            });
-
-            const buscar = (n, id) => {
-                let emp = empMap[normalizarNombre(n)] || empMap[n.toLowerCase()];
-                if (emp) return emp;
-                if (id) { emp = empMap[id] || empMap[id.replace(/[-\s]/g, '')]; if (emp) return emp; }
-                const nNorm = normalizarNombre(n);
-                for (const e of empleados) {
-                    const ns = normalizarNombre((e.nombre || '').toString());
-                    if (ns && (ns === nNorm || ns.includes(nNorm) || nNorm.includes(ns))) return e;
-                }
-                return null;
-            };
+            const indicePorId = this._indiceEmpleadosPorIdReloj(empleados);
 
             data.slice(1).forEach(row => {
-                if (!row || row.length < 2) return;
-                const id = row[0] != null ? String(row[0]).trim() : '';
+                if (!row || !row.length) return;
+                const id = this.normalizarIdReloj(row[0]);
                 const nombre = row[1] != null ? String(row[1]).trim() : '';
                 const clave = id || nombre;
                 if (clave && !(clave in claveExcelAEmpleado)) {
-                    claveExcelAEmpleado[clave] = buscar(nombre, id);
+                    claveExcelAEmpleado[clave] = id ? (indicePorId.get(id) || null) : null;
                 }
             });
         }
@@ -559,10 +496,10 @@ const ReportesModule = {
         const porEmpleadoYFecha = {};
         data.slice(1).forEach(row => {
             if (!row || row.length < 4) return;
-            const idUsuario = row[0] != null ? String(row[0]).trim() : '';
+            const idUsuario = this.normalizarIdReloj(row[0]);
             const nombre = row[1] != null ? String(row[1]).trim() : '';
             const estadoRaw = row[3] != null ? String(row[3]).trim() : '';
-            if (!nombre) return;
+            if (!idUsuario && !nombre) return;
 
             const fh = normalizarFechaHora(row[2]);
             if (!fh || !fh.fecha) return;
@@ -609,7 +546,7 @@ const ReportesModule = {
             if (!tardiasMap[c]) {
                 tardiasMap[c] = {
                     idUsuario: item.idUsuario,
-                    nombre: item.nombre,
+                    nombre: empleado?.nombre || item.nombre || item.idUsuario,
                     cedula: empleado?.cedula || 'N/A',
                     empleadoEnSistema: empleado || null,
                     horarioEntrada: esDiaLibre ? null : horaEsperada,
@@ -870,8 +807,8 @@ const ReportesModule = {
                             <tbody class="divide-y divide-gray-100">${filas}</tbody>
                         </table>
                         <p class="px-4 py-3 text-xs text-yellow-700 bg-yellow-50 border-t border-yellow-200">
-                            Para que el sistema encuentre a estos empleados, asegúrese de que el nombre en el Excel coincida con el del sistema,
-                            o asigne el ID de reloj del empleado en el módulo Empleados.
+                            Para que el sistema encuentre a estos empleados, el ID de la columna 1 del Excel debe ser igual
+                            al ID en el Reloj Marcador de la ficha en Empleados. El nombre no se usa para identificarlos.
                         </p>
                     </div>
                 </div>`;

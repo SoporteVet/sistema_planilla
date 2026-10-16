@@ -559,7 +559,9 @@ cd functions && npm install && firebase deploy --only functions</pre>
 
         data.slice(1).forEach(row => {
             if (!row || row.length < 4) return;
-            const id = row[0] != null ? String(row[0]).trim() : '';
+            const id = (typeof ReportesModule !== 'undefined' && ReportesModule.normalizarIdReloj)
+                ? ReportesModule.normalizarIdReloj(row[0])
+                : (row[0] != null ? String(row[0]).trim() : '');
             const nombre = row[1] != null ? String(row[1]).trim() : '';
             const clave = id || nombre;
             if (!clave) return;
