@@ -574,12 +574,17 @@ cd functions && npm install && firebase deploy --only functions</pre>
             const estado = estadoMatch ? estadoMatch[1] : estadoRaw;
 
             if (!porEmpleado[clave]) {
+                const empleado = claveAEmpleado[clave] || null;
                 porEmpleado[clave] = {
                     idUsuario: id,
-                    nombre,
-                    empleado: claveAEmpleado[clave] || null,
+                    nombre: (typeof ReportesModule !== 'undefined' && ReportesModule.nombreVisibleReporte)
+                        ? ReportesModule.nombreVisibleReporte(empleado, nombre, id)
+                        : (empleado?.nombre || nombre || id),
+                    empleado,
                     dias: {}
                 };
+            } else if (nombre && !porEmpleado[clave].nombre) {
+                porEmpleado[clave].nombre = nombre;
             }
 
             const diaKey = fh.fecha;
@@ -688,7 +693,7 @@ cd functions && npm install && firebase deploy --only functions</pre>
                     <div class="bg-gray-50 px-4 py-3 flex justify-between items-center cursor-pointer hover:bg-gray-100"
                         onclick="document.getElementById('${idDiv}').classList.toggle('hidden')">
                         <div>
-                            <span class="font-semibold text-gray-800">${emp.nombre}</span>
+                            <span class="font-semibold text-gray-800">${emp.nombre || emp.idUsuario || '—'}</span>
                             ${horasEmp ? `<span class="ml-2 text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700">${horasEmp.totalHoras}h trabajadas</span>` : ''}
                         </div>
                         <div class="flex items-center gap-2">
@@ -745,7 +750,7 @@ cd functions && npm install && firebase deploy --only functions</pre>
             ['REPORTE ASISTENCIA - ASISTENTE IA'],
             ['Tolerancia:', tardias.toleranciaMinutos + ' min'],
             [],
-            ['Nombre', 'Cédula', 'Fecha', 'Entrada', 'Esperada', 'Tardía (min)', 'Estado', 'Horas día', 'Total horas emp.']
+            ['Nombre', 'ID', 'Cédula', 'Fecha', 'Entrada', 'Esperada', 'Tardía (min)', 'Estado', 'Horas día', 'Total horas emp.']
         ];
 
         tardias.detalleTodos.forEach(emp => {
@@ -754,7 +759,8 @@ cd functions && npm install && firebase deploy --only functions</pre>
             (emp.diasAnalizados || []).forEach(d => {
                 const horasDia = horasEmp?.detalleDias?.find(hd => hd.fecha === d.fecha);
                 data.push([
-                    emp.nombre,
+                    emp.nombre || '',
+                    emp.idUsuario || '',
                     emp.cedula,
                     d.fecha,
                     d.horaEntrada,
@@ -769,7 +775,7 @@ cd functions && npm install && firebase deploy --only functions</pre>
 
         const wb = XLSX.utils.book_new();
         const ws = XLSX.utils.aoa_to_sheet(data);
-        ws['!cols'] = [{ wch: 30 }, { wch: 15 }, { wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 10 }, { wch: 12 }];
+        ws['!cols'] = [{ wch: 30 }, { wch: 12 }, { wch: 15 }, { wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 10 }, { wch: 12 }];
         XLSX.utils.book_append_sheet(wb, ws, 'Asistencia IA');
 
         const fecha = Formatters.formatearFechaArchivo?.(new Date()) || new Date().toISOString().split('T')[0];

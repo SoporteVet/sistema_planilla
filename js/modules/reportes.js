@@ -179,6 +179,20 @@ const ReportesModule = {
         return s.toLowerCase();
     },
 
+    /**
+     * Nombre que se muestra en el reporte final.
+     * Se identifica por ID, pero el título siempre es el nombre de la persona
+     * (ficha del sistema, o el del Excel si aún no está en el sistema).
+     */
+    nombreVisibleReporte(empleado, nombreExcel, idUsuario) {
+        const delSistema = empleado && String(empleado.nombre || empleado.nombreEmpleado || '').trim();
+        if (delSistema) return delSistema;
+        const delExcel = String(nombreExcel || '').trim();
+        if (delExcel) return delExcel;
+        const id = this.normalizarIdReloj(idUsuario);
+        return id ? `ID ${id}` : 'Sin nombre';
+    },
+
     _indiceEmpleadosPorIdReloj(empleados) {
         const indice = new Map();
         (empleados || []).forEach(emp => {
@@ -513,6 +527,7 @@ const ReportesModule = {
             const claveEmp = idUsuario || nombre;
             const clave = claveEmp + '|||' + fecha;
             if (!porEmpleadoYFecha[clave]) porEmpleadoYFecha[clave] = { idUsuario, nombre, claveEmp, marcas: [] };
+            if (nombre && !porEmpleadoYFecha[clave].nombre) porEmpleadoYFecha[clave].nombre = nombre;
             porEmpleadoYFecha[clave].marcas.push({ estado, horaStr, min: parsed.minutosDesdeMedianoche });
         });
 
@@ -537,7 +552,12 @@ const ReportesModule = {
                 ? claveExcelAEmpleado[item.claveEmp]
                 : null;
 
-            if (!empleado) noEncontradosSet[item.claveEmp] = { nombreExcel: item.nombre, idExcel: item.idUsuario };
+            if (!empleado) {
+                noEncontradosSet[item.claveEmp] = {
+                    nombreExcel: this.nombreVisibleReporte(null, item.nombre, item.idUsuario),
+                    idExcel: item.idUsuario
+                };
+            }
 
             const horaEsperada = getHoraEsperada(empleado, fecha);
             const esDiaLibre = horaEsperada === null;
@@ -546,13 +566,17 @@ const ReportesModule = {
             if (!tardiasMap[c]) {
                 tardiasMap[c] = {
                     idUsuario: item.idUsuario,
-                    nombre: empleado?.nombre || item.nombre || item.idUsuario,
+                    nombre: this.nombreVisibleReporte(empleado, item.nombre, item.idUsuario),
+                    nombreExcel: item.nombre || '',
                     cedula: empleado?.cedula || 'N/A',
                     empleadoEnSistema: empleado || null,
                     horarioEntrada: esDiaLibre ? null : horaEsperada,
                     tardias: [],
                     diasAnalizados: []
                 };
+            } else if (item.nombre && !tardiasMap[c].nombreExcel) {
+                tardiasMap[c].nombreExcel = item.nombre;
+                tardiasMap[c].nombre = this.nombreVisibleReporte(empleado, item.nombre, item.idUsuario);
             }
 
             const diaInfo = getDiaKeyFromFecha(fecha);
@@ -607,7 +631,10 @@ const ReportesModule = {
         detalleTardias.sort((a, b) => b.tardias.length - a.tardias.length);
 
         const detalleTodos = Object.values(tardiasMap);
-        detalleTodos.sort((a, b) => b.tardias.length - a.tardias.length);
+        detalleTodos.sort((a, b) => {
+            if (b.tardias.length !== a.tardias.length) return b.tardias.length - a.tardias.length;
+            return String(a.nombre || '').localeCompare(String(b.nombre || ''), 'es', { sensitivity: 'base' });
+        });
 
         return {
             totalRegistros: data.length - 1,
@@ -745,7 +772,7 @@ const ReportesModule = {
                         onclick="document.getElementById('${idDiv}').classList.toggle('hidden')">
                         <div>
                             <div class="flex items-center gap-2">
-                                <span class="font-semibold text-gray-800">${emp.nombre}</span>
+                                <span class="font-semibold text-gray-800">${emp.nombre || emp.nombreExcel || '—'}</span>
                                 ${badgeHorario(enSistema)}
                                 ${!enSistema ? '<span class="text-xs px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700">No en sistema</span>' : ''}
                             </div>
@@ -782,7 +809,7 @@ const ReportesModule = {
         if (noEncontrados.length > 0) {
             const filas = noEncontrados.map(ne => `
                 <tr>
-                    <td class="px-3 py-2 text-sm text-yellow-800">${ne.nombreExcel}</td>
+                    <td class="px-3 py-2 text-sm text-yellow-800">${ne.nombreExcel || '—'}</td>
                     <td class="px-3 py-2 text-sm text-gray-500">${ne.idExcel || '—'}</td>
                     <td class="px-3 py-2 text-xs text-gray-400">Se usó fallback (${resultados.horaEsperadaPorDefecto})</td>
                 </tr>`).join('');
@@ -839,13 +866,14 @@ const ReportesModule = {
                 ['Con Horario Personalizado:', r.conHorarioPersonalizado],
                 ['Sin Horario Personalizado:', r.sinHorarioPersonalizado],
                 [],
-                ['Nombre', 'Cédula', 'Fecha', 'Día', 'Hora Entrada', 'Hora Esperada', 'Minutos Retraso', 'Estado']
+                ['Nombre', 'ID', 'Cédula', 'Fecha', 'Día', 'Hora Entrada', 'Hora Esperada', 'Minutos Retraso', 'Estado']
             ];
 
             r.detalleTodos.forEach(emp => {
                 (emp.diasAnalizados || emp.tardias).forEach(d => {
                     data.push([
-                        emp.nombre,
+                        emp.nombre || emp.nombreExcel || '',
+                        emp.idUsuario || '',
                         emp.cedula,
                         d.fecha,
                         d.dia || '',
@@ -865,7 +893,7 @@ const ReportesModule = {
             const wb = XLSX.utils.book_new();
             const ws = XLSX.utils.aoa_to_sheet(data);
             ws['!cols'] = [
-                { wch: 30 }, { wch: 15 }, { wch: 14 }, { wch: 12 },
+                { wch: 30 }, { wch: 12 }, { wch: 15 }, { wch: 14 }, { wch: 12 },
                 { wch: 14 }, { wch: 16 }, { wch: 16 }, { wch: 10 }
             ];
             XLSX.utils.book_append_sheet(wb, ws, 'Tardías');
